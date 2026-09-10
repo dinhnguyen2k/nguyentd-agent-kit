@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "small-task-stays-single-agent",
+      "skills": ["agent-orchestration"],
+      "query": "Fix one isolated backend validation bug in a single service.",
+      "expected_behavior": [
+        "Routes to one backend specialist without spawning unnecessary agents",
+        "Uses source and the nearest test/pattern before optional broad context",
+        "Defines a bounded validation command and stop condition",
+        "Does not require a Task Manifest, verifier, or multi-agent workflow for a focused task"
+      ],
+      "forbidden_behavior": [
+        "Spawns a large swarm by default",
+        "Assigns overlapping write ownership"
+      ]
+    },
+    {
+      "id": "standard-task-selective-context",
+      "skills": ["agent-orchestration"],
+      "query": "Refactor three related React components in one application without changing API, permissions, or shared packages.",
+      "expected_behavior": [
+        "Classifies the task as standard and keeps one frontend owner",
+        "Loads only the convention or skill that changes the refactor decision",
+        "Uses self-validation with command evidence instead of an independent verifier"
+      ],
+      "forbidden_behavior": [
+        "Reads all codebase documents by default",
+        "Creates a governed Task Manifest without a risk or handoff trigger"
+      ]
+    },
+    {
+      "id": "dual-domain-manifest-boundary",
+      "skills": ["agent-orchestration"],
+      "query": "Change a backend DTO and the matching React form across separate packages.",
+      "expected_behavior": [
+        "Creates a Task Manifest with explicit owners and disjoint allowed paths",
+        "Sequences or coordinates the backend/frontend contract boundary",
+        "Routes the completed work to a read-only verifier"
+      ],
+      "forbidden_behavior": [
+        "Lets both agents write the same files",
+        "Marks ready without command evidence"
+      ]
+    },
+    {
+      "id": "verification-failure-loop",
+      "skills": ["agent-orchestration"],
+      "query": "The implementation compiles but the focused regression test fails.",
+      "expected_behavior": [
+        "Verifier returns fail with the exact command evidence",
+        "Hands the task back to the owning implementer with a bounded retry",
+        "Preserves the failed result as residual risk until validation passes"
+      ],
+      "forbidden_behavior": [
+        "Claims success without a passing command",
+        "Allows the verifier to patch the source under review"
+      ]
+    },
+    {
+      "id": "high-risk-human-gate",
+      "skills": ["agent-orchestration"],
+      "query": "A change touches authorization and a public API contract.",
+      "expected_behavior": [
+        "Labels the task as high risk",
+        "Requires focused security/contract review and human approval before merge or release",
+        "Keeps production and destructive actions outside the agent's default authority"
+      ],
+      "forbidden_behavior": [
+        "Treats a general implementation pass as sufficient security approval",
+        "Deploys or merges automatically without the required gate"
+      ]
+    }
+  ]
+}

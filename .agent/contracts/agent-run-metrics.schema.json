@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cogain.local/agent/agent-run-metrics.schema.json",
+  "title": "Cogain Agent Run Metrics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "tier", "owner", "files_read", "tool_calls", "validation_status"],
+  "properties": {
+    "task_id": { "type": "string", "minLength": 1 },
+    "tier": { "enum": ["fast", "standard", "governed"] },
+    "owner": { "enum": ["backend-specialist", "frontend-specialist", "verifier", "orchestrator"] },
+    "files_read": { "type": "integer", "minimum": 0 },
+    "context_bytes": { "type": "integer", "minimum": 0 },
+    "input_tokens": { "type": "integer", "minimum": 0 },
+    "output_tokens": { "type": "integer", "minimum": 0 },
+    "cache_read_tokens": { "type": "integer", "minimum": 0 },
+    "tool_calls": { "type": "integer", "minimum": 0 },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "validation_status": { "enum": ["pass", "fail", "blocked", "not-run"] },
+    "rework_required": { "type": "boolean" },
+    "notes": { "type": "string" }
+  }
+}

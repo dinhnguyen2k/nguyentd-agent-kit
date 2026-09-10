@@ -1,0 +1,11 @@
+---
+description: Daily dev quick mode (cross-agent)
+argument-hint: [question-or-task]
+---
+Load and apply `.agent/daily_dev_quick.md`.
+
+Always load and follow `AI_RULES.md` as the repository-wide standard rules.
+If present, treat `.agent/rules/GEMINI.md` as an extension layer (must not override `AI_RULES.md`).
+
+User input:
+$ARGUMENTS

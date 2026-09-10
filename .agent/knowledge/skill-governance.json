@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-08",
+  "scope": "Shared local agent system for Claude, Codex, and Antigravity in cogain-core",
+  "activeSkillRoot": ".agent/skills",
+  "quarantineSkillRoot": ".agent/quarantine/skills",
+  "decisions": {
+    "repositoryPolicy": "Keep .agent and harness adapter files local-only under .git/info/exclude unless the owner later chooses a shared internal repo/package.",
+    "publishGate": "No crawler, LLM, or MCP may write canonical SKILL.md content directly. External knowledge must move through evidence, proposal, eval, human approval, then publish.",
+    "socialSources": "LinkedIn, Facebook, forums, and broad feeds are discovery leads only.",
+    "mcpPilot": "Start with Microsoft Learn and GitHub read-only. Add other MCP servers only after a scoped read-only pilot.",
+    "evalCadence": "Run static validation for local changes; run behavior evals nightly and whenever skill/model/MCP behavior changes."
+  },
+  "sourceTiers": [
+    {
+      "tier": "T0",
+      "examples": [
+        "Cogain source code",
+        "tests",
+        "runtime config",
+        "AI_RULES.md"
+      ],
+      "permission": "Source of truth for project behavior"
+    },
+    {
+      "tier": "T1",
+      "examples": [
+        "official docs",
+        "specifications",
+        "release notes",
+        "maintainer repositories"
+      ],
+      "permission": "May create technical change proposals after Cogain applicability checks"
+    },
+    {
+      "tier": "T2",
+      "examples": [
+        "official engineering blogs",
+        "security advisories"
+      ],
+      "permission": "May create review signals and proposals, not unilateral convention changes"
+    },
+    {
+      "tier": "T3",
+      "examples": [
+        "identified founder or senior engineer posts with verifiable examples"
+      ],
+      "permission": "Discovery lead only; must be corroborated with T0 or T1"
+    },
+    {
+      "tier": "T4",
+      "examples": [
+        "LinkedIn",
+        "Facebook",
+        "forums",
+        "general feeds"
+      ],
+      "permission": "Discovery lead only; never direct skill patches"
+    }
+  ],
+  "crawlPolicy": {
+    "publishGate": "evidence -> proposal -> eval -> human approval -> publish",
+    "hardStaleSignals": [
+      "Referenced Cogain path or symbol no longer exists",
+      "Runtime or package major version no longer matches applies_to",
+      "Official deprecation or security advisory affects the skill",
+      "Relative link, script, or reference is broken",
+      "Behavior eval or contradiction eval fails",
+      "Configured model or MCP endpoint is deprecated"
+    ],
+    "softStaleSignals": [
+      "verified_at exceeds TTL",
+      "Official source content hash changes",
+      "Minor or patch version drift touches the skill domain",
+      "New relevant source appears but is unmapped",
+      "Skill has no owner, usage signal, or eval for a full review cycle"
+    ]
+  },
+  "evalCadence": {
+    "localChange": "node .agent/scripts/validate-agent-system.mjs",
+    "nightly": "Run routing and behavior cases across available harnesses.",
+    "skillOrModelChange": "Run static validation plus behavior cases before publishing.",
+    "mcpChange": "Run static validation, provenance checks, and a read-only pilot before enabling."
+  },
+  "mcpPilot": {
+    "first": [
+      {
+        "name": "Microsoft Learn MCP",
+        "mode": "read-only",
+        "purpose": ".NET, ASP.NET Core, EF Core, and Microsoft platform docs"
+      },
+      {
+        "name": "GitHub MCP",
+        "mode": "read-only",
+        "purpose": "Repository, release, issue, and source provenance lookup"
+      }
+    ],
+    "conditional": [
+      "Context7 for allowlisted versioned library docs",
+      "Tavily for discovery-only research",
+      "Sentry inspect-only if operationally configured"
+    ],
+    "blocked": [
+      "Production write tools",
+      "Broad token scopes",
+      "Unknown-provenance sources",
+      "Direct canonical skill writes"
+    ]
+  },
+  "ownerConsolidation": {
+    "api": "api-patterns",
+    "testing": "testing-patterns",
+    "react": "frontend-development",
+    "typescript": "typescript-pro",
+    "database": "postgresql",
+    "planning": "concise-planning"
+  },
+  "quarantinedSkills": [
+    {
+      "name": "agent-coding-standards",
+      "reason": "Meta guidance already carried by AI_RULES.md and clean-code.",
+      "ownerAfterCleanup": "AI_RULES.md"
+    },
+    {
+      "name": "agent-continuous-learning",
+      "reason": "Stub content without executable procedure or reliable freshness model.",
+      "ownerAfterCleanup": "skill-governance"
+    },
+    {
+      "name": "agent-project-guidelines-example",
+      "reason": "Example stack conflicts with Cogain React/Vite and .NET architecture.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "agent-strategic-compact",
+      "reason": "Stub context-management content without a decision-changing procedure.",
+      "ownerAfterCleanup": "AI_RULES.md"
+    },
+    {
+      "name": "api-design-principles",
+      "reason": "Broad principles overlapping api-patterns.",
+      "ownerAfterCleanup": "api-patterns"
+    },
+    {
+      "name": "api-documentation-generator",
+      "reason": "Overlaps api-documenter.",
+      "ownerAfterCleanup": "api-documenter"
+    },
+    {
+      "name": "bash-linux",
+      "reason": "Generic shell guidance outside the Cogain stack.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "bash-pro",
+      "reason": "Generic shell guidance outside the Cogain stack.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "behavioral-modes",
+      "reason": "Mode switching already defined in AI_RULES.md section 2.",
+      "ownerAfterCleanup": "AI_RULES.md"
+    },
+    {
+      "name": "brainstorming",
+      "reason": "Duplicates the /brainstorm workflow and brainstorm skill.",
+      "ownerAfterCleanup": "brainstorm"
+    },
+    {
+      "name": "code-review-excellence",
+      "reason": "Process/mentoring prose; code-review and code-reviewer carry the procedure.",
+      "ownerAfterCleanup": "code-review"
+    },
+    {
+      "name": "cro-expert-kit",
+      "reason": "Marketing/conversion content unrelated to the product surface.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "database-admin",
+      "reason": "Ops/backup/HA content outside current Cogain agent scope.",
+      "ownerAfterCleanup": "postgresql"
+    },
+    {
+      "name": "database-architect",
+      "reason": "Generic DB selection; backend-development routes to postgresql.",
+      "ownerAfterCleanup": "postgresql"
+    },
+    {
+      "name": "database-design",
+      "reason": "Generic schema guidance; postgresql owns Cogain data modeling.",
+      "ownerAfterCleanup": "postgresql"
+    },
+    {
+      "name": "database-migrations-migration-observability",
+      "reason": "Narrow CDC/observability slice; sql-migrations is the live one.",
+      "ownerAfterCleanup": "database-migrations-sql-migrations"
+    },
+    {
+      "name": "docker-expert",
+      "reason": "Container authoring is not current agent scope.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "frontend-developer",
+      "reason": "Broad persona overlaps frontend-development and includes Next.js-only patterns.",
+      "ownerAfterCleanup": "frontend-development"
+    },
+    {
+      "name": "git-collaboration-master",
+      "reason": "Overlaps git-advanced-workflows.",
+      "ownerAfterCleanup": "git-advanced-workflows"
+    },
+    {
+      "name": "incident-response-incident-response",
+      "reason": "Duplicate incident skill with generated name and overlapping ownership.",
+      "ownerAfterCleanup": "incident-responder"
+    },
+    {
+      "name": "infinite-gratitude",
+      "reason": "External workflow stub that assumes multi-agent delegation without local authority.",
+      "ownerAfterCleanup": "strategic-research"
+    },
+    {
+      "name": "javascript-mastery",
+      "reason": "Generic JS tutorial content; Cogain frontend is TypeScript-first.",
+      "ownerAfterCleanup": "typescript-pro"
+    },
+    {
+      "name": "javascript-pro",
+      "reason": "Generic JS runtime content superseded by TypeScript skills.",
+      "ownerAfterCleanup": "typescript-pro"
+    },
+    {
+      "name": "langgraph-engineering",
+      "reason": "LangGraph is not part of the Cogain stack.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "legacy-modernizer",
+      "reason": "No active legacy migration track.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "modern-javascript-patterns",
+      "reason": "ES6+ tutorial content already implied by the TS stack.",
+      "ownerAfterCleanup": "typescript-pro"
+    },
+    {
+      "name": "parallel-agents",
+      "reason": "Parallelism policy belongs to /orchestrate and AI_RULES.md section 7.",
+      "ownerAfterCleanup": "orchestrate"
+    },
+    {
+      "name": "performance-testing-review-multi-agent-review",
+      "reason": "Generated multi-agent review workflow overlaps review and performance skills.",
+      "ownerAfterCleanup": "performance-profiling"
+    },
+    {
+      "name": "plan-writing",
+      "reason": "Third planning variant; concise-planning plus /plan cover it.",
+      "ownerAfterCleanup": "concise-planning"
+    },
+    {
+      "name": "posix-shell-pro",
+      "reason": "Generic shell guidance outside the Cogain stack.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "postgres-best-practices",
+      "reason": "Supabase and Prisma guidance does not match Cogain PostgreSQL/EF Core ownership.",
+      "ownerAfterCleanup": "postgresql"
+    },
+    {
+      "name": "react-best-practices",
+      "reason": "Next.js, RSC, NextAuth, and App Router guidance conflicts with Cogain React/Vite SPAs.",
+      "ownerAfterCleanup": "frontend-development"
+    },
+    {
+      "name": "react-state-management",
+      "reason": "Zustand/Query guidance already owned by cogain-query-cache and react-patterns.",
+      "ownerAfterCleanup": "react-patterns"
+    },
+    {
+      "name": "react-ui-patterns",
+      "reason": "Overlaps react-patterns, the skill frontend-development routes to.",
+      "ownerAfterCleanup": "react-patterns"
+    },
+    {
+      "name": "senior-architect",
+      "reason": "Too broad, multi-stack persona overlaps architecture and project-native routing.",
+      "ownerAfterCleanup": "architecture"
+    },
+    {
+      "name": "subagent-driven-development",
+      "reason": "Overlaps /orchestrate; spawn policy lives in AI_RULES.md section 7.",
+      "ownerAfterCleanup": "orchestrate"
+    },
+    {
+      "name": "tailwind-design-system",
+      "reason": "Overlaps tailwind-patterns, which frontend-development routes to.",
+      "ownerAfterCleanup": "tailwind-patterns"
+    },
+    {
+      "name": "tavily-web",
+      "reason": "Web-search skill superseded by research plus built-in web tools.",
+      "ownerAfterCleanup": "research"
+    },
+    {
+      "name": "testing-automation-mcp",
+      "reason": "Hardcoded MCP automation guidance overlaps Playwright and webapp-testing owners.",
+      "ownerAfterCleanup": "playwright-skill"
+    },
+    {
+      "name": "typescript-advanced-types",
+      "reason": "Type-level tutorial overlapping typescript-pro.",
+      "ownerAfterCleanup": "typescript-pro"
+    },
+    {
+      "name": "typescript-expert",
+      "reason": "Overlaps typescript-pro, which frontend-development already routes to.",
+      "ownerAfterCleanup": "typescript-pro"
+    },
+    {
+      "name": "writing-plans",
+      "reason": "Third planning variant; concise-planning plus /plan cover it.",
+      "ownerAfterCleanup": "concise-planning"
+    },
+    {
+      "name": "writing-skills",
+      "reason": "Meta skill-authoring guidance, not needed in the always-on catalog.",
+      "ownerAfterCleanup": "skill-governance"
+    }
+  ]
+}

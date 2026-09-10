@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "baseservice-select-hook",
+      "skills": ["cogain-baseservice-hooks"],
+      "query": "Add a custom statusCode filter that must work in GetPaged, GetAll and GetDropdown for a Cogain service.",
+      "expected_behavior": [
+        "Inspects BaseService and a nearby override before choosing a seam",
+        "Uses BeforeApplyAutoFilterCoreAsync for the shared paged and non-paged filter",
+        "Preserves BaseService orchestration"
+      ],
+      "forbidden_behavior": [
+        "Overrides GetPaged, GetAll, or GetDropdown to duplicate orchestration",
+        "Invents a hook without checking source"
+      ]
+    },
+    {
+      "id": "baseservice-update-order",
+      "skills": ["cogain-baseservice-hooks"],
+      "query": "Resolve snapshots for newly synchronized child rows during Update.",
+      "expected_behavior": [
+        "Recognizes AfterMappingAsync runs before child synchronization",
+        "Uses AfterReconcileCollectionsAsync when synchronized children must already exist",
+        "Assesses remote-write consistency"
+      ],
+      "forbidden_behavior": ["Assumes AfterMappingAsync can see incoming synchronized children"]
+    },
+    {
+      "id": "child-sync-natural-key",
+      "skills": ["cogain-child-sync"],
+      "query": "Add OperationDetails collection synchronization to ProductionEstimate; payload rows may omit Id.",
+      "expected_behavior": [
+        "Entity implements ISyncsChildren<ProductionEstimate>",
+        "Service overrides BuildIncomingGraph",
+        "Selects a stable natural key and separates mutable fields into onUpdate",
+        "Uses soft-delete without removing tracked required-FK children"
+      ],
+      "forbidden_behavior": [
+        "Adds new ReconcileCollections usage",
+        "Makes the entity depend on DTO types",
+        "Removes missing rows from the navigation collection"
+      ]
+    },
+    {
+      "id": "excel-hook-only",
+      "skills": ["cogain-excel-import-export"],
+      "query": "Customize Product Excel import with batch gRPC lookup and add two template columns.",
+      "expected_behavior": [
+        "Keeps ImportFromExcel orchestration in BaseService",
+        "Uses import/template hooks after checking their current signatures",
+        "Batch-loads gRPC lookup data",
+        "Keeps parser, template, validation, and export columns consistent"
+      ],
+      "forbidden_behavior": ["Overrides ImportFromExcel", "Calls gRPC once per row or cell"]
+    },
+    {
+      "id": "query-invalidation-family",
+      "skills": ["cogain-query-cache"],
+      "query": "After updating a Job, the detail refreshes but paged, all, and dropdown views remain stale.",
+      "expected_behavior": [
+        "Finds the existing Job query-key family and its consumers",
+        "Invalidates the affected stable prefixes including parameter variants",
+        "Avoids a global cache clear"
+      ],
+      "forbidden_behavior": ["Invents unrelated query keys", "Reloads the page to hide stale cache"]
+    },
+    {
+      "id": "form-nullable-hydration",
+      "skills": ["cogain-form-rhf-zod"],
+      "query": "Edit hydration fails because API fromWarehouseId is null while the form schema expects a string.",
+      "expected_behavior": [
+        "Maps API data to form-safe values during reset",
+        "Normalizes empty form values back to the nullable API contract on submit",
+        "Checks schema, form type, API type, reset, and submit mapping together"
+      ],
+      "forbidden_behavior": [
+        "Weakens the form to any",
+        "Changes the backend contract only to satisfy a UI control"
+      ]
+    },
+    {
+      "id": "form-effect-loop",
+      "skills": ["cogain-form-rhf-zod", "cogain-agent-gotchas"],
+      "query": "A watched React Hook Form field is set inside useEffect and causes Maximum update depth exceeded.",
+      "expected_behavior": [
+        "Makes the effect idempotent by comparing getValues before setValue",
+        "Hoists watched values instead of calling watch in dependency expressions",
+        "Adds regression coverage when practical"
+      ],
+      "forbidden_behavior": ["Uses a changing key prop to force remounts as the primary fix"]
+    },
+    {
+      "id": "gotcha-endpoint-verification",
+      "skills": ["cogain-agent-gotchas"],
+      "query": "Create a new frontend query for item-templates/production-order-source.",
+      "expected_behavior": [
+        "Verifies the route exists in backend controllers or existing clients before implementation",
+        "Uses an existing endpoint/local derivation if the proposed route does not exist"
+      ],
+      "forbidden_behavior": ["Implements a client call to an unverified endpoint"]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "estimated_chars_per_token": 4,
+  "base_files": [
+    "AGENTS.md",
+    "AI_RULES.md",
+    "OPINION.md",
+    ".agent/rules/GEMINI.md",
+    ".agent/GEMINI.md",
+    ".agent/START_HERE.md"
+  ],
+  "profiles": {
+    "backend-specialist": {
+      "file": ".agent/agents/backend-specialist.md",
+      "domain_rule": ".agent/rules/backend.md"
+    },
+    "frontend-specialist": {
+      "file": ".agent/agents/frontend-specialist.md",
+      "domain_rule": ".agent/rules/frontend.md"
+    },
+    "verifier": {
+      "file": ".agent/agents/verifier.md",
+      "domain_rule": null
+    }
+  },
+  "core_codebase_files": [
+    ".planning/codebase/STRUCTURE.md",
+    ".planning/codebase/ARCHITECTURE.md",
+    ".planning/codebase/CONVENTIONS.md",
+    ".planning/codebase/STACK.md"
+  ],
+  "limits": {
+    "entrypoint_max_bytes": 6500,
+    "profile_max_bytes": 3000,
+    "fast_max_estimated_tokens": 2400,
+    "standard_max_estimated_tokens": 5000,
+    "governed_core_max_estimated_tokens": 11000
+  }
+}

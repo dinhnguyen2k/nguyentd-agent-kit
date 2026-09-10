@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": 3,
+  "invariants": {
+    "test_authorship_separation": "An agent that writes production code must never create or modify test files, and must never weaken an existing assertion to make a build pass. Test authorship belongs to `test-author` only. Enforced at runtime by `.agent/scripts/agent-boundary-guard.mjs` (rule R2), not by prose.",
+    "execution_role_separation": "Chạy test suite là hành vi nghiệm thu, không phải hành vi triển khai. Agent triển khai xác thực bằng `dotnet build <project>` rồi dừng và bàn giao. Enforced at runtime by rule R1."
+  },
+  "test_paths": [
+    "backend/tests/**",
+    "frontend/**/__tests__/**",
+    "frontend/**/*.test.ts",
+    "frontend/**/*.test.tsx",
+    "frontend/**/*.spec.ts",
+    "frontend/**/*.spec.tsx"
+  ],
+  "protected_config_paths": [
+    ".agent/contracts/agent-registry.json",
+    ".agent/scripts/agent-boundary-guard.mjs",
+    ".agent/scripts/agent-role.sh",
+    ".claude/settings.json",
+    ".claude/settings.local.json",
+    "AI_RULES.md",
+    "OPINION.md"
+  ],
+  "shared_write_paths": [".agent/reports/**", ".agent/scratch/**", ".agent/task-manifests/**"],
+  "enforcement": {
+    "guard": ".agent/scripts/agent-boundary-guard.mjs",
+    "guard_modes": {
+      "hook": "stdin JSON -> JSON quyết định (Claude Code PreToolUse)",
+      "cli": "--check-command <cmd> | --check-write <path> [--role <role>], exit 2 khi bị chặn"
+    },
+    "harness": {
+      "canonical_wiring_dir": ".agent/harness",
+      "installer": ".agent/scripts/install-harness-wiring.sh",
+      "claude": {
+        "wiring": ".agent/harness/claude/settings.json",
+        "symlink": ".claude/settings.json -> ../.agent/harness/claude/settings.json",
+        "enforcement": "hook (cứng)"
+      },
+      "codex": { "enforcement": "CLI mode + prose", "note": "chưa có PreToolUse hook" },
+      "antigravity": { "enforcement": "CLI mode + prose", "note": "chưa có PreToolUse hook" }
+    },
+    "role_state": ".agent/scratch/.runtime/agent-role",
+    "role_control": ".agent/scripts/agent-role.sh",
+    "role_inline": "COGAIN_AGENT_ROLE=<role> đứng đầu dòng lệnh, có hiệu lực cho đúng lệnh đó và luôn hiện trong transcript",
+    "audit_log": ".agent/reports/boundary-guard.log",
+    "default_role": "implementer",
+    "role_ttl_hours": 8,
+    "role_semantics": "State file và inline chỉ CẤP THÊM năng lực (R1/R2). Ràng buộc write_paths (R4) chỉ áp khi role đến từ danh tính subagent thật hoặc env, để không gông nhầm seat đang chạy song song.",
+    "fail_mode": "open-on-crash",
+    "limits": "Guard chặn được nhầm lẫn và thói quen, không chặn được cố ý mạo danh role trong cùng một process. Nó làm việc vượt ranh giới trở nên tường minh và có log, thay vì âm thầm.",
+    "rules": {
+      "test_runner": {
+        "id": "R1",
+        "applies_to": ["Bash"],
+        "allowed_roles": ["verifier", "test-author"],
+        "deny_message": "Permission Denied: Running test suites is strictly reserved for 'verifier' and 'test-author'.",
+        "patterns": [
+          "\\bdotnet\\s+test\\b",
+          "\\bdotnet\\s+.*\\s+test\\b",
+          "\\bvitest\\b",
+          "\\bjest\\b",
+          "\\bplaywright\\s+test\\b",
+          "\\b(npm|pnpm|yarn|npx)\\s+(run\\s+)?test(:|\\s|$)",
+          "\\bpnpm\\s+--filter\\s+\\S+\\s+test\\b"
+        ]
+      },
+      "test_write": {
+        "id": "R2",
+        "applies_to": ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"],
+        "allowed_roles": ["test-author"],
+        "shell_path_markers": [
+          "backend/tests/",
+          "__tests__/",
+          ".test.ts",
+          ".test.tsx",
+          ".spec.ts",
+          ".spec.tsx"
+        ],
+        "shell_mutating_tokens": [
+          "sed -i",
+          "cp ",
+          "mv ",
+          "rm ",
+          "tee ",
+          ">",
+          "truncate",
+          "git checkout",
+          "git restore",
+          "git apply",
+          "patch ",
+          "ln "
+        ]
+      },
+      "self_protect": {
+        "id": "R3",
+        "applies_to": ["Edit", "Write", "MultiEdit", "Bash"],
+        "allowed_roles": ["maintainer"],
+        "shell_matching": "Nhánh Bash bỏ qua `2>&1` và `>/dev/null`, và chỉ tính khi đường dẫn được bảo vệ đứng SAU token ghi. `cat settings.json > /tmp/x` không bị chặn; `sed -i ... settings.json` thì bị.",
+        "known_false_positive": "Đường dẫn được bảo vệ nằm trong chuỗi trích dẫn ĐỨNG SAU một token ghi (ví dụ `sed -i 's|registry.json|...|' file-khac.md`) vẫn bị chặn. Dùng Edit/Write cho file không được bảo vệ, hoặc bật maintainer."
+      },
+      "write_boundary": {
+        "id": "R4",
+        "applies_to": ["Edit", "Write", "MultiEdit", "NotebookEdit"],
+        "note": "write_paths/deny_write_paths chỉ được áp khi một role cụ thể đang bật. Role mặc định `implementer` chỉ chịu R1/R2/R3 để phiên làm việc thường không bị chặn oan."
+      }
+    }
+  },
+  "command_policy": {
+    "note": "Whitelist mô tả ý định; cưỡng chế thật nằm ở enforcement.rules và permissions trong .claude/settings.json.",
+    "build_only": ["dotnet build <project>", "dotnet format style --verify-no-changes", "tsc --noEmit", "eslint <changed files>"],
+    "verification_only": ["dotnet test", "vitest", "playwright test"]
+  },
+  "agents": [
+    {
+      "name": "orchestrator",
+      "profile": null,
+      "kind": "control",
+      "write_paths": [],
+      "deny_write_paths": [],
+      "tools": ["Read", "Grep", "Glob", "Bash"],
+      "skills": ["orchestrate"],
+      "commands": { "allow": [], "deny": ["dotnet test", "dotnet build"] }
+    },
+    {
+      "name": "backend-specialist",
+      "profile": ".agent/agents/backend-specialist.md",
+      "kind": "worker",
+      "write_paths": ["backend/**"],
+      "deny_write_paths": ["backend/tests/**"],
+      "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
+      "skills": ["backend-development"],
+      "commands": {
+        "allow": ["dotnet build <project>", "dotnet format style", "dotnet restore"],
+        "deny": ["dotnet test", "dotnet ef database update"]
+      },
+      "handoff": "Build xanh -> dừng và bàn giao cho verifier. Không tự nghiệm thu."
+    },
+    {
+      "name": "frontend-specialist",
+      "profile": ".agent/agents/frontend-specialist.md",
+      "kind": "worker",
+      "write_paths": ["frontend/**"],
+      "deny_write_paths": [
+        "frontend/**/__tests__/**",
+        "frontend/**/*.test.ts",
+        "frontend/**/*.test.tsx",
+        "frontend/**/*.spec.ts",
+        "frontend/**/*.spec.tsx"
+      ],
+      "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
+      "skills": ["frontend-development"],
+      "commands": {
+        "allow": ["tsc --noEmit", "eslint <changed files>", "vite build"],
+        "deny": ["vitest", "playwright test"]
+      },
+      "handoff": "Typecheck/lint xanh -> dừng và bàn giao cho verifier."
+    },
+    {
+      "name": "test-author",
+      "profile": ".agent/agents/test-author.md",
+      "kind": "worker",
+      "write_paths": [
+        "backend/tests/**",
+        "frontend/**/__tests__/**",
+        "frontend/**/*.test.ts",
+        "frontend/**/*.test.tsx",
+        "frontend/**/*.spec.ts",
+        "frontend/**/*.spec.tsx"
+      ],
+      "deny_write_paths": ["backend/src/**", "frontend/src/**"],
+      "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
+      "skills": ["testing-patterns", "tdd-workflow"],
+      "commands": {
+        "allow": ["dotnet build tests/<Project>", "dotnet test --filter <new tests>", "vitest run <file>"],
+        "deny": ["dotnet test (toàn bộ suite không filter)"]
+      },
+      "parallel_safe_with": ["backend-specialist", "frontend-specialist"],
+      "runtime_registration": "subagent thật: .claude/agents/test-author.md -> ../../.agent/agents/test-author.md"
+    },
+    {
+      "name": "verifier",
+      "profile": ".agent/agents/verifier.md",
+      "kind": "gate",
+      "write_paths": [],
+      "deny_write_paths": ["backend/**", "frontend/**"],
+      "tools": ["Read", "Grep", "Glob", "Bash"],
+      "skills": ["lint-and-validate", "testing-patterns", "code-reviewer"],
+      "commands": {
+        "allow": ["dotnet test", "dotnet format --verify-no-changes", "vitest run", "git stash/diff"],
+        "deny": ["mọi lệnh ghi vào backend/src/** hoặc frontend/src/**"]
+      },
+      "activation": "Chỉ khi người dùng yêu cầu rõ, hoặc /orchestrate phân loại task là governed.",
+      "runtime_registration": "subagent thật: .claude/agents/verifier.md -> ../../.agent/agents/verifier.md. Không có Edit/Write ở tầng runtime, đó là ranh giới cứng thật sự."
+    }
+  ]
+}
