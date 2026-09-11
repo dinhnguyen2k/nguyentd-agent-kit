@@ -16,6 +16,15 @@ $ARGUMENTS
 - Inspect only the source/docs needed to identify current behavior, constraints, and affected boundaries.
 - Use an explorer subagent only when codebase discovery is substantial, independently scoped, and delegation is available/authorized.
 
+## 🟠 RESEARCH MODE GATE
+
+- Load `.agent/skills/research/SKILL.md` before web research.
+- Set `mode: FOCUSED` by default and read only `.agent/skills/research/references/focused.md`.
+- Before browsing, create one research brief with one decision, at most 3 decision-changing questions, relevant constraints, and explicit exclusions.
+- If the request reduces to one isolated factual question, stop this workflow and route it to `mode: LOOKUP`.
+- DO NOT escalate to `mode: DEEP` unless the user explicitly requests deep research.
+- Source budgets are upper bounds, not completion targets; stop as soon as the decision-changing claims have sufficient evidence.
+
 ## 🟡 PHASE 2+3: Ideation & Self-Critique
 
 - Develop 2-3 materially distinct options. Parallelize one option per agent only when the option lanes are independent and delegation is justified:

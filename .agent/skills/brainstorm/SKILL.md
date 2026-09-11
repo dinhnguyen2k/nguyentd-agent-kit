@@ -21,6 +21,10 @@ Chọn phương án phù hợp nhất với bối cảnh thật, không biến c
 ### 2. Research Gate
 
 - Trước khi tạo option, nạp và dùng `.agent/skills/research/SKILL.md`; không bỏ qua gate khi delegation không khả dụng.
+- Set `mode: FOCUSED` by default and read only `.agent/skills/research/references/focused.md`.
+- Before browsing, create one research brief with one decision, at most 3 decision-changing questions, relevant constraints, and explicit exclusions.
+- If the request reduces to one isolated factual question, stop the brainstorm flow and route it to `mode: LOOKUP`.
+- DO NOT escalate to `mode: DEEP` unless the user explicitly requests deep research.
 - Với trade-off thực tế, yêu cầu cả primary evidence và case từ blog/talk/GitHub của practitioner trực tiếp xây dựng hoặc vận hành hệ thống tương tự.
 - Dùng web để kiểm tra thông tin hiện hành, tìm counterexample và phân biệt `fact`, `reported experience`, `inference`, `open question`.
 - Chỉ đọc [evidence-review.md](references/evidence-review.md) khi rủi ro cao, nguồn mâu thuẫn, credibility ảnh hưởng kết luận hoặc user yêu cầu nghiên cứu sâu.
