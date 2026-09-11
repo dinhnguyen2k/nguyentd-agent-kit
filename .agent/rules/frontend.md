@@ -117,7 +117,7 @@ glob: "frontend/**/*"
 
 ---
 
-## 12. Lint-Aware Authoring & Cổng Validation
+## 12. Frontend Execution Gate
 
 ### 12.1. Viết Code Theo Lint (BẮT BUỘC)
 1. `eslint.config.js` và `tsconfig.eslint.json` của app là source of truth.
@@ -134,22 +134,25 @@ glob: "frontend/**/*"
    - Không thêm `eslint-disable`/`@ts-ignore` trừ khi không có giải pháp đúng hơn; scope
      nhỏ nhất, nêu lý do và rule bị disable.
 
-### 12.2. Lint Theo Phạm Vi (BẮT BUỘC)
-1. Không chạy `pnpm --filter <app> lint` toàn app sau mỗi edit nhỏ.
-   Với thay đổi cục bộ `.ts`/`.tsx`, chạy một lần lint chỉ các file đã đổi:
-   `pnpm --filter <app> exec eslint <đường-dẫn-file-tương-đối-app> [...]`.
-2. Nếu lint lỗi, sửa đúng nguyên nhân rồi chỉ chạy lại cùng scope; không lặp lint toàn app.
-3. Chạy lint toàn app khi thay đổi ESLint/TypeScript config, dependency/build config, shared
-   code ảnh hưởng nhiều app, route generation, hoặc refactor diện rộng. Báo rõ nếu không chạy
-   full lint và lý do scope hẹp là đủ.
+### 12.2. ON-DEMAND ONLY - HARD RULE
 
-### 12.3. Validation
+1. **DO NOT RUN lint, typecheck, route generation, Vite build, browser checks, or
+   tests automatically.**
+2. Run a frontend validation command only when the user explicitly requests that
+   validation action by name, such as `lint`, `typecheck`, `build`, `/test`, or `/verify`.
+3. `fix`, `implement`, `finish`, `done`, `check`, governed classification, changed
+   routes, shared files, or handoff requirements do not authorize validation.
+4. When validation is explicitly requested, use the exact requested scope. Do not
+   expand from one app to all apps unless the user explicitly requests `--all`.
+5. **IDEMPOTENT:** run each approved validation command at most once for the same
+   source state. Do not rerun it when relevant inputs have not changed.
 
-Cấm chạy `pnpm --filter <app> build` trực tiếp sau mỗi thay đổi nhỏ ở local.
-Dùng `./frontend/fast-check.sh <app> --quick` (~5s, chỉ bắt lỗi type) trong lúc code,
-và `./frontend/fast-check.sh <app>` (full: routes + typecheck + vite build) BẮT BUỘC
-trước khi báo cáo xong. Không được báo "đã xong" nếu mới chỉ chạy `--quick`.
+### 12.3. Handoff Status
 
-Chi tiết thời gian từng app, giới hạn của quick mode, cờ `--all`, và ghi chú kỹ
-thuật của script: `.agent/rules/frontend-fastcheck.md`.
+- Source changes complete: `Status: implemented`.
+- No explicit validation request: `Validation: not run - not requested`.
+- Validation command completed with evidence: `Status: verified`.
+- **DO NOT block implementation handoff while waiting for an unrequested validation.**
 
+Các mode validation opt-in và cách chọn scope nằm tại
+`.agent/rules/frontend-fastcheck.md`.

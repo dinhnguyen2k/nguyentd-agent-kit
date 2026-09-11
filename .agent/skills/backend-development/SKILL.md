@@ -34,7 +34,8 @@ Load the smallest set that changes the implementation decision. A local task usu
 3. Identify business invariants and downstream consumers before changing behavior.
 4. Follow the closest working pattern unless it conflicts with a current repository rule.
 5. Implement the smallest compatible change and add focused regression coverage.
-6. Run the narrowest useful build/test target, expanding only when impact crosses a service boundary.
+6. **DO NOT RUN build, format, restore, or tests automatically. ON-DEMAND ONLY:**
+   the user must explicitly request the action and scope. Do not expand it by inference.
 
 ## Non-Negotiable Boundaries
 
@@ -47,6 +48,7 @@ Load the smallest set that changes the implementation decision. A local task usu
 ## Verification
 
 - The final implementation follows the current local layer and contract pattern.
-- Relevant tests/builds ran, or the exact unverified gap is stated.
+- Validation status is explicit. Use `not run - not requested` when implementation
+  was requested without validation.
 - Public contract, permission, persistence, and cross-service effects were assessed.
 - Final response follows the report format in `AI_RULES.md`.

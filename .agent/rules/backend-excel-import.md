@@ -127,7 +127,8 @@ Export pipeline:
 
 ## 8. Validation
 
-1. Sau khi sửa, tối thiểu build project Services bị ảnh hưởng với `dotnet build <project> --no-restore -v:minimal`.
+1. **DO NOT RUN build automatically. ON-DEMAND ONLY.** Nếu user yêu cầu build,
+   dùng project Services bị ảnh hưởng với scope nhỏ nhất.
 
 2. Nếu build thường fail do generated/zone files hoặc workspace artifact, ghi rõ command thay thế và warning còn lại.
 3. Với thay đổi mapping/header/lookup, cần kiểm tra thủ công hoặc test case cho:

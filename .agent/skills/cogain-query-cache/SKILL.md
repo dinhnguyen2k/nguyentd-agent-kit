@@ -44,4 +44,5 @@ These are observed patterns, not permission to invent aliases. Preserve existing
 - After create/update/delete, every affected open view converges to server truth without a full reload.
 - Key prefixes match existing producers/consumers.
 - Disabled queries and conditional IDs cannot trigger invalid requests.
-- Target app lint/build and focused hook/component tests pass when available.
+- Validation status follows `.agent/rules/frontend-fastcheck.md`.
+  **DO NOT RUN lint/build/tests unless the user explicitly requests the action.**

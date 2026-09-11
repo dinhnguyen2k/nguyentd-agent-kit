@@ -21,10 +21,16 @@ glob: "**/*"
 
 1. **Tool Call Repetition**: Cấm gọi cùng một Tool với cùng một tham số quá 3 lần liên tiếp nếu kết quả trả về không thay đổi. Phải thay đổi chiến thuật nếu tool thất bại.
 2. **Recursive Depth Limit**: Giới hạn độ sâu khi đọc thư mục hoặc tìm kiếm file là **5 cấp**.
-3. **Heavy Command Safety**: Khi chạy lệnh nặng (như `npm install`, build, test...), phải sử dụng chạy ngầm và kiểm tra status định kỳ. Không chạy lệnh chờ vô hạn không có Timeout.
+3. **HEAVY COMMANDS ARE ON-DEMAND ONLY:** DO NOT RUN install, audit, build, lint,
+   typecheck, test, code generation, or similar expensive commands automatically.
+   The user must explicitly request the action. When authorized, use bounded waits
+   and status polling; never wait indefinitely.
 4. **Step Timeout**: Mỗi bước thực thi (tool call) không kéo dài quá **60 giây**. Nếu tiến trình con bị treo quá 5 phút không có output mới, Agent bắt buộc phải chủ động can thiệp (kill task/zombie process).
 5. **Interactive UI**: Ưu tiên cờ tự động (`--force`, `--skip-prompts`). Nếu CLI yêu cầu tương tác và bị kẹt sau 2 lần thử gõ phím, phải coi là bị treo và dừng tiến trình.
-6. **Build & Test Idempotency (Chống Spam Build)**: Cấm chạy lặp lại các lệnh build/test (`dotnet build`, `dotnet test`, `pnpm build`, v.v.) khi không có thay đổi mã nguồn mới so với lần chạy thành công trước đó trong cùng phiên. Khi build/test đã pass (exit code 0), kết quả đó là bằng chứng hợp lệ; cấm re-run chỉ để "đánh giá lại" nếu source code không đổi.
+6. **IDEMPOTENT BUILD AND TEST:** An explicit authorization permits one run of the
+   requested command and scope for the current relevant source state. DO NOT rerun
+   a successful build/test when relevant inputs have not changed. A failed run does
+   not authorize expanding scope or switching to another heavy command.
 
 ---
 

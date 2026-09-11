@@ -24,7 +24,8 @@ Optimize only after identifying a concrete hot path, allocation pattern, complex
 2. Verify whether the code executes in memory or remains an `IQueryable`; an in-memory optimization can change SQL translation.
 3. Apply the smallest change with measurable or complexity-based benefit.
 4. Preserve ordering, duplicate, null, comparer, and deferred-execution semantics.
-5. Run focused tests/build and, for meaningful performance claims, capture a before/after measurement.
+5. **DO NOT RUN tests/build or benchmarks automatically.** When the user explicitly
+   requests measurement or validation, run only the authorized scope.
 
 The optional scanner reports candidate patterns; it does not prove a bug:
 

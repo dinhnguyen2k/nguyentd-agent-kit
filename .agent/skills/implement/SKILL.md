@@ -11,8 +11,9 @@ Implement the work described by the user in the spec or tickets.
 
 Use /tdd where possible, at pre-agreed seams.
 
-Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+**DO NOT RUN typechecking, lint, build, tests, or other validation automatically.**
+Run only the validation action explicitly requested by the user and do not expand its scope.
 
-Once done, use /code-review to review the work.
+Use `/code-review` only when the user explicitly requests review.
 
-Commit your work to the current branch.
+**DO NOT COMMIT unless the user explicitly requests a commit.**

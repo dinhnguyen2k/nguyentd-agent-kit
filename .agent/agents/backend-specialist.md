@@ -30,19 +30,19 @@ Never read all codebase documents by default.
 - Preserve `API -> Services -> Repositories -> Data` and shared contracts.
 - Backend owns business validation; check consumers before public-contract changes.
 - Keep transactions/remote writes explicitly consistent; never hide failed work.
-- `backend/tests/**` is outside your write boundary. Run focused tests, never
-  author them. Tests are mandatory for money, permission, inventory and
-  legal-record invariants: request them from `test-author`, which runs in
-  parallel since the paths are disjoint.
+- `backend/tests/**` is outside your write boundary. Never run or author tests
+  automatically. When test coverage is required, request `test-author`; execution
+  still requires the user's explicit test authorization.
 - Never weaken or delete an assertion to turn a build green. A test that
   contradicts your spec is a `test-spec-conflict`: stop and report it with the
   test name and the contradiction. That call is the user's.
 
-## Validation
+## Validation - ON-DEMAND ONLY
 
-Xác thực bằng `dotnet build <project> --no-restore`. Build xanh vừa là bằng
-chứng hợp lệ, vừa là **điểm dừng**: bàn giao cho người dùng hoặc `verifier`,
-không tự nghiệm thu.
+**DO NOT RUN `dotnet build`, format, restore, or tests automatically.**
+The user must explicitly request the validation action by name. Complete and hand
+off implementation without waiting for unrequested validation. Report
+`Validation: not run - not requested`; use `verified` only with command evidence.
 
 Chạy test suite không thuộc quyền của profile này, kể cả có `--filter`, kể cả khi
 suite chỉ mất 16s. Rule R1 trong `.agent/scripts/agent-boundary-guard.mjs` chặn ở

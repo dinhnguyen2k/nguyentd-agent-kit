@@ -32,9 +32,9 @@ $ARGUMENTS
 **Mission**: Build UI theo blueprint với thay đổi nhỏ và an toàn.
 - Ưu tiên tái sử dụng pattern/component đang có trong repo.
 - Không introduce framework pattern lệch stack (Next-only patterns, RSC, v.v.).
-- Validate tối thiểu:
-  - `pnpm --filter <target-app> lint`
-  - `pnpm --filter <target-app> build`
+- **DO NOT RUN lint, typecheck, route generation, build, browser checks, or tests
+  automatically. ON-DEMAND ONLY:** the user must explicitly request the validation
+  action by name. Otherwise hand off `Validation: not run - not requested`.
 
 ## 🔴 PHASE 4: Quality Audit & Handoff
 **Execution role**: `verification role`
@@ -47,7 +47,7 @@ $ARGUMENTS
 - Output: `walkthrough.md` gồm:
   - Mục tiêu đã đạt
   - File changed
-  - Kết quả lint/build
+  - Trạng thái validation và command evidence nếu đã chạy
   - Residual risks
 
 ## 🟣 PHASE 5: Orchestrate Mode (Optional)
@@ -57,7 +57,8 @@ $ARGUMENTS
   1. `frontend-specialist`: UI implementation
   2. `verification role`: a11y/perf/review
   3. `testing role` (hoặc workflow `/test`): regression checks
-- Bắt buộc giữ evidence lint/build và cập nhật `walkthrough.md`.
+- Update `walkthrough.md`. A workflow, orchestration tier, or verification role cannot
+  grant frontend validation permission on the user's behalf.
 - Nếu task vượt frontend scope (đụng API/contract), chuyển sang `/orchestrate` tổng với `backend-specialist`.
 
 ---
@@ -72,8 +73,8 @@ $ARGUMENTS
 - Walkthrough: {path}
 
 ### Validation
-- Lint: {pass/fail}
-- Build: {pass/fail}
+- Status: {not run - not requested/pass/fail}
+- Evidence: {command/result nếu đã chạy}
 
 ### Residual Risks
 - {if any}
@@ -85,5 +86,5 @@ $ARGUMENTS
 
 - Không có `UI-SPEC-<slug>.md` (hoặc equivalent update).
 - Không có `walkthrough.md`.
-- Không có kết quả lint/build cho phạm vi đã sửa.
+- Claim `verified` nhưng không có command evidence.
 - Thiết kế đi lệch conventions runtime của repo.

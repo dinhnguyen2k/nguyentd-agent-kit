@@ -3,40 +3,47 @@ trigger: model_decision
 description: "When validating frontend changes, choosing between quick/full check, running or modifying frontend/fast-check.sh, or reporting frontend build results."
 ---
 
-# FRONTEND-FASTCHECK.MD - Cổng Validation Frontend
+# FRONTEND-FASTCHECK.MD - ON-DEMAND ONLY
 
 > Tách từ `.agent/rules/frontend.md` mục 12.3 để không nạp vào mọi lần chạm file frontend.
 
-Công cụ bắt buộc: `./frontend/fast-check.sh` (script local-only, nằm trong
-`.git/info/exclude`, vô hình với Git và DevOps).
+`./frontend/fast-check.sh` is optional and local-only.
 
-Tuyệt đối KHÔNG chạy `pnpm --filter <app> build` trực tiếp sau mỗi thay đổi nhỏ ở
-local: nó chạy tsc cold + bundling production, rất nặng.
+**DO NOT RUN THIS SCRIPT AUTOMATICALLY. ON-DEMAND ONLY.**
+
+- Run it only when the user explicitly requests frontend typecheck or build validation.
+- An agent, skill, workflow, handoff checklist, governed task, or changed route/shared
+  file must not activate it by inference.
+- Always pass the target app explicitly. Do not infer scope from the dirty worktree.
+- Do not use `--all` unless the user explicitly requests all frontend apps.
+- **IDEMPOTENT:** do not repeat the same mode for unchanged relevant inputs.
 
 ## Nấc 1 - Quick Mode
 
-`./frontend/fast-check.sh <app> --quick` - đo thực tế **~5s** (tận dụng TypeScript
-incremental cache). Đây là chế độ MẶC ĐỊNH trong lúc làm việc.
+`./frontend/fast-check.sh <app> --quick` - incremental TypeScript typecheck.
 
 Giới hạn: CHỈ bắt lỗi type. Không bắt được import CSS/asset sai đường dẫn, CJS/ESM
 export mismatch, hay lỗi resolve của TanStack Router. Đó là lỗi tầng Rollup, tsc mù
 hoàn toàn.
 
-## Nấc 2 - Full Mode (BẮT BUỘC trước khi báo cáo xong)
+## Nấc 2 - Full Mode
 
-`./frontend/fast-check.sh <app>` (generate:routes + typecheck + vite build).
+`./frontend/fast-check.sh <app>` (typecheck + Vite build).
 
-Thời gian phụ thuộc mạnh vào từng app: `erp` ~25s, `interactive` ~59s, lần build đầu
-khi cache Vite còn nguội có thể lên ~112s. Đừng hứa với user một con số cố định; app
-lớn thì chạy nền (`run_in_background`).
+Chỉ dùng full mode khi người dùng yêu cầu build/validation có kiểm tra import, CSS,
+asset hoặc module resolution. Thời gian phụ thuộc mạnh vào từng app: `erp` ~25s,
+`interactive` ~59s, lần build đầu khi cache Vite còn nguội có thể lên ~112s.
 
-Đây là chốt chặn duy nhất bắt được lỗi import/CSS/asset/dynamic-import của Vite.
-KHÔNG được báo "đã xong" nếu mới chỉ chạy `--quick`.
+Full mode bắt được lỗi import/CSS/asset/dynamic-import của Vite. Nó không phải điều
+kiện để báo implementation đã hoàn tất.
 
-## Sửa shared hoặc trước khi push
+## Route Generation
 
-`./frontend/fast-check.sh --all --quick` (song song toàn bộ 7 apps trên nhiều nhân
-CPU). Bỏ `--quick` nếu muốn full build toàn bộ apps, chậm hơn đáng kể.
+`./frontend/fast-check.sh <app> --routes` chỉ dùng khi route tree hoặc router config
+thay đổi và người dùng yêu cầu validation. `--quick` không tự generate routes.
+
+`--all` là lựa chọn explicit cho người dùng. Agent không tự dùng `--all` vì thay đổi
+shared hoặc vì không xác định được target app.
 
 ## Ghi chú kỹ thuật (đừng "tối ưu" ngược lại)
 

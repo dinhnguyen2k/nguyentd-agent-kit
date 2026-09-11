@@ -10,7 +10,7 @@
 2. **Security (Bandit):** `bandit -r "path" -ll`
 3. **Types (MyPy):** `mypy "path"`
 
-## The Quality Loop
+## The Quality Loop - Only After Explicit Validation Authorization
 1. **Write/Edit Code**
 2. **Run Audit:** `npm run lint && npx tsc --noEmit`
 3. **Analyze Report:** Check the "FINAL AUDIT REPORT" section.
@@ -22,7 +22,8 @@
 - If no tool is configured: Check the project root for `.eslintrc`, `tsconfig.json`, `pyproject.toml` and suggest creating one.
 
 ---
-**Strict Rule:** No code should be committed or reported as "done" without passing these checks.
+**Strict Rule:** Do not claim a validation passed unless the command actually ran and
+passed. Implementation may be handed off as `implemented - validation not requested`.
 
 ---
 

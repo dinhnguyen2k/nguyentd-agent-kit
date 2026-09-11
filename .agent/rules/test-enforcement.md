@@ -14,12 +14,15 @@ glob: "backend/**/*,frontend/**/*"
 - **Phân định vai trò:** Việc chạy test suite (`dotnet test`) và kiểm chứng tự động thuộc về Agent nghiệm thu (`verifier`).
 - **Trong task phân tích hoặc task triển khai cục bộ/đơn giản:**
   - Agent triển khai (`backend-specialist` / implementer) **TUYỆT ĐỐI CẤM** tự ý chạy `dotnet test`.
-  - Chỉ được phép chạy `dotnet build <project>` để xác nhận biên dịch không lỗi cú pháp.
+  - **DO NOT RUN `dotnet build` automatically. ON-DEMAND ONLY:** chỉ chạy khi user
+    yêu cầu rõ build project/scope tương ứng.
   - Cấm tự tiện chạy test làm phiên làm việc kéo dài bất hợp lý (treo máy, tốn token, phát sinh lỗi từ test không liên quan).
-- **Khi nào mới kích hoạt Verifier và chạy test:**
-  - CHỈ KHI người dùng có yêu cầu rõ ràng gọi `verifier` hoặc chỉ định chạy test suite.
-  - Hoặc trong quy trình `/orchestrate` đối với các task lớn chạm nhiều service/cross-domain đã được lập kế hoạch phân công cho `verifier`.
-- **Quy tắc chặn spam build (Build Idempotency)**: Chỉ build đúng 1 lần cho một lượt xác thực. Nếu build đã thành công và không có file source nào thay đổi thêm, cấm tuyệt đối việc gọi lại `dotnet build` hay `dotnet test` để "đánh giá lại". Kết quả build xanh trước đó là bằng chứng hợp lệ.
+- **ON-DEMAND ONLY:** activate test execution only when the user explicitly requests
+  `verifier` or a test command/scope. `/orchestrate`, risk level, task manifest, or
+  test-author assignment does not authorize test execution.
+- **IDEMPOTENT BUILD:** explicit authorization permits one build of the requested
+  scope for the current relevant source state. DO NOT rerun after success when
+  relevant inputs have not changed.
 
 ### Cưỡng chế ở runtime, không phải lời dặn
 
@@ -67,7 +70,7 @@ tranh cãi thì đưa vào `residual_risks` và hỏi user, đừng tự quyết
 
 ## 3. Red hồi tố (bù cho việc chạy song song)
 
-Chạy song song thì không ai chứng kiến pha Red. `verifier` dựng lại: `git stash`
+Khi user đã yêu cầu test execution, `verifier` có thể dựng lại Red: `git stash`
 phần `backend/src`, chạy test mới trên code cũ, **bắt buộc phải đỏ**. Test nào xanh
 trên cả code cũ lẫn code mới thì không kiểm chứng được gì → loại (`vacuous-test`).
 

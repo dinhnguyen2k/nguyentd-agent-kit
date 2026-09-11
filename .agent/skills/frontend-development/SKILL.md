@@ -33,7 +33,9 @@ Load the smallest set that changes the decision. Do not load visual-design, brow
 3. Trace the complete boundary affected: route/search params, hook/query, service client, backend contract, and shared primitive as applicable.
 4. Implement the smallest change that preserves current patterns and shared consumers.
 5. Add focused regression coverage for changed behavior or a recurring runtime failure.
-6. Run target-package lint/build; regenerate routes only when route definitions changed.
+6. Report implementation status. **DO NOT RUN lint, typecheck, route generation,
+   build, browser checks, or tests automatically. ON-DEMAND ONLY:** the user must
+   explicitly request the validation action by name.
 
 ## Non-Negotiable Boundaries
 
@@ -49,4 +51,6 @@ Load the smallest set that changes the decision. Do not load visual-design, brow
 - The changed app follows route -> hook/query -> service boundaries.
 - Form/API and enum/nullability contracts remain aligned.
 - Shared changes were checked against multiple consumers.
-- Relevant target lint/build/tests ran, or the exact gap is stated.
+- Validation status is explicit. Use `not run - not requested` when implementation
+  was requested without validation. A skill or workflow cannot grant validation
+  permission on the user's behalf.

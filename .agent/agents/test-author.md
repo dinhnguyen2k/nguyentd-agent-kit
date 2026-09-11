@@ -57,7 +57,8 @@ per `AI_RULES.md` section 9.
 
 ## Validation
 
-Run the narrowest command that exercises the new tests, then report output:
+**DO NOT RUN build or tests automatically.** If the user explicitly requests test
+execution, run only the narrowest authorized command and report output:
 
 ```
 dotnet build tests/<Project>/<Project>.csproj --no-restore -v q

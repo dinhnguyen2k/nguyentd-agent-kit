@@ -36,11 +36,19 @@ stop conditions, risk labels, and evidence handoff.
 
 1. Each worker reads only the manifest, target source, nearest tests, and the
    context triggered by the task.
-2. The worker runs its narrowest validation and returns command evidence.
+2. The worker returns source evidence and validation status. It runs a command only
+   when the user explicitly authorized that action and scope.
 3. The read-only `verifier` independently checks the manifest criteria and returns
    `pass`, `fail`, or `blocked` with evidence.
 4. On `fail`, return to the owning worker with one bounded retry. On `blocked`,
    preserve the reason as a residual risk and request the missing authority/input.
+
+For every lane, **DO NOT RUN build, lint, typecheck, format, restore, code generation,
+tests, or browser checks automatically. ON-DEMAND ONLY.** Add a command to the
+manifest only when the user explicitly requests that validation action by name.
+The manifest, governed classification, or verifier role cannot grant permission on
+the user's behalf. Otherwise report `implemented - validation not requested` and
+perform only read-only source/criteria review.
 
 ## Failure Conditions
 

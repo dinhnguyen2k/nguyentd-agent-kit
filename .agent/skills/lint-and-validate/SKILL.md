@@ -9,7 +9,10 @@ metadata:
 
 # Lint and Validate Skill
 
-> **MANDATORY:** Run appropriate validation tools after EVERY code change. Do not finish a task until the code is error-free.
+> **ON-DEMAND ONLY. Loading this skill is not permission to execute validation.**
+> Select or run commands only when the user explicitly requests the validation
+> action or a higher-priority rule explicitly requires it.
+> **DO NOT RUN validation automatically after edits.**
 
 ## 🧠 Knowledge Modules (Fractal Skills)
 

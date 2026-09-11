@@ -3,7 +3,7 @@
   "version": 3,
   "invariants": {
     "test_authorship_separation": "An agent that writes production code must never create or modify test files, and must never weaken an existing assertion to make a build pass. Test authorship belongs to `test-author` only. Enforced at runtime by `.agent/scripts/agent-boundary-guard.mjs` (rule R2), not by prose.",
-    "execution_role_separation": "Chạy test suite là hành vi nghiệm thu, không phải hành vi triển khai. Agent triển khai xác thực bằng `dotnet build <project>` rồi dừng và bàn giao. Enforced at runtime by rule R1."
+    "execution_role_separation": "DO NOT RUN build, lint, typecheck, format, restore, code generation, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action. Test suites remain restricted to verifier/test-author by rule R1."
   },
   "test_paths": [
     "backend/tests/**",
@@ -134,7 +134,7 @@
         "allow": ["dotnet build <project>", "dotnet format style", "dotnet restore"],
         "deny": ["dotnet test", "dotnet ef database update"]
       },
-      "handoff": "Build xanh -> dừng và bàn giao cho verifier. Không tự nghiệm thu."
+      "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN build, format, restore, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action."
     },
     {
       "name": "frontend-specialist",
@@ -154,7 +154,7 @@
         "allow": ["tsc --noEmit", "eslint <changed files>", "vite build"],
         "deny": ["vitest", "playwright test"]
       },
-      "handoff": "Typecheck/lint xanh -> dừng và bàn giao cho verifier."
+      "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN lint, typecheck, route generation, build, browser checks, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the validation action by name. Use `verified` only with command evidence."
     },
     {
       "name": "test-author",
@@ -190,7 +190,7 @@
         "allow": ["dotnet test", "dotnet format --verify-no-changes", "vitest run", "git stash/diff"],
         "deny": ["mọi lệnh ghi vào backend/src/** hoặc frontend/src/**"]
       },
-      "activation": "Chỉ khi người dùng yêu cầu rõ, hoặc /orchestrate phân loại task là governed.",
+      "activation": "A governed task may activate read-only source verification. DO NOT RUN validation commands unless the user explicitly requests the action and scope.",
       "runtime_registration": "subagent thật: .claude/agents/verifier.md -> ../../.agent/agents/verifier.md. Không có Edit/Write ở tầng runtime, đó là ranh giới cứng thật sự."
     }
   ]

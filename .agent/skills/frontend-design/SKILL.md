@@ -48,5 +48,6 @@ Before implementation, make the consequential choices explicit:
 
 - The result fits the current product and user task.
 - Interaction states and keyboard/focus behavior are covered.
-- Target app lint/build passes.
+- Validation status follows `.agent/rules/frontend-fastcheck.md`.
+  **DO NOT RUN lint/build or browser checks unless the user explicitly requests the action.**
 - Visual/browser verification is reported only when actually performed.

@@ -44,4 +44,5 @@ Treat the form model and API model as different boundary types when nullability 
 - Submission matches backend nullability and enum contracts.
 - Repeated reset/effect execution is idempotent.
 - Keyboard/label behavior remains valid for interactive controls.
-- Target app lint/build and relevant tests pass.
+- Validation status follows `.agent/rules/frontend-fastcheck.md`.
+  **DO NOT RUN lint/build/tests unless the user explicitly requests the action.**
