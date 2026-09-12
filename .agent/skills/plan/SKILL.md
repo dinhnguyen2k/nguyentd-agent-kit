@@ -26,12 +26,12 @@ $ARGUMENTS
 - **Output folder**: `.agent/planning/{task-slug}/` (create it if missing).
 - **File split**:
   1. `00-OVERVIEW.md` — the coordination hub. Contains: Goals, scope, dependency chains between tasks, the task index (ID, title, status, link to its file), and the review log from Phase 3. This is the only file read to get the big picture or to route work.
-  2. `TASK-{NN}-{task-slug}.md` — one file per task, fully self-contained. Each file carries everything needed to execute that task without reopening other files: its goal, the specific dependencies/files it touches, its phase-by-phase steps, any performance analysis relevant to it (against the 7 core algorithms in [performance-decision-rules.md](file:///home/nguyentd/cogain/cogain-core/.agent/rules/performance-decision-rules.md)), and its own verification plan (Automated + Manual).
+  2. `TASK-{NN}-{task-slug}.md` — one file per task, fully self-contained. Each file carries everything needed to execute that task without reopening other files: its goal, the specific dependencies/files it touches, its phase-by-phase steps, and its own verification plan (Automated + Manual).
 - **Requirement**: Use GitHub-style alerts (IMPORTANT/WARNING) for risks, inline in the task file they belong to.
 - **Requirement**: `00-OVERVIEW.md` MUST list every `TASK-*.md` file with a one-line description so nothing gets orphaned. Task files do not need to link back to each other — only to `00-OVERVIEW.md` if context is needed.
 - **Protocol**:
   1. Define Clear Goals and the dependency map across tasks → `00-OVERVIEW.md`.
-  2. Break the work into discrete tasks; for each one, write one `TASK-{NN}-{task-slug}.md` covering: its dependencies, its phase steps, its performance analysis (if relevant), and its verification plan.
+  2. Break the work into discrete tasks; for each one, write one `TASK-{NN}-{task-slug}.md` covering: its dependencies, its phase steps, and its verification plan.
   3. Register every task in the `00-OVERVIEW.md` index.
 
 ## 🟠 PHASE 3: Structured Review Loop (Stress-Testing)
@@ -70,7 +70,7 @@ $ARGUMENTS
 ```markdown
 [OK] Plan Created: .agent/planning/{task-slug}/
 ├── 00-OVERVIEW.md (start here: goals, dependency map, task index, review log)
-├── TASK-01-{slug}.md (self-contained: deps, phases, performance, verification)
+├── TASK-01-{slug}.md (self-contained: deps, phases, verification)
 ├── TASK-02-{slug}.md
 └── TASK-{NN}-{slug}.md
 
@@ -87,5 +87,5 @@ $ARGUMENTS
 
 - **No Code**: This workflow is strictly for strategy.
 - **Naming Protocol**: Folder `.agent/planning/kebab-case-slug/`; `00-OVERVIEW.md` for coordination, `TASK-{NN}-{task-slug}.md` per task.
-- **Context Discipline**: One file per task, fully self-contained. Never split a single task's concerns (deps/phases/performance/verification) across multiple files — that just adds file-hopping. Never merge multiple tasks into one file either — that reloads unrelated context. `00-OVERVIEW.md` is index-only, not a place to duplicate task detail.
+- **Context Discipline**: One file per task, fully self-contained. Never split a single task's concerns (deps/phases/verification) across multiple files — that just adds file-hopping. Never merge multiple tasks into one file either — that reloads unrelated context. `00-OVERVIEW.md` is index-only, not a place to duplicate task detail.
 - **User-Centric**: Respect the user's OS and workspace constraints.

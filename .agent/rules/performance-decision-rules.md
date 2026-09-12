@@ -77,22 +77,3 @@ Agent BẮT BUỘC phải đối chiếu nghiệp vụ cần triển khai với 
 2.  **Memoize Computations:** Sử dụng `useMemo` cho các hàm biến đổi dữ liệu, filter mảng phức tạp tại client, và `useCallback` cho các event handler truyền xuống component con để giảm re-render.
 3.  **Clean State Updates:** Không cập nhật Zustand store hoặc Local state liên tục trong vòng lặp hoặc các sự kiện scroll/resize mà không có `debounce`/`throttle`.
 
----
-
-## 🚪 3. CỔNG DUYỆT HIỆU NĂNG TRONG KẾ HOẠCH (DECISION GATE PROTOCOL)
-
-Khi viết `PLAN-{task-slug}.md` cho bất kỳ task nào có can thiệp đến Logic nghiệp vụ phức tạp hoặc Database, Agent **bắt buộc** phải bổ sung section sau vào Plan:
-
-```markdown
-## Phân Tích Hiệu Năng & Tối Ưu Hóa (Performance & Optimization Analysis)
-
-### 1. Đánh giá thuật toán & cấu trúc dữ liệu:
-*   [ ] Đã rà soát 7 kỹ thuật tối ưu hóa. Kỹ thuật được chọn: [Tên thuật toán] (Ví dụ: Hashing).
-*   **Giải pháp thay thế (Alternative):** Mô tả phương án viết code đơn giản nhưng kém hiệu năng.
-*   **Giải pháp lựa chọn (Chosen):** Mô tả giải pháp tối ưu và lý do chọn (về Time/Space complexity).
-
-### 2. Đánh giá số lần gọi DB & Network:
-*   Số lần gọi DB dự kiến: [Số lần hoặc N/A]
-*   Số lần gọi gRPC / API bên ngoài: [Số lần]
-*   Biện pháp giảm tải (nếu có): [Ví dụ: Eager loading, Batching, Caching]
-```
