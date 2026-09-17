@@ -34,6 +34,23 @@ $ARGUMENTS
   2. Break the work into discrete tasks; for each one, write one `TASK-{NN}-{task-slug}.md` covering: its dependencies, its phase steps, and its verification plan.
   3. Register every task in the `00-OVERVIEW.md` index.
 
+### Design Decision Gate
+
+Mỗi `TASK-*.md` chạm một quyết định thiết kế (chọn storage/cache, đặt transaction boundary, thêm external call, thêm consumer/job, đổi contract public) phải trả lời 5 câu sau ngay trong file task đó.
+Trả lời ngắn, 1-2 câu mỗi ý; không có gì để nói thì ghi `n/a` kèm lý do, không bỏ trống.
+
+1. **Why this design** - vì sao chọn phương án này thay vì phương án đơn giản hơn liền kề.
+2. **What are the trade-offs** - đánh đổi gì và chấp nhận mất gì (latency, consistency, cost, vận hành).
+3. **What can break** - failure mode cụ thể: dependency down, timeout, duplicate request, retry storm, deploy lệch version.
+4. **How do we operate it** - log/metric/alert nào cho biết nó hỏng, và rollback ra sao.
+5. **How does it evolve** - requirement gần nhất đã biết có phá thiết kế này không.
+
+> [!IMPORTANT]
+> Câu 5 bị chặn trần bởi `.agent/rules/solution-complexity.md`: trả lời nó bằng cách kiểm tra thiết kế **không khoá đường mở rộng**, không phải bằng cách thêm interface/wrapper/generic cho nhu cầu chưa tồn tại.
+> Chỉ dựng sẵn khi requirement đã được xác nhận, không dựng theo suy đoán.
+
+Với task chạm risk surface production (transaction, external call, broker, job, bảng lớn, endpoint public, migration), áp thêm `.agent/rules/architecture-review.md` theo đúng mục tương ứng.
+
 ## 🟠 PHASE 3: Structured Review Loop (Stress-Testing)
 
 **Execution role**: `planning role`
@@ -61,6 +78,7 @@ $ARGUMENTS
 
 - **Verification**: Check if the plan matches `DNA_REF` compliance.
 - **Review Check**: Confirm all three review lenses are addressed or explicitly acknowledged in the Review Log.
+- **Gate Check**: Mọi task chạm quyết định thiết kế đã trả lời đủ 5 câu của Design Decision Gate, không còn ô trống.
 - **Reporting**: Report the exact folder path (`.agent/planning/{task-slug}/`) to the User, entry point `00-OVERVIEW.md`.
 
 ---

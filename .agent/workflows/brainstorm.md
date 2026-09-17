@@ -38,6 +38,21 @@ $ARGUMENTS
 - Output: concise Pros / Cons / Risks with mitigation / Effort.
 - If subagents are used, synthesize their bounded summaries; the coordinator owns the final comparison.
 
+### Design Decision Gate (bắt buộc cho mỗi option)
+
+Một option chưa trả lời được 5 câu này thì chưa đủ tư cách vào bảng so sánh Phase 4.
+Mỗi câu 1-2 dòng, không có thì ghi `n/a` kèm lý do.
+
+1. **Why this design** - vì sao chọn nó thay vì phương án đơn giản hơn liền kề.
+2. **What are the trade-offs** - mất gì để đổi lấy gì (latency, consistency, cost, vận hành).
+3. **What can break** - failure mode cụ thể, không phải rủi ro chung chung.
+4. **How do we operate it** - tín hiệu nào cho biết nó hỏng trên production, rollback ra sao.
+5. **How does it evolve** - requirement gần nhất đã biết có phá nó không.
+
+- Câu 5 bị chặn trần bởi `.agent/rules/solution-complexity.md`: kiểm tra thiết kế **không khoá đường mở rộng**, không phải dựng sẵn abstraction cho nhu cầu chưa tồn tại.
+Một option ghi điểm ở câu 5 bằng cách thêm generic layer là dấu hiệu over-engineering, phải bị bắt ở lens 1.
+- Option chạm risk surface production (transaction, external call, broker, job, bảng lớn, endpoint public, migration) thì soi thêm bằng mục tương ứng trong `.agent/rules/architecture-review.md`.
+
 ## 🔵 PHASE 4: Synthesis
 
 - **Action**: Từ 3 bản tóm tắt nhận được, tổng hợp bảng so sánh A/B/C.

@@ -1,6 +1,6 @@
 ---
-trigger: glob
-glob: "**/docker-compose*.{yml,yaml},**/Dockerfile,**/ocelot*.json,**/*.tf,**/*.hcl"
+trigger: model_decision
+description: "When the change touches a production risk surface: DB transaction boundary, external call (HTTP/gRPC/3rd-party), MassTransit publish or consume, background job/Hangfire, Redis cache, list endpoint pagination or index on a large table, public endpoint auth/rate limit, EF migration rollout, or infra config (docker-compose, Dockerfile, ocelot, terraform)."
 ---
 
 # ARCHITECTURE-REVIEW.MD - Enterprise System Integrity
@@ -10,6 +10,15 @@ glob: "**/docker-compose*.{yml,yaml},**/Dockerfile,**/ocelot*.json,**/*.tf,**/*.
 ---
 
 ## 1. Review Scope And Priority
+
+### 1.0 Scope Gate - Đọc trước
+- Rule này nạp theo `model_decision`, không phải theo loại file.
+Chỉ áp các mục tương ứng với **risk surface mà change thực sự chạm**, không chạy hết 15 mục cho mọi thay đổi backend.
+- Mapping nhanh: transaction/write nghiệp vụ -> §5; gọi HTTP/gRPC/3rd-party -> §3; publish/consume MassTransit hoặc Hangfire -> §6; list/query bảng lớn -> §7; endpoint public -> §4, §8; migration -> §5, §13; docker-compose/Dockerfile/ocelot/terraform -> §9.
+- Change không chạm risk surface nào (đổi mapping DTO, sửa validation message, rename, style) thì **không phát sinh finding từ file này**.
+Im lặng là kết quả hợp lệ.
+- Trần độ phức tạp vẫn là `.agent/rules/solution-complexity.md`.
+Không đề xuất outbox, circuit breaker, saga hay queue cho flow chưa có nhu cầu hiện tại chỉ vì rule có liệt kê chúng.
 
 - Ưu tiên kiểm tra các điểm dễ gây downtime hoặc mất dữ liệu:
    - External call (HTTP/gRPC/3rd-party) không timeout/retry/circuit breaker.
