@@ -71,6 +71,7 @@ Agent BẮT BUỘC phải đối chiếu nghiệp vụ cần triển khai với 
 2.  **Tránh Query N+1:** Tuyệt đối không dùng vòng lặp để truy vấn DB. Sử dụng `.Include()` (Eager Loading) hoặc gom danh sách IDs lại và query `WHERE Id IN (ids)` (Query Batching).
 3.  **Split Queries:** Đối với các truy vấn kết hợp nhiều `.Include()` trên các collection lớn, sử dụng `.AsSplitQuery()` để tránh bị nhân dòng (Cartesian Explosion) ở SQL.
 4.  **DbSet.AnyAsync() vs CountAsync():** Khi chỉ muốn kiểm tra sự tồn tại của dữ liệu, sử dụng `AnyAsync()` để Postgres trả về True/False ngay lập tức, tuyệt đối không dùng `CountAsync() > 0` hoặc `.ToListAsync()`.
+5.  **Zero-Allocation gRPC Collections:** Danh sách lặp trả về từ Protobuf (`RepeatedField<T>`) bản chất đã là in-memory list (`IReadOnlyList<T>`, `IList<T>`). Tuyệt đối không gọi `.ToList()` hoặc clone `[..]` sang `List<T>` mới; khai báo hàm trả về `IReadOnlyList<T>` và trả trực tiếp `RepeatedField<T>`.
 
 ### 2.2. Frontend React / Zustand / TanStack Query
 1.  **Stable Query Keys:** Đảm bảo key của `useQuery` luôn nhất quán để tận dụng tối đa cơ chế cache của TanStack Query, tránh fetch lại dữ liệu không cần thiết.
