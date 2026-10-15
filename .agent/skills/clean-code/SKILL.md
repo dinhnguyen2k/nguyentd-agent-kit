@@ -11,6 +11,10 @@ metadata:
 
 > **CRITICAL SKILL** - Be **concise, direct, and solution-focused**.
 
+`AI_RULES.md` and applicable domain rules take precedence over this skill and its linked modules.
+Read-only intent permits inspection only; implementation permission covers only requested scope and `allowed_paths`, not validation execution.
+Checklists and module headings do not grant execution, test ownership, or wider edit permission.
+
 ---
 
 ## Core Principles
@@ -25,6 +29,9 @@ metadata:
 
 > **These are heuristics, not laws.** Every one has a cost. Applying them blindly
 > is its own anti-pattern — see [When The Rules Are Wrong](#when-the-rules-are-wrong).
+
+Apply Boy Scout, SRP, DRY, size limits and cleanup only within the requested change and allowed paths.
+Do not remove unrelated user changes or add refactors merely to satisfy a heuristic.
 
 ---
 
@@ -85,13 +92,15 @@ metadata:
 
 | Situation | Action |
 |-----------|--------|
-| User asks for feature | Write it directly |
-| User reports bug | Fix it, don't explain |
-| No clear requirement | Ask, don't assume |
-| Request has a flaw | Say it in 1-2 sentences, then **build it anyway** under stated assumptions |
-| User reaffirms after pushback | That's their call. Proceed with the full request, no re-litigating. |
+| User asks for feature | Implement the requested behavior within scope and hard rules |
+| User reports bug | Inspect the real flow and evidence, then fix the root cause within scope |
+| No clear requirement | Read available source/spec first; ask only for unresolved business, scope or policy decisions |
+| Request has a flaw | State the failure scenario briefly; resolve technical choices from evidence and hard rules, not guessed assumptions |
+| User reaffirms after pushback | Proceed within hard rules and established contracts; reaffirmation does not authorize guessing or extra execution |
 
-> Pushback is a sentence, not a negotiation. Never hold work hostage to an objection.
+Keep pushback concise and solution-focused.
+Never invent symbols, fields, defaults or contracts not established by source/spec.
+If required evidence is unavailable, stop that part and report the missing prerequisite to Main/user; continue reachable work that does not depend on it.
 
 ---
 
@@ -152,6 +161,9 @@ Fix:     Optimistic concurrency on RowVersion, or UPDATE ... WHERE Status = 'Pen
 | Magic numbers | Named constants |
 | God functions | Split by responsibility |
 
+These fixes are heuristics within scope, not automatic deletion rules.
+Single-caller abstractions can preserve real I/O, testability or independent-change boundaries; weigh evidence and counter-forces before inlining.
+
 ---
 
 ## 🔴 Before Editing ANY File (THINK FIRST!)
@@ -172,8 +184,15 @@ File to edit: UserService.ts
 └── Do they need changes too? → Check function signatures
 ```
 
-> 🔴 **Rule:** Edit the file + all dependent files in the SAME task.
+> 🔴 **Rule:** Inspect affected callers and migrate necessary dependent files within requested scope and `allowed_paths`.
 > 🔴 **Never leave broken imports or missing updates.**
+If a required caller update is outside the boundary, report the needed scope to Main/user before applying a breaking change; do not edit outside it or deliver a broken cutover.
+
+Regression coverage remains mandatory for money, permissions, inventory and legal-record invariants under `AI_RULES.md` §9 and `.agent/rules/test-enforcement.md`.
+Test authorship belongs to `test-author`, not the production-code writer; coordinate required coverage through Main from the same spec.
+Test execution is on-demand under those rules and role boundaries, independently of authorship or coverage obligations.
+Report `test-spec-conflict` and stop when a test contradicts the spec; do not weaken assertions to match implementation.
+An advisor can inform choices but replaces neither clean-code review nor test duties.
 
 ---
 
@@ -194,32 +213,40 @@ File to edit: UserService.ts
 
 ## 🔴 Self-Check Before Completing (MANDATORY)
 
-**Before saying "task complete", verify:**
+**Before completing source work, review the changed source and affected flow:**
 
 | Check | Question |
 |-------|----------|
 | ✅ **Goal met?** | Did I do exactly what user asked? |
-| ✅ **Files edited?** | Did I modify all necessary files? |
-| ✅ **Code works?** | Did I test/verify the change? |
-| ✅ **No errors?** | Lint and TypeScript pass? |
+| ✅ **Files edited?** | Are necessary updates complete within scope, with out-of-boundary dependencies escalated? |
+| ✅ **Behavior supported?** | Does source/flow evidence support the requested behavior, and what remains unverified? |
+| ✅ **Known errors?** | Did I address observed errors within scope and role, without running unrequested lint/typecheck/tests? |
 | ✅ **Nothing forgotten?** | Any edge cases missed? |
-| ✅ **Diff justified?** | Read the actual diff, not the plan. Every changed line traces back to the request? Any single-caller abstraction, dead code, unused import, or block deletable with no behavior change — tag it FLAG/NOTE and cut it before reporting done. |
-| ✅ **Assumptions stated?** | What did I decide on the user's behalf? Say it out loud. |
+| ✅ **Diff justified?** | Review actual changed source, not just the plan. Does every changed line trace back to the request? Remove only obsolete code/imports caused by this change within scope; weigh abstraction counter-forces and preserve unrelated changes. |
+| ✅ **Decisions grounded?** | Are technical choices supported by evidence, with unresolved business/scope/policy decisions escalated rather than guessed? |
+| ✅ **Coverage duty?** | Is required invariant/regression coverage accounted for through `test-author`, separately from execution permission? |
 | ✅ **Highest level checked?** | Did I stop at style (L4) while an L2/L3 flaw stands? |
 | ✅ **Concurrency & failure?** | Two users at once, retry, partial write, empty/null input? |
 | ✅ **Reversible?** | Migration, stored format, public contract — can we undo this? |
-| ✅ **Honest report?** | Untested = say "untested". Skipped = say skipped. No hedging both ways. |
+| ✅ **Honest report?** | Distinguish source implemented from verified; claim verified only with actual authorized command/result evidence. Without a validation request, report `Validation: not run - not requested`. |
 
-> 🔴 **Rule:** If ANY check fails, fix it before completing.
-> 🔴 **Never report "done" for work you did not verify.**
+Fix source defects within scope before handing off; escalate blockers requiring another role, missing evidence or wider scope.
+Unrequested validation is not a failed check and does not block completion of source work.
+Do not wait for, run, or imply successful validation merely to satisfy this checklist.
 
 ---
 
-## Verification Scripts (MANDATORY)
+## Verification Scripts (ON-DEMAND)
 
-> 🔴 **CRITICAL:** Each agent runs ONLY their own skill's scripts after completing work.
+Run only the explicitly authorized action and scope under `AI_RULES.md` §2 and the applicable role/domain rules.
+Script mappings identify relevant tools, not permission to execute them.
+Do not run scripts automatically after editing or treat unrequested execution as a completion prerequisite.
 
 ## 🧠 Knowledge Modules (Fractal Skills)
+
+Read modules only when their trigger fits the current task: critical review for failure-mode/design objections; script mapping for authorized validation selection; output/error/warning/passed modules for actual available results.
+Do not auto-load or auto-run modules because their headings say MANDATORY.
+If linked guidance conflicts with hard rules on scope, evidence, ownership or execution, follow the hard rules; do not amend sub-skills outside the assigned boundary.
 
 ### 0. [🔥 Critical Review Protocol](./sub-skills/critical-review-protocol.md) — failure-mode sweep, steel-manning, disagreement resolution
 ### 1. [Agent → Script Mapping](./sub-skills/agent-script-mapping.md)

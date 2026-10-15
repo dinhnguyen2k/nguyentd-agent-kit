@@ -1,6 +1,9 @@
 # Code Review Agent
 
-You are reviewing code changes for production readiness.
+Optional briefing template for a registered read-only reviewer.
+This is not an agent registration or a substitute for the governed verifier in [requesting-code-review](./SKILL.md).
+Use a Git range only when reviewing an actual diff; decision/health review can use explicit source scope instead.
+Validation results must come from existing evidence or an explicitly authorized run.
 
 **Your task:**
 1. Review {WHAT_WAS_IMPLEMENTED}
@@ -29,12 +32,9 @@ git diff {BASE_SHA}..{HEAD_SHA}
 
 ## Review Checklist
 
-**Code Quality:**
-- Clean separation of concerns?
-- Proper error handling?
-- Type safety (if applicable)?
-- DRY principle followed?
-- Edge cases handled?
+**Shared risk and quality checks:**
+Use the canonical [code-reviewer checklist](../code-reviewer/SKILL.md#focused-checklist-references) for correctness, security, performance, quality, testing, documentation, hallucination, and prompt risks.
+Check separation of concerns and type safety where applicable.
 
 **Architecture:**
 - Sound design decisions?
@@ -42,11 +42,11 @@ git diff {BASE_SHA}..{HEAD_SHA}
 - Performance implications?
 - Security concerns?
 
-**Testing:**
+**Testing evidence:**
 - Tests actually test logic (not mocks)?
 - Edge cases covered?
 - Integration tests where needed?
-- All tests passing?
+- Do available results show tests passing? If results are absent, state that; this question does not authorize test execution.
 
 **Requirements:**
 - All plan requirements met?
@@ -87,7 +87,8 @@ git diff {BASE_SHA}..{HEAD_SHA}
 
 ### Assessment
 
-**Ready to merge?** [Yes/No/With fixes]
+**Reviewer assessment:** [No blocking findings/Blocking findings/Insufficient evidence]
+This is advisory evidence, not the verifier `pass`/`fail`/`blocked` verdict.
 
 **Reasoning:** [Technical assessment in 1-2 sentences]
 
@@ -140,7 +141,7 @@ git diff {BASE_SHA}..{HEAD_SHA}
 
 ### Assessment
 
-**Ready to merge: With fixes**
+**Reviewer assessment: Blocking findings**
 
 **Reasoning:** Core implementation is solid with good architecture and tests. Important issues (help text, date validation) are easily fixed and don't affect core functionality.
 ```

@@ -11,9 +11,14 @@ Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 - **Standards**: does the code conform to this repo's documented coding standards?
 - **Spec**: does the code faithfully implement the originating issue / spec?
 
-Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
+Run this procedure only when the user explicitly requests a fixed-point diff review.
+Both axes may run in parallel read-only sub-agents when explicitly requested, or be inspected separately in-process without polluting each other's findings.
 
-The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, tell the user to run `/setup-matt-pocock-skills`.
+Use the repository's actual issue-tracker workflow when one exists.
+Do not require a setup command, external tool, or unregistered agent.
+This procedure is only for a genuine diff review, not a design, decision, or health review.
+Risk and checklist knowledge belongs to [code-reviewer](../code-reviewer/SKILL.md); governed independent verification belongs to [requesting-code-review](../requesting-code-review/SKILL.md).
+Review is read-only; validation commands require explicit user authorization.
 
 ## Process
 
@@ -29,7 +34,7 @@ Before going further, confirm the fixed point resolves (`git rev-parse <fixed-po
 
 Look for the originating spec, in this order:
 
-1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.), fetched via the workflow in `docs/agents/issue-tracker.md`.
+1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.), fetched through the available repository/harness workflow.
 2. A path the user passed as an argument.
 3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
@@ -58,7 +63,10 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.
 - **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
-### 4. Spawn both sub-agents in parallel
+### 4. Inspect both axes separately (or spawn read-only sub-agents when requested)
+
+Do not automatically spawn sub-agents on ordinary deliverables; only run this procedure when the user explicitly requests a fixed-point review.
+Use registered read-only agents supported by the current harness when parallel sub-agent review is requested, or inspect the axes separately in-process and disclose that mode; do not merge their findings.
 
 **Standards sub-agent prompt** should include:
 

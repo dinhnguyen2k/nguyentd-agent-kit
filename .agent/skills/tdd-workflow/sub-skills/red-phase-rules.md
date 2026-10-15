@@ -1,9 +1,9 @@
 # RED Phase Rules
 
-- Test must fail first
+- Write the test before implementation; confirm its expected failure only when execution is explicitly authorized.
 - Test name describes expected behavior
-- One assertion per test (ideally)
+- One coherent behavior per test; use the assertions needed to prove that behavior.
 
 ---
 
-## 4. GREEN Phase Principles
+See [the canonical cycle](../SKILL.md) for the GREEN phase.

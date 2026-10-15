@@ -1,39 +1,10 @@
 # 3. Generate Plan
 
-Use the following structure:
+Use `.agent/workflows/plan.md` as the canonical protocol; this is presentation guidance, not another contract template.
 
-- **Approach**: 1-3 sentences on what and why.
-- **Scope**: Bullet points for "In" and "Out".
-- **Action Items**: A list of 6-10 atomic, ordered tasks (Verb-first).
-- **Validation**: At least one item for testing.
-
-## Plan Template
-
-```markdown
-# Plan
-
-<High-level approach>
-
-## Scope
-
-- In:
-- Out:
-
-## Action Items
-
-[ ] <Step 1: Discovery>
-[ ] <Step 2: Implementation>
-[ ] <Step 3: Implementation>
-[ ] <Step 4: Validation/Testing>
-[ ] <Step 5: Rollout/Commit>
-
-## Open Questions
-
-- <Question 1 (max 3)>
-```
-
-## Checklist Guidelines
-
-- **Atomic**: Each step should be a single logical unit of work.
-- **Verb-first**: "Add...", "Refactor...", "Verify...".
-- **Concrete**: Name specific files or modules when possible.
+- State the settled approach in one sentence; add a reason/source citation only when it protects a meaningful decision.
+- List only the atomic, ordered actions actually needed, naming files/symbols and the concrete change; do not force 6-10 tasks.
+- Include scope exclusions, dependencies, failure behavior and acceptance only where needed to execute safely; do not repeat canonical metadata in prose.
+- Omit empty sections, generic discovery steps already completed by Main, discarded alternatives, review PASS and questions that are already settled.
+- Include validation/rollout only within named user authorization; do not insert testing, app startup, generation or commit steps by default.
+- For an implementation handoff, present instructions rather than inviting the worker to explore, compare designs or optimize beyond scope.

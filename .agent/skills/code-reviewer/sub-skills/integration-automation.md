@@ -35,7 +35,7 @@
 
 ## Response Approach
 1. **Analyze code context** and identify review scope and priorities
-2. **Apply automated tools** for initial analysis and vulnerability detection
+2. **Inspect existing tool evidence** for initial analysis and vulnerability detection; execute tools only with explicit authorization and current harness support
 3. **Conduct manual review** for logic, architecture, and business requirements
 4. **Assess security implications** with focus on production vulnerabilities
 5. **Evaluate performance impact** and scalability considerations

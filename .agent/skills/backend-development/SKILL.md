@@ -25,17 +25,22 @@ Use this as a router, not a backend textbook. `AI_RULES.md`, `.agent/rules/backe
 | Recurring repo-specific failure                                | [skill:cogain-agent-gotchas]        |
 | Cross-service architecture decision                            | [skill:dotnet-architect]            |
 
-Load the smallest set that changes the implementation decision. A local task usually needs this router plus one project-native/domain skill. Generic skills are fallback knowledge; project-native skills and source code own Cogain behavior.
+Reuse this router and skills already in context; read only missing skills or needed sections not yet loaded.
+Every matching registry trigger requires its owning skill before the related decision, whether the trigger appears in the request or is discovered while inspecting relevant source/callers.
+Matching a trigger does not authorize a worker to reopen design or expand scope.
+
+Load the smallest set that satisfies those mandatory triggers, not a fixed one-skill limit. Context reuse never replaces inspection of affected source, nearest patterns/tests, or downstream consumers according to risk. Generic skills are fallback knowledge; project-native skills and source code own Cogain behavior.
 
 ## Workflow
 
 1. Determine analysis, proposal, or implementation mode from the user request.
-2. Inspect the affected service, contract, entity, migration, and nearest test as applicable.
-3. Identify business invariants and downstream consumers before changing behavior.
-4. Follow the closest working pattern unless it conflicts with a current repository rule.
-5. Implement the smallest compatible change and add focused regression coverage.
-6. **DO NOT RUN build, format, restore, or tests automatically. ON-DEMAND ONLY:**
-   the user must explicitly request the action and scope. Do not expand it by inference.
+2. Main discovery/design: trace affected service/contract/entity/migration, nearest pattern/test and downstream consumers according to risk; settle invariants, reuse and the recipe under `.agent/workflows/plan.md`.
+3. Worker implementation: confirm the current contract against source at the affected boundary, not a full rediscovery or parent-TASK/history reconstruction.
+   Missing design, source mismatch, failed reuse or a needed scope change returns Main `file:line`, expected/actual and the decision; do not choose another API/default/transaction/retry/compensation boundary or abstraction.
+4. Apply the settled recipe within scope; choose equivalent local details, never a guessed fallback.
+   Read affected source/pattern/tests/callers as risk requires; Main's conclusion cannot override conflicting source.
+5. Report regression/coverage needs to Main under `AI_RULES.md` §9 and test-enforcement, including money/permission/stock/legal invariants; specialists neither write tests nor spawn `test-author`.
+6. No automatic build/format/restore/tests; execution needs named user authorization and an authorized role, not a coverage duty.
 
 ## Non-Negotiable Boundaries
 

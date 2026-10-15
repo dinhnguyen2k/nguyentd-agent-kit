@@ -7,6 +7,17 @@ description: "Tối ưu SEO/GEO để lên Top Google và AI Search. Use when op
 
 $ARGUMENTS
 
+## Quyền thực thi và artifact
+
+- Yêu cầu audit/check/inspect chỉ trả lời findings và dẫn chứng trong chat, không sửa nội dung hoặc tạo file nếu chưa có quyền ghi riêng.
+- Chỉ thực hiện Phase 3 khi user yêu cầu triển khai; quyền sửa không cấp quyền chạy validation.
+- Một slice chỉ cần contract/checkpoint gọn khi handoff/resume cần nó; nhiều slice dùng `.agent/planning/{task-slug}/00-OVERVIEW.md` và `TASK-*.md` theo `/plan`.
+- Scope/acceptance thuộc TASK canonical; overview chỉ index/link, chỉ coordinator cập nhật lifecycle.
+- Lane governed dẫn xuất manifest từ metadata TASK bằng parser canonical, không sửa tay manifest hoặc sao chép acceptance.
+- Packet handoff tham chiếu identity của contract snapshot và quan hệ supersession; không tạo thêm PLAN, implementation_plan, walkthrough hoặc handoff chỉ để lặp lại contract.
+- Giữ Search Visibility Report hoặc tài liệu sản phẩm độc nhất khi user yêu cầu rõ, tại path được cấp quyền.
+- Research chỉ persist khi được yêu cầu, trong `.agent/artifacts`, không ghi mới vào `reports/artifacts`.
+
 ---
 
 ## 🟢 PHASE 1: Semantic Discovery
@@ -34,8 +45,8 @@ $ARGUMENTS
 ## 🔴 PHASE 4: Visibility Gating
 **Execution role**: `verification role`
 **Mission**: Certify the "Search-Ready" status.
-- **Verification**: Run Lighthouse SEO audit.
-- **Artifact**: Provide a "Search Visibility Report" in the `walkthrough.md`.
+- **Verification**: Chỉ chạy Lighthouse SEO audit khi user yêu cầu đúng hành động này; chưa chạy thì không chứng nhận "Search-Ready".
+- **Output**: Trả findings, dẫn chứng và validation status trong chat; chỉ lưu Search Visibility Report khi user yêu cầu rõ, không tự tạo `walkthrough.md`.
 
 ---
 

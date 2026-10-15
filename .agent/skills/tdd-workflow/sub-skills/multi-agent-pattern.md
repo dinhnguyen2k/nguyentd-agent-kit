@@ -2,10 +2,12 @@
 
 | Agent | Role |
 |-------|------|
-| Agent A | Write failing tests (RED) |
-| Agent B | Implement to pass (GREEN) |
-| Agent C | Optimize (REFACTOR) |
+| test-author | Write tests for the agreed contract (RED); own all actual test-file edits |
+| Production writer | Implement the agreed behavior (GREEN) and behavior-preserving refactoring |
+| Authorized verifier | Execute only explicitly authorized checks and report observed results |
 
 ---
 
-> **Remember:** The test is the specification. If you can't write a test, you don't understand the requirement.
+The approved specification is the source of expected behavior, not an existing test that contradicts it.
+Report `test-spec-conflict` rather than changing production behavior to satisfy a conflicting test.
+Do not spawn agents solely because this table lists roles; follow repository delegation rules.

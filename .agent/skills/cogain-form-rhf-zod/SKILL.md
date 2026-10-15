@@ -14,6 +14,8 @@ Treat the form model and API model as different boundary types when nullability 
 
 - Hydration: map API data into form-safe values; do not pass nullable API arrays/IDs directly when the schema expects arrays or strings.
 - Submission: convert UI `""` to `null`/`undefined` according to the API contract.
+- Submit pending: every `await` before `mutateAsync` (file upload, lookup) runs inside the submit handler, so Save and Cancel must be disabled by `form.formState.isSubmitting` as well as `mutation.isPending`; otherwise double submit creates duplicate records.
+- After any `await` inside submit, build the payload from `form.getValues()`, not from the `values` argument captured before the await.
 - Validation: backend owns business rules. Zod mirrors stable rules for UX but must not become the only enforcement layer.
 - Enums: preserve numeric values shared with the backend; do not submit raw magic numbers when a domain enum exists.
 

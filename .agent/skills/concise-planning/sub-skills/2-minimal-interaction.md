@@ -1,4 +1,6 @@
 # 2. Minimal Interaction
 
-- Ask **at most 1–2 questions** and only if truly blocking.
-- Make reasonable assumptions for non-blocking unknowns.
+- Ask only for a business/scope decision tools and source cannot settle; batch related questions.
+- Choose source-backed, equivalent local details without asking.
+- Do not assume fields, defaults, APIs or business rules to fill a gap; Main resolves missing design before worker implementation.
+- A ready execution plan has no unresolved decision affecting correctness; omit Open Questions when there is none.

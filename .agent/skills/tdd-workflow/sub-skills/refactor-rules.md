@@ -1,8 +1,8 @@
 # REFACTOR Rules
 
-- All tests must stay green
+- Preserve behavior and existing test expectations; green status requires observed, authorized test execution.
 - Small incremental changes
-- Commit after each refactor
+- Do not commit unless the user explicitly requests it.
 
 ---
 
