@@ -18,6 +18,7 @@ const metricsSchemaPath = join(contractRoot, 'agent-run-metrics.schema.json');
 const errors = [];
 const warnings = [];
 const allowedSkillFrontmatterFields = new Set(['name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools']);
+const projectSkillNames = new Set(['php-development', 'mysql']);
 
 function walk(directory, predicate = () => true) {
   if (!existsSync(directory)) return [];
@@ -158,7 +159,7 @@ for (const evalFile of walk(evalRoot, (path) => path.endsWith('.json'))) {
 }
 
 for (const name of skills.keys()) {
-  if (name.startsWith('cogain-') && !coveredSkills.has(name)) {
+  if (projectSkillNames.has(name) && !coveredSkills.has(name)) {
     errors.push(`.agent/evals: project skill '${name}' has no behavior case`);
   }
 }
@@ -250,11 +251,11 @@ function validateTaskManifestSchema() {
   const schema = readJson(manifestSchemaPath);
   if (!schema) return;
   const required = new Set(schema.required ?? []);
-  for (const field of ['manifest_version', 'tier', 'task_id', 'goal', 'mode', 'owner', 'independent_verification', 'allowed_paths', 'acceptance_criteria', 'validation_commands', 'stop_conditions']) {
+  for (const field of ['manifest_version', 'tier', 'task_id', 'slice_id', 'contract_ref', 'contract_version', 'contract_hash', 'lifecycle_hash', 'goal', 'mode', 'owner', 'independent_verification', 'allowed_paths', 'source_paths', 'acceptance_criteria', 'dependencies', 'validation_commands', 'stop_conditions']) {
     if (!required.has(field)) errors.push(`.agent/contracts/task-manifest.schema.json: required field '${field}' is missing`);
   }
-  if (schema.properties?.manifest_version?.const !== 1) {
-    errors.push('.agent/contracts/task-manifest.schema.json: manifest_version const must be 1');
+  if (schema.properties?.manifest_version?.const !== 2) {
+    errors.push('.agent/contracts/task-manifest.schema.json: manifest_version const must be 2');
   }
   if (schema.properties?.tier?.const !== 'governed') {
     errors.push('.agent/contracts/task-manifest.schema.json: tier const must be governed');
@@ -409,8 +410,8 @@ const governance = validateSkillGovernance();
 
 function writeCatalog() {
   const entries = [...skills.entries()].sort(([a], [b]) => a.localeCompare(b));
-  const project = entries.filter(([name]) => name.startsWith('cogain-'));
-  const generic = entries.filter(([name]) => !name.startsWith('cogain-'));
+  const project = entries.filter(([name]) => projectSkillNames.has(name));
+  const generic = entries.filter(([name]) => !projectSkillNames.has(name));
   const quarantined = governance?.quarantinedSkills ?? [];
   const row = ([name, skill]) => `- \`${name}\`: ${skill.metadata.description}`;
   const output = [
@@ -420,7 +421,7 @@ function writeCatalog() {
     '',
     '## Routing Policy',
     '',
-    '- Project-native skills own Cogain procedures and override generic examples when they conflict.',
+    '- Project-native skills own PHP/PDO/MySQL procedures and override generic examples when they conflict.',
     '- Load only skills that change the current decision; a local task normally needs one router plus one or two domain skills.',
     '- Source code and `AI_RULES.md` remain higher-priority truth sources.',
     '- Quarantined skills live under `.agent/quarantine/skills` and are not part of active auto-discovery.',

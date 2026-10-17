@@ -1,7 +1,7 @@
 {
   "name": "nguyentd-agent-kit",
   "version": "1.0.0",
-  "description": "NguyenTD's AI Agent Kit: rules, opinion, skills, and workflows for Claude, Gemini, Antigravity, and Codex",
+  "description": "NguyenTD's PHP Agent Kit: PHP/PDO/MySQL rules, skills, workflows and harness wiring",
   "bin": {
     "nguyentd-agent-kit": "./bin/install.js"
   },
@@ -12,7 +12,10 @@
     "opinion",
     "antigravity",
     "claude",
-    "gemini"
+    "gemini",
+    "php",
+    "pdo",
+    "mysql"
   ],
   "author": "NguyenTD <dinhnguyen2k>",
   "license": "MIT"

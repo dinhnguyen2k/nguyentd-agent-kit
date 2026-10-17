@@ -3,15 +3,19 @@
   "version": 3,
   "invariants": {
     "test_authorship_separation": "An agent that writes production code must never create or modify test files, and must never weaken an existing assertion to make a build pass. Test authorship belongs to `test-author` only. Enforced at runtime by `.agent/scripts/agent-boundary-guard.mjs` (rule R2), not by prose.",
-    "execution_role_separation": "DO NOT RUN build, lint, typecheck, format, restore, code generation, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action. Test suites remain restricted to verifier/test-author by rule R1."
+    "execution_role_separation": "DO NOT RUN lint, syntax check, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action. Test suites remain restricted to verifier/test-author by rule R1."
   },
   "test_paths": [
-    "backend/tests/**",
-    "frontend/**/__tests__/**",
-    "frontend/**/*.test.ts",
-    "frontend/**/*.test.tsx",
-    "frontend/**/*.spec.ts",
-    "frontend/**/*.spec.tsx"
+    "tests/**",
+    "tests",
+    "*Test.php",
+    "**/*Test.php",
+    "*.test.js",
+    "**/*.test.js",
+    "*.spec.js",
+    "**/*.spec.js",
+    "**/__tests__/**",
+    "__tests__/**"
   ],
   "protected_config_paths": [
     ".agent/contracts/agent-registry.json",
@@ -54,15 +58,14 @@
         "id": "R1",
         "applies_to": ["Bash"],
         "allowed_roles": ["verifier", "test-author"],
-        "deny_message": "Permission Denied: Running test suites is strictly reserved for 'verifier' and 'test-author'.",
+        "deny_message": "Permission Denied: Running test suites (PHPUnit, composer test) is strictly reserved for 'verifier' and 'test-author'.",
         "patterns": [
-          "\\bdotnet\\s+test\\b",
-          "\\bdotnet\\s+.*\\s+test\\b",
+          "\\bphpunit\\b",
+          "\\bcomposer\\s+(?:run(?:-script)?\\s+)?test(?::|\\s|$)",
+          "\\b(npm|pnpm|yarn|npx|bun)\\s+(?:run\\s+)?test(?::|\\s|$)",
           "\\bvitest\\b",
           "\\bjest\\b",
-          "\\bplaywright\\s+test\\b",
-          "\\b(npm|pnpm|yarn|npx)\\s+(run\\s+)?test(:|\\s|$)",
-          "\\bpnpm\\s+--filter\\s+\\S+\\s+test\\b"
+          "\\bplaywright\\s+test\\b"
         ]
       },
       "test_write": {
@@ -70,12 +73,11 @@
         "applies_to": ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"],
         "allowed_roles": ["test-author"],
         "shell_path_markers": [
-          "backend/tests/",
+          "tests/",
+          "Test.php",
           "__tests__/",
-          ".test.ts",
-          ".test.tsx",
-          ".spec.ts",
-          ".spec.tsx"
+          ".test.js",
+          ".spec.js"
         ],
         "shell_mutating_tokens": [
           "sed -i",
@@ -108,8 +110,8 @@
   },
   "command_policy": {
     "note": "Whitelist mô tả ý định; cưỡng chế thật nằm ở enforcement.rules và permissions trong .claude/settings.json.",
-    "build_only": ["dotnet build <project>", "dotnet format style --verify-no-changes", "tsc --noEmit", "eslint <changed files>"],
-    "verification_only": ["dotnet test", "vitest", "playwright test"]
+    "build_only": ["php -l <file> (khi php runtime có sẵn)", "composer validate (khi composer có sẵn)", "node --check <file>"],
+    "verification_only": ["vendor/bin/phpunit (khi PHPUnit có sẵn)", "php vendor/bin/phpunit", "composer test"]
   },
   "agents": [
     {
@@ -120,60 +122,152 @@
       "deny_write_paths": [],
       "tools": ["Read", "Grep", "Glob", "Bash"],
       "skills": ["orchestrate"],
-      "commands": { "allow": [], "deny": ["dotnet test", "dotnet build"] }
+      "commands": { "allow": [], "deny": ["phpunit", "vendor/bin/phpunit", "php vendor/bin/phpunit", "composer test"] }
     },
     {
       "name": "backend-specialist",
       "profile": ".agent/agents/backend-specialist.md",
       "kind": "worker",
-      "write_paths": ["backend/**"],
-      "deny_write_paths": ["backend/tests/**"],
+      "write_paths": [
+        "*.php",
+        "**/*.php",
+        "admin/**",
+        "composer.json",
+        "composer.lock",
+        "src/**",
+        "config/**",
+        "public/**",
+        "migrations/**"
+      ],
+      "deny_write_paths": [
+        "vendor/**",
+        "vendor",
+        "tests/**",
+        "tests",
+        "*Test.php",
+        "**/*Test.php",
+        "*.test.js",
+        "**/*.test.js",
+        "*.spec.js",
+        "**/*.spec.js",
+        "**/__tests__/**",
+        "__tests__/**",
+        "uploads/**",
+        "uploads",
+        "admin/uploads/**",
+        "admin/uploads",
+        "admin/ckeditor/**",
+        "admin/ckeditor",
+        ".agent/**",
+        ".git/**"
+      ],
       "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
-      "skills": ["backend-development"],
+      "skills": ["backend-development", "php-development", "mysql"],
       "commands": {
-        "allow": ["dotnet build <project>", "dotnet format style", "dotnet restore"],
-        "deny": ["dotnet test", "dotnet ef database update"]
+        "allow": ["php -l <file>", "composer validate"],
+        "deny": [
+          "phpunit",
+          "vendor/bin/phpunit",
+          "./vendor/bin/phpunit",
+          "php vendor/bin/phpunit",
+          "composer test",
+          "composer run test",
+          "composer run-script test"
+        ]
       },
-      "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN build, format, restore, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action."
+      "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN php syntax checks, composer validate, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action. Commands like php -l require PHP runtime installed. Presentation outside backend logic belongs to frontend-specialist."
     },
     {
       "name": "frontend-specialist",
       "profile": ".agent/agents/frontend-specialist.md",
       "kind": "worker",
-      "write_paths": ["frontend/**"],
+      "write_paths": [
+        "css/**",
+        "js/**",
+        "images/**",
+        "layout/**",
+        "admin/css/**",
+        "admin/js/**"
+      ],
       "deny_write_paths": [
-        "frontend/**/__tests__/**",
-        "frontend/**/*.test.ts",
-        "frontend/**/*.test.tsx",
-        "frontend/**/*.spec.ts",
-        "frontend/**/*.spec.tsx"
+        "*.php",
+        "vendor/**",
+        "vendor",
+        "tests/**",
+        "tests",
+        "*Test.php",
+        "**/*Test.php",
+        "*.test.js",
+        "**/*.test.js",
+        "*.spec.js",
+        "**/*.spec.js",
+        "**/__tests__/**",
+        "__tests__/**",
+        "uploads/**",
+        "uploads",
+        "admin/uploads/**",
+        "admin/uploads",
+        "admin/ckeditor/**",
+        "src/**",
+        "config/**",
+        ".agent/**",
+        ".git/**"
       ],
       "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
       "skills": ["frontend-development"],
       "commands": {
-        "allow": ["tsc --noEmit", "eslint <changed files>", "vite build"],
-        "deny": ["vitest", "playwright test"]
+        "allow": ["node --check <file>"],
+        "deny": ["phpunit", "vendor/bin/phpunit", "composer test", "npm test"]
       },
-      "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN lint, typecheck, route generation, build, browser checks, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the validation action by name. Use `verified` only with command evidence."
+      "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN lint, style, or test commands automatically. ON-DEMAND ONLY: the user must explicitly request the validation action by name. Frontend owns layout/** templates, css/**, js/**, images/**. Root/admin PHP presentation changes require explicit handoff with single-owner per task."
     },
     {
       "name": "test-author",
       "profile": ".agent/agents/test-author.md",
       "kind": "worker",
       "write_paths": [
-        "backend/tests/**",
-        "frontend/**/__tests__/**",
-        "frontend/**/*.test.ts",
-        "frontend/**/*.test.tsx",
-        "frontend/**/*.spec.ts",
-        "frontend/**/*.spec.tsx"
+        "tests/**",
+        "tests",
+        "*Test.php",
+        "**/*Test.php",
+        "*.test.js",
+        "**/*.test.js",
+        "*.spec.js",
+        "**/*.spec.js",
+        "**/__tests__/**",
+        "__tests__/**"
       ],
-      "deny_write_paths": ["backend/src/**", "frontend/src/**"],
+      "deny_write_paths": [
+        "index.php",
+        "db.php",
+        "admin/**",
+        "layout/**",
+        "css/**",
+        "js/**",
+        "images/**",
+        "src/**",
+        "config/**",
+        "public/**",
+        "vendor/**",
+        "vendor",
+        "uploads/**",
+        "uploads",
+        "admin/uploads/**",
+        "admin/uploads",
+        ".agent/**",
+        ".git/**"
+      ],
       "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
       "skills": ["testing-patterns", "tdd-workflow"],
       "commands": {
-        "allow": ["dotnet build tests/<Project>", "dotnet test --filter <new tests>", "vitest run <file>"],
-        "deny": ["dotnet test (toàn bộ suite không filter)"]
+        "allow": [
+          "vendor/bin/phpunit --filter <test>",
+          "php vendor/bin/phpunit --filter <test>",
+          "./vendor/bin/phpunit --filter <test>",
+          "composer test",
+          "composer run test"
+        ],
+        "deny": []
       },
       "parallel_safe_with": ["backend-specialist", "frontend-specialist"],
       "runtime_registration": "subagent thật: .claude/agents/test-author.md -> ../../.agent/agents/test-author.md"
@@ -183,14 +277,46 @@
       "profile": ".agent/agents/verifier.md",
       "kind": "gate",
       "write_paths": [],
-      "deny_write_paths": ["backend/**", "frontend/**"],
+      "deny_write_paths": [
+        "*.php",
+        "**/*.php",
+        "admin/**",
+        "css/**",
+        "js/**",
+        "layout/**",
+        "images/**",
+        "src/**",
+        "config/**",
+        "public/**",
+        "vendor/**",
+        "vendor",
+        "tests/**",
+        "tests",
+        "*Test.php",
+        "**/*Test.php",
+        "uploads/**",
+        "uploads",
+        "admin/uploads/**",
+        "admin/uploads",
+        ".agent/**"
+      ],
       "tools": ["Read", "Grep", "Glob", "Bash"],
       "skills": ["lint-and-validate", "testing-patterns", "code-reviewer"],
       "commands": {
-        "allow": ["dotnet test", "dotnet format --verify-no-changes", "vitest run", "git stash/diff"],
-        "deny": ["mọi lệnh ghi vào backend/src/** hoặc frontend/src/**"]
+        "allow": [
+          "php -l <file>",
+          "composer validate",
+          "vendor/bin/phpunit",
+          "php vendor/bin/phpunit",
+          "./vendor/bin/phpunit",
+          "composer test",
+          "composer run test",
+          "composer run-script test",
+          "git stash/diff"
+        ],
+        "deny": ["mọi thao tác ghi vào mã nguồn hoặc file test"]
       },
-      "activation": "A governed task may activate read-only source verification. DO NOT RUN validation commands unless the user explicitly requests the action and scope.",
+      "activation": "A governed task may activate read-only source verification. DO NOT RUN validation commands unless the user explicitly requests the action and scope. Commands requiring PHP/Composer/PHPUnit only run when installed.",
       "runtime_registration": "subagent thật: .claude/agents/verifier.md -> ../../.agent/agents/verifier.md. Không có Edit/Write ở tầng runtime, đó là ranh giới cứng thật sự."
     }
   ]

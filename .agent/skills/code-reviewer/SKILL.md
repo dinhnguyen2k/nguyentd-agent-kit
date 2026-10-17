@@ -36,27 +36,27 @@ Apply only relevant checks against the repo contract; checklist wording is not p
 7. [Logic & Hallucinations](./references/checklist/logic-hallucinations.md)
 8. [Prompt Engineering Review](./references/checklist/prompt-engineering-review.md)
 
-For UI findings, retain the [UI review taxonomy](../code-review/references/ui-review-taxonomy.md) and its attribution and Cogain override.
+For UI findings, retain the [UI review taxonomy](../code-review/references/ui-review-taxonomy.md) and its attribution and project override.
 
 
-## Cogain Review Rubric (D1-D10) & Architecture Checklist
+## Project Review Rubric (D1-D10) & Architecture Checklist
 
 | # | Tiêu chí | Mức độ |
 | --- | --- | --- |
 | D1 | Toàn vẹn dữ liệu & tương thích hợp đồng/migration: không mất mát, không ghi dở dang, xử lý concurrency/retry an toàn | Blocker |
-| D2 | Kỷ luật ranh giới & khớp hợp đồng BE ↔ FE: đúng `allowed_paths`, đúng schema/enum (`domain-parity`), không breaking API | Blocker |
-| D3 | Tái sử dụng component/helper/hook sẵn có, không tự tạo convention thứ hai | Major |
-| D4 | Không viết code đoán mò / fallback bịa đặt (`?? ''`, `x \|\| 0`, `as unknown as`, `catch {}`, fallback che lỗi) | Blocker |
-| D5 | Đúng ranh giới kiến trúc (Clean Architecture, hook `BaseService`, không phụ thuộc vòng, không chạm DB service khác) | Major |
-| D6 | Hiệu năng hợp lý: tránh N+1 query/request, tải dữ liệu có phân trang (`performance-decision-rules`) | Major |
-| D7 | Invariant nghiệp vụ trọng yếu (tiền tệ, phân quyền, tồn kho, trạng thái workflow) được bảo toàn | Blocker |
-| D8 | Xử lý lỗi tường minh: trả `Result.Failure(msg)` hoặc để TanStack Query/state lỗi xử lý, không nuốt exception | Major |
-| D9 | Bảo mật, cấu hình, phân quyền endpoint/rate-limit và an toàn dữ liệu nhạy cảm | Blocker |
-| D10 | Quản lý nợ kỹ thuật: bề mặt khó quay lui (schema DB, public contract, permission, tiền tệ) bắt buộc sửa ngay; vấn đề cục bộ ghi nhận vào `.planning/codebase/CONCERNS.md` | Minor |
+| D2 | Kỷ luật ranh giới & khớp hợp đồng BE ↔ FE: đúng `allowed_paths`, đúng tham số biểu mẫu và kiểu dữ liệu | Blocker |
+| D3 | Tái sử dụng component/helper/layout sẵn có, không tự tạo convention thứ hai | Major |
+| D4 | Không viết code đoán mò / fallback bịa đặt (`?? ''`, `x || 0`, `catch {}` nuốt lỗi hoặc che giấu lỗi) | Blocker |
+| D5 | Đúng ranh giới kiến trúc (phân tách rõ xử lý logic, truy vấn PDO trong `db.php` và presentation `layout/**`, không include lặp/vòng) | Major |
+| D6 | Hiệu năng hợp lý: câu truy vấn có LIMIT/OFFSET phân trang, có index khóa ngoại và cột lọc, tránh quét toàn bộ bảng | Major |
+| D7 | Invariant nghiệp vụ trọng yếu (tiền tệ dùng DECIMAL, phân quyền session admin, trạng thái tour) được bảo toàn | Blocker |
+| D8 | Xử lý lỗi tường minh: bắt ngoại lệ `\PDOException`, log lỗi hệ thống, trả thông báo thân thiện, không nuốt exception | Major |
+| D9 | Bảo mật: 100% prepared statements (chống SQLi), escape `htmlspecialchars` (chống XSS), kiểm tra token CSRF, bảo vệ session | Blocker |
+| D10 | Quản lý nợ kỹ thuật: bề mặt khó quay lui (schema DB, session auth, tiền tệ) bắt buộc sửa ngay; vấn đề cục bộ ghi nhận rõ ràng | Minor |
 
-- **Backend**: Đúng lớp `API -> Services -> Repositories -> Data`; tùy biến `BaseService` qua hook (`BeforeApplyAutoFilterCoreAsync`, `AfterReconcileCollectionsAsync`, `ISyncsChildren<T>`); logic dùng chung ở `backend/src/BuildingBlocks/*`; ghi nhiều bước có transaction không bao external call.
-- **Frontend**: Đúng luồng `routes -> hooks -> services -> api-client`; `useQuery`/`useMutation` trong hook, service qua `createBaseService`, không đẩy server data vào Zustand; type/hook dùng chung ở `@shared/types` và `@shared/hooks`; invalidate đúng family query key (`cogain-query-cache`) và giữ idempotency form (`cogain-form-rhf-zod`).
-- **Chống code đoán**: Mọi field, method, endpoint, enum, prop phải có `<file>:<line>` xác thực trong repo; cấm chuỗi fallback đoán shape (`res.data?.items || res.items || []`), ép kiểu (`as any`, `as unknown as`, `!.`), `FirstOrDefault() ?? new T()`, hoặc `catch` nuốt lỗi trả default.
+- **Backend**: Truy vấn CSDL 100% qua PDO prepared statements với kiểu bind rõ ràng (`PDO::PARAM_INT`, `PDO::PARAM_STR`); xử lý giao dịch (`beginTransaction`/`commit`/`rollBack`) cho thao tác nhiều bước; xác thực session đăng nhập cho các trang quản trị (`admin/**`); kiểm tra MIME server-side và tạo tên ngẫu nhiên khi upload; gửi mail qua PHPMailer có try-catch an toàn.
+- **Frontend**: HTML trong template được escape bằng `htmlspecialchars()`; CSS responsive rõ ràng, không phá vỡ layout hiện có; Javascript thuần lắng nghe sự kiện DOM an toàn, xử lý fetch/AJAX có bắt lỗi; biểu mẫu POST có token CSRF hợp lệ.
+- **Chống code đoán**: Mọi field, method, endpoint, query param phải có `<file>:<line>` xác thực trong repo; cấm chuỗi fallback đoán shape (`res.data?.items || []`), ép kiểu vô căn cứ, hoặc `catch` nuốt lỗi trả default.
 
 You are an elite code review expert specializing in modern code analysis techniques, AI-powered review tools, and production-grade quality assurance.
 

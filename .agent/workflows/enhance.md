@@ -1,6 +1,6 @@
 ---
 name: enhance
-description: Muốn sửa màu, thêm nút, sửa logic nhỏ? Vào đây.
+description: Nâng cấp, tinh chỉnh giao diện hoặc bổ sung logic nhỏ cho ứng dụng PHP
 ---
 
 # /enhance - Incremental Feature Upgrade
@@ -10,40 +10,41 @@ $ARGUMENTS
 ---
 
 ## 🟢 PHASE 1: Impact Discovery
-**Execution role**: `codebase discovery role` & `frontend-specialist`
-**Mission**: Map the "Blast Radius."
-- **Action**: Identify all components and services affected by the change.
-- **Action**: Check for breaking CSS or Logic changes.
+**Execution role**: `frontend-specialist` hoặc `backend-specialist`
+**Nhiệm vụ**: Xác định phạm vi ảnh hưởng của thay đổi ("Blast Radius").
+- Rà soát các file PHP, template trong `layout/**`, và style trong `css/**` bị tác động.
+- Kiểm tra tính tương thích CSS và logic hiển thị hiện có.
 
 ## 🟡 PHASE 2: Enhancement Plan
-**Execution role**: `planning role`
-**Mission**: Strategic addition.
-- **Action**: Create a mini-plan in the `task.md`.
-- **Note**: For major UI overhauls, invoke `/brainstorm` first.
+**Execution role**: `orchestrator`
+**Nhiệm vụ**: Lập kế hoạch thay đổi ngắn gọn.
+- Tạo kế hoạch ngắn gọn trong `task.md`.
+- Với các thay đổi lớn về trải nghiệm người dùng, có thể cân nhắc `/brainstorm` trước.
 
 ## 🔵 PHASE 3: Surgical Implementation
-**Execution role**: `frontend-specialist` or `backend-specialist`
-**Mission**: Add the "WOW" factor.
-- **Action**: Implement changes using `ui-ux-pro-max` standards.
-- **Standard**: Follow [clean-code](file:///skills/clean-code/SKILL.md) and [tailwind-patterns](file:///skills/tailwind-patterns/SKILL.md).
+**Execution role**: `frontend-specialist` (giao diện, CSS, JS) hoặc `backend-specialist` (logic PHP, query)
+**Nhiệm vụ**: Triển khai thay đổi tinh gọn và nhất quán:
+- Tôn trọng phong cách thiết kế hiện tại của website (màu sắc chủ đạo, font chữ, layout container).
+- Viết CSS vào file thích hợp trong `css/**`, JS vào `js/**`.
+- Không làm gián đoạn các biến dữ liệu PHP đang được truyền vào template.
 
 ## 🔴 PHASE 4: Professional Verification
-**Execution role**: `verification role` & `testing role`
-**Mission**: Verify the delta.
-- **Action**: Run `/preview` to playtest the UI.
-- **Action**: Verify that existing tests still pass (Regression Check).
-- **Handoff**: Document the change in `walkthrough.md`.
+**Execution role**: `verifier` & `test-author`
+**Nhiệm vụ**: Xác minh thay đổi.
+- Kiểm tra hiển thị qua `/preview` (lưu ý điều kiện runtime PHP và database).
+- Đảm bảo không phát sinh lỗi hiển thị hoặc lỗi cú pháp PHP.
+- Cập nhật tài liệu thay đổi trong `walkthrough.md`.
 
 ---
 
-## Enhancement Principles:
-- **Non-Destructive**: Don't break existing features to add new ones.
-- **Consistent UI**: New elements must match the existing Design System.
-- **Atomic Commits**: Group project changes in logical git commits.
+## Nguyên tắc Nâng cấp:
+- **Không phá vỡ (Non-Destructive)**: Thêm mới hoặc cải tiến mà không làm hỏng tính năng đang hoạt động.
+- **Nhất quán UI**: Thành phần mới phải hài hòa với giao diện tổng thể của website Long Phát.
+- **Tối giản**: Không đưa thêm framework hay thư viện nặng nề không cần thiết.
 
 ---
 
-## Examples:
-- `/enhance add dark mode toggle`
-- `/enhance integrate Google Auth`
-- `/enhance make the landing page sections fade in`
+## Ví dụ:
+- `/enhance add filter by price range in tour list`
+- `/enhance update header hotline and social links`
+- `/enhance add responsive mobile hamburger menu`

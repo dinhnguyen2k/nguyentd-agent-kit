@@ -1,32 +1,24 @@
 ---
 name: mobile
-description: native mobile application development and optimization.
+description: Tối ưu hóa hiển thị di động (Responsive Mobile Web) cho ứng dụng PHP
 ---
 
-## 📱 Quy trình Phát triển Di động
+## 📱 Quy trình Tối ưu Giao diện Di động (Responsive Web)
 
-> Scope warning: Cogain currently registers no mobile runtime agent or mobile
-> skill. Do not dispatch `mobile-developer`; pause and request an approved mobile
-> profile/project boundary before executing this workflow.
-
-Tối ưu hóa mã nguồn cho môi trường Mobile (React Native / Expo / Flutter).
+> **Cảnh báo phạm vi**: Dự án hiện tại là ứng dụng Web PHP hiển thị giao diện phía server, không có dự án mobile native (React Native / Flutter / iOS / Android) riêng biệt. Quy trình này tập trung vào việc đảm bảo giao diện web tương thích hoàn hảo trên thiết bị di động (Mobile Web Responsive).
 
 ### 1. Thiết kế Mobile-First
-- Chuyên gia: `mobile-developer`.
-- Áp dụng `mobile-design` skill và `web-design-guidelines`.
-- Kiểm tra Touch Targets, Safe Areas và Accessibility.
+- **Execution role**: `frontend-specialist`
+- Đảm bảo thẻ `<meta name="viewport" content="width=device-width, initial-scale=1.0">` có mặt trong `layout/header.php`.
+- Tối ưu kích thước vùng chạm (Touch Targets tối thiểu 44x44px cho buttons và links).
+- Sử dụng CSS Media Queries linh hoạt trong `css/**` cho các breakpoint phổ biến (Mobile < 768px, Tablet 768px - 1024px).
 
-### 2. Tối ưu Hiệu suất
-- Kiểm tra kích thước bundle, lazy loading image.
-- Tối ưu hóa bộ nhớ và pin.
+### 2. Tối ưu Hiệu năng trên Mạng Di động
+- **Execution role**: `frontend-specialist`
+- Tối ưu hóa kích thước hình ảnh banner, tour thumbnail trong `images/**` (dùng WebP, lazy loading `loading="lazy"`).
+- Giảm thiểu dung lượng file CSS và JS tải về client.
 
-### 3. Kiểm thử đa thiết bị (Emulator/Simulator)
-- QA: `qa-automation-engineer`.
-- Chạy test trên các độ phân giải màn hình khác nhau.
-
-### 4. Chuẩn bị Store
-- Cấu hình Metadata, Screenshots và App Icons.
-- Kiểm tra các yêu cầu của App Store / Play Store.
-
-// turbo
-`npx expo prebuild`
+### 3. Kiểm thử Tương thích
+- **Execution role**: `verifier`
+- Kiểm tra hiển thị trên các độ phân giải màn hình khác nhau qua DevTools.
+- Đảm bảo thanh điều hướng mobile (menu hamburger) đóng/mở mượt mà, không tràn ngang (horizontal overflow).

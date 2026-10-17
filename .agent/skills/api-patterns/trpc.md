@@ -1,7 +1,7 @@
 # tRPC Principles
 
 > End-to-end type safety for TypeScript monorepos.
-> Cogain is a .NET backend with React/Vite SPAs; tRPC is a contrast reference, not a default recommendation.
+> This project uses a PHP backend; tRPC is a contrast reference, not a default recommendation.
 
 ## When to Use
 

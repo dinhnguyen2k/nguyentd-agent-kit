@@ -1,6 +1,6 @@
 # Luật trạng thái và tương tác (I)
 
-> Trích nguyên văn từ evondevKit `skills/ui-ux` commit `dff15b4` (MIT). Cogain override trong `frontend-development/SKILL.md` (mục "UI reference") thắng nội dung dưới đây.
+> Trích nguyên văn từ evondevKit `skills/ui-ux` commit `dff15b4` (MIT). Project override trong `frontend-development/SKILL.md` (mục "UI reference") thắng nội dung dưới đây.
 
 <!-- nguồn: references/rules-state.md:150-168 -->
 **I9. Mọi phần tử bấm được phải CÓ hover, và hover đó phải nhìn thấy được.**

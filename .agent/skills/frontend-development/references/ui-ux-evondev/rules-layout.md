@@ -1,6 +1,6 @@
 # Luật khối và bố cục (F)
 
-> Trích nguyên văn từ evondevKit `skills/ui-ux` commit `dff15b4` (MIT). Cogain override trong `frontend-development/SKILL.md` (mục "UI reference") thắng nội dung dưới đây.
+> Trích nguyên văn từ evondevKit `skills/ui-ux` commit `dff15b4` (MIT). Project override trong `frontend-development/SKILL.md` (mục "UI reference") thắng nội dung dưới đây.
 
 <!-- nguồn: references/rules-form.md:34-35 -->
 **F2. Lồng khối tối đa hai tầng.** Card lồng card lồng card là dấu hiệu chưa

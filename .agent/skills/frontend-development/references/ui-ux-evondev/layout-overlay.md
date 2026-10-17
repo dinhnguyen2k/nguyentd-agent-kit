@@ -1,6 +1,6 @@
 # Khối nổi: hộp xác nhận, modal, panel trượt, dropdown, popover lọc
 
-> Trích nguyên văn từ evondevKit `skills/ui-ux` commit `dff15b4` (MIT). Cogain override trong `frontend-development/SKILL.md` (mục "UI reference") thắng nội dung dưới đây.
+> Trích nguyên văn từ evondevKit `skills/ui-ux` commit `dff15b4` (MIT). Project override trong `frontend-development/SKILL.md` (mục "UI reference") thắng nội dung dưới đây.
 
 <!-- nguồn: references/layouts/overlay.md:19-102 -->
 ## Hộp xác nhận

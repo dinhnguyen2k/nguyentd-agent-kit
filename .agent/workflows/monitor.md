@@ -1,48 +1,53 @@
 ---
 name: monitor
-description: Server và Pipeline có ổn không? Cài đặt giám sát ngay.
+description: Giám sát trạng thái hoạt động và sức khỏe của ứng dụng PHP / MySQL
 ---
 
-# /monitor - Full-Stack Observability & Health
+# /monitor - PHP Application Observability & Health
 
 $ARGUMENTS
 
 ---
 
 ## 🟢 PHASE 1: Topology Discovery
-**Execution role**: `deployment role` & `codebase discovery role`
-**Mission**: Map the "Heartbeat" locations.
-- **Action**: Identify critical services, databases, and CI/CD pipelines.
-- **Action**: Locate existing logging and metrics configuration.
+**Execution role**: `orchestrator`
+**Nhiệm vụ**: Xác định các điểm trọng yếu cần giám sát.
+- Điểm kết nối CSDL MySQL (`db.php`).
+- File log lỗi PHP (`error_log` hoặc cấu hình logging của web server).
+- Các endpoint quan trọng: trang chủ, chi tiết tour, form liên hệ, đăng nhập admin.
+- Thư mục lưu trữ tệp tin upload và phân vùng đĩa.
 
 ## 🟡 PHASE 2: Sourcing & Alerting Logic
-**Execution role**: `incident-responder` or `deployment role`
-**Mission**: Define "Healthy."
-- **Action**: Set thresholds for Error Rates, Latency (p99), and Resource Saturation.
-- **Action**: Configure Alerting routes (Slack, Email, PagerTree).
+**Execution role**: `orchestrator`
+**Nhiệm vụ**: Xác định ngưỡng sức khỏe hệ thống.
+- HTTP status: Phản hồi 200 OK cho các trang chính.
+- Tần suất lỗi Fatal Error hoặc PDOException trong PHP error log.
+- Thời gian phản hồi trang web và truy vấn MySQL chậm (Slow Query Log).
 
 ## 🔵 PHASE 3: Surgical Instrumentation
-**Execution role**: `deployment role`
-**Mission**: Install the "Nervous System."
-- **Action**: Setup OpenTelemetry, Prometheus, or Grafana Dashboards.
-- **Action**: Implement log rotation and sanitization filters.
+**Execution role**: `backend-specialist`
+**Nhiệm vụ**: Thiết lập cơ chế ghi nhận và cảnh báo.
+- Bật ghi log lỗi PHP an toàn (ghi log vào file nội bộ, không hiển thị trực tiếp ra màn hình trên môi trường production).
+- Thiết lập cơ chế bắt `PDOException` và ghi nhận chi tiết lỗi vào log hệ thống.
+- Cấu hình bắt lỗi khi gửi email qua PHPMailer.
 
 ## 🔴 PHASE 4: Reliability Audit
-**Execution role**: `verification role`
-**Mission**: Verify the "Watchman."
-- **Verification**: Trigger a mock failure to test alert delivery.
-- **Reporting**: Report the Dashboard URL or "Health Status" to the User.
+**Execution role**: `verifier`
+**Nhiệm vụ**: Xác minh hoạt động của hệ thống giám sát.
+- Kiểm tra tính đầy đủ của file log.
+- Xác nhận không có thông tin đăng nhập CSDL hoặc mật khẩu người dùng bị ghi vào file log.
+- Báo cáo trạng thái sức khỏe tổng thể.
 
 ---
 
-## Observability Principles:
-- **Zero Blindspots**: Monitor the "Critical Path" end-to-end.
-- **No Noise**: Alerts must be actionable; suppress low-signal chatter.
-- **Evidence-Based**: Operational decisions must be based on metrics, not intuition.
+## Nguyên tắc Giám sát:
+- **Không làm chậm ứng dụng**: Cơ chế ghi log phải nhẹ và không gây nghẽn I/O.
+- **Bảo mật Log**: File log không được đặt trong thư mục public có thể tải về trực tiếp từ trình duyệt.
+- **Dựa trên Bằng chứng**: Phán đoán dựa vào số liệu và thông báo lỗi thực tế.
 
 ---
 
-## Examples:
-- `/monitor setup uptime tracking`
-- `/monitor dashboard for backend latency`
-- `/monitor check pipeline reliability`
+## Ví dụ:
+- `/monitor check db connection health`
+- `/monitor inspect php error log`
+- `/monitor check disk space and uploads folder`

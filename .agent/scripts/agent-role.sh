@@ -6,13 +6,16 @@
 #
 #   agent-role.sh                 -> hiện role hiện tại
 #   agent-role.sh verifier        -> mở cổng chạy test suite (TTL 8h)
-#   agent-role.sh test-author     -> mở cổng ghi backend/tests/**
+#   agent-role.sh test-author     -> mở cổng ghi tests/**
 #   agent-role.sh maintainer      -> mở cổng sửa file cấu hình enforcement
 #   agent-role.sh clear           -> quay lại implementer (chặt nhất)
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT="${AGENT_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}"
+if [[ ! -f "$ROOT/.agent/contracts/agent-registry.json" ]]; then
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fi
 STATE_DIR="$ROOT/.agent/scratch/.runtime"
 STATE_FILE="$STATE_DIR/agent-role"
 LOG_FILE="$ROOT/.agent/reports/boundary-guard.log"

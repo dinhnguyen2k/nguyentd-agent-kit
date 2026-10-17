@@ -2,103 +2,105 @@
   "schemaVersion": 1,
   "cases": [
     {
-      "id": "baseservice-select-hook",
-      "skills": ["cogain-baseservice-hooks"],
-      "query": "Add a custom statusCode filter that must work in GetPaged, GetAll and GetDropdown for a Cogain service.",
+      "id": "query-injection-pdo",
+      "skills": ["php-development", "mysql"],
+      "query": "A tour filter endpoint receives $_GET['category'] and $_GET['min_price'] and appends them to a database query.",
       "expected_behavior": [
-        "Inspects BaseService and a nearby override before choosing a seam",
-        "Uses BeforeApplyAutoFilterCoreAsync for the shared paged and non-paged filter",
-        "Preserves BaseService orchestration"
+        "Uses PDO prepared statements with named (:cat, :min_price) or positional (?) placeholders instead of string concatenation",
+        "Binds parameter values explicitly with appropriate PDO types such as PDO::PARAM_INT for integer IDs and prices",
+        "Disables emulated prepares (PDO::ATTR_EMULATE_PREPARES => false) to enforce native server-side prepared statements"
       ],
       "forbidden_behavior": [
-        "Overrides GetPaged, GetAll, or GetDropdown to duplicate orchestration",
-        "Invents a hook without checking source"
+        "Concatenates or interpolates $_GET variables directly into SQL query strings",
+        "Relies on addslashes or string quoting instead of parameter binding for SQL injection defense"
       ]
     },
     {
-      "id": "baseservice-update-order",
-      "skills": ["cogain-baseservice-hooks"],
-      "query": "Resolve snapshots for newly synchronized child rows during Update.",
+      "id": "output-contexts-xss",
+      "skills": ["php-development", "agent-frontend-patterns"],
+      "query": "Render user-submitted customer reviews, tour titles, and search keywords inside PHP templates.",
       "expected_behavior": [
-        "Recognizes AfterMappingAsync runs before child synchronization",
-        "Uses AfterReconcileCollectionsAsync when synchronized children must already exist",
-        "Assesses remote-write consistency"
-      ],
-      "forbidden_behavior": ["Assumes AfterMappingAsync can see incoming synchronized children"]
-    },
-    {
-      "id": "child-sync-natural-key",
-      "skills": ["cogain-child-sync"],
-      "query": "Add OperationDetails collection synchronization to ProductionEstimate; payload rows may omit Id.",
-      "expected_behavior": [
-        "Entity implements ISyncsChildren<ProductionEstimate>",
-        "Service overrides BuildIncomingGraph",
-        "Selects a stable natural key and separates mutable fields into onUpdate",
-        "Uses soft-delete without removing tracked required-FK children"
+        "Escapes output rendered into HTML body and attributes using htmlspecialchars($str, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')",
+        "Encodes dynamic values destined for JavaScript execution contexts using json_encode with safe hex flags",
+        "Preserves valid Unicode characters and Vietnamese accents without garbling"
       ],
       "forbidden_behavior": [
-        "Adds new ReconcileCollections usage",
-        "Makes the entity depend on DTO types",
-        "Removes missing rows from the navigation collection"
+        "Outputs raw, unescaped user or database values directly into HTML body or attributes",
+        "Relies solely on strip_tags for output escaping"
       ]
     },
     {
-      "id": "excel-hook-only",
-      "skills": ["cogain-excel-import-export"],
-      "query": "Customize Product Excel import with batch gRPC lookup and add two template columns.",
+      "id": "csrf-session-guard",
+      "skills": ["php-development"],
+      "query": "Implement a tour booking form that submits passenger details and booking date via POST.",
       "expected_behavior": [
-        "Keeps ImportFromExcel orchestration in BaseService",
-        "Uses import/template hooks after checking their current signatures",
-        "Batch-loads gRPC lookup data",
-        "Keeps parser, template, validation, and export columns consistent"
-      ],
-      "forbidden_behavior": ["Overrides ImportFromExcel", "Calls gRPC once per row or cell"]
-    },
-    {
-      "id": "query-invalidation-family",
-      "skills": ["cogain-query-cache"],
-      "query": "After updating a Job, the detail refreshes but paged, all, and dropdown views remain stale.",
-      "expected_behavior": [
-        "Finds the existing Job query-key family and its consumers",
-        "Invalidates the affected stable prefixes including parameter variants",
-        "Avoids a global cache clear"
-      ],
-      "forbidden_behavior": ["Invents unrelated query keys", "Reloads the page to hide stale cache"]
-    },
-    {
-      "id": "form-nullable-hydration",
-      "skills": ["cogain-form-rhf-zod"],
-      "query": "Edit hydration fails because API fromWarehouseId is null while the form schema expects a string.",
-      "expected_behavior": [
-        "Maps API data to form-safe values during reset",
-        "Normalizes empty form values back to the nullable API contract on submit",
-        "Checks schema, form type, API type, reset, and submit mapping together"
+        "Generates a cryptographically secure token using bin2hex(random_bytes(32)) stored in $_SESSION",
+        "Renders the CSRF token into a hidden input field within the HTML form",
+        "Validates the incoming token strictly as a non-empty string and verifies it with hash_equals",
+        "Configures session cookie parameters with httponly and samesite before session_start"
       ],
       "forbidden_behavior": [
-        "Weakens the form to any",
-        "Changes the backend contract only to satisfy a UI control"
+        "Processes state-changing POST requests without verifying a CSRF token",
+        "Compares security tokens using loose equality (== or !=)",
+        "Allows empty string tokens to match"
       ]
     },
     {
-      "id": "form-effect-loop",
-      "skills": ["cogain-form-rhf-zod", "cogain-agent-gotchas"],
-      "query": "A watched React Hook Form field is set inside useEffect and causes Maximum update depth exceeded.",
+      "id": "secure-file-upload",
+      "skills": ["php-development"],
+      "query": "Allow admin users to upload tour banner images with thumbnail preview.",
       "expected_behavior": [
-        "Makes the effect idempotent by comparing getValues before setValue",
-        "Hoists watched values instead of calling watch in dependency expressions",
-        "Adds regression coverage when practical"
+        "Validates that $_FILES['image']['error'] equals UPLOAD_ERR_OK and enforces an explicit maximum file size limit",
+        "Verifies MIME type on the server using finfo or mime_content_type against a strict image allowlist (jpg, png, webp)",
+        "Generates a randomized, unique target filename on disk to prevent path traversal and overwrite attacks",
+        "Stores uploaded files in a designated directory with PHP script execution disabled"
       ],
-      "forbidden_behavior": ["Uses a changing key prop to force remounts as the primary fix"]
+      "forbidden_behavior": [
+        "Trusts client-provided $_FILES['image']['type'] or original file extension alone",
+        "Allows executable file extensions (.php, .phtml, .phar) to be uploaded or executed"
+      ]
     },
     {
-      "id": "gotcha-endpoint-verification",
-      "skills": ["cogain-agent-gotchas"],
-      "query": "Create a new frontend query for item-templates/production-order-source.",
+      "id": "phpmailer-smtp-dispatch",
+      "skills": ["php-development"],
+      "query": "Send a booking confirmation email to the customer upon successful payment using PHPMailer.",
       "expected_behavior": [
-        "Verifies the route exists in backend controllers or existing clients before implementation",
-        "Uses an existing endpoint/local derivation if the proposed route does not exist"
+        "Loads PHPMailer via Composer autoload (vendor/autoload.php) and instantiates PHPMailer\\PHPMailer\\PHPMailer",
+        "Configures SMTP with UTF-8 charset, authentication, and secure transport (TLS/SSL)",
+        "Catches mailer exceptions and logs failures without exposing SMTP credentials in error output or responses"
       ],
-      "forbidden_behavior": ["Implements a client call to an unverified endpoint"]
+      "forbidden_behavior": [
+        "Hardcodes SMTP passwords or credentials in the script",
+        "Allows unescaped user input into email recipient headers"
+      ]
+    },
+    {
+      "id": "mysql-vs-sqlite-dialect",
+      "skills": ["mysql", "php-development"],
+      "query": "Configure database connection and write a paginated query with limit, offset, and foreign key constraints.",
+      "expected_behavior": [
+        "Uses the MySQL PDO DSN (mysql:host=...;dbname=...;charset=utf8mb4) matching the verified application driver",
+        "Uses MySQL-compatible schema types (e.g. INT UNSIGNED AUTO_INCREMENT, DECIMAL for currency, DATETIME)",
+        "Binds LIMIT and OFFSET values as explicit integer types (PDO::PARAM_INT)"
+      ],
+      "forbidden_behavior": [
+        "Uses SQLite-specific pragma or DSN syntax when MySQL is the configured driver",
+        "Uses FLOAT or DOUBLE for monetary amounts"
+      ]
+    },
+    {
+      "id": "ownership-lane-separation",
+      "skills": ["agent-backend-patterns", "agent-frontend-patterns"],
+      "query": "Add a new tour booking status filter in the admin tour management page.",
+      "expected_behavior": [
+        "Keeps backend database querying and status handling in the PHP script or admin handler",
+        "Keeps UI styling, CSS classes, and client-side DOM interactions in layout templates and stylesheets",
+        "Maintains single ownership per task without conflicting concurrent writes to presentation and logic"
+      ],
+      "forbidden_behavior": [
+        "Inlines database queries directly into client-side JavaScript",
+        "Allows overlapping uncoordinated edits across backend and frontend boundaries"
+      ]
     }
   ]
 }

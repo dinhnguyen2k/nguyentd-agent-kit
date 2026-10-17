@@ -2,15 +2,15 @@
 name: requesting-code-review
 description: Use before merging governed work or when an explicit independent review is requested.
 metadata:
-  version: "4.1.0-cogain"
+  version: "4.1.0"
 ---
 
-# Cogain On-Demand Review & Governed Verification
+# On-Demand Review & Governed Verification
 
 Code review is opt-in and runs only when explicitly requested by the user.
 Ordinary deliverables are coordinated directly by `main` using concise `allowed_paths`, `Reuse`, and `Acceptance` and verified from source evidence without a mandatory merge gate or automatic `reviewer` invocation.
 
-When the user explicitly requests an independent code review, use the read-only `reviewer` role or inspect directly with [code-reviewer](../code-reviewer/SKILL.md) (risk and Cogain D1-D10 rubric) or [code-review](../code-review/SKILL.md) (fixed-point Standards/Spec diff review).
+When the user explicitly requests an independent code review, use the read-only `reviewer` role or inspect directly with [code-reviewer](../code-reviewer/SKILL.md) (risk and project D1-D10 rubric) or [code-review](../code-review/SKILL.md) (fixed-point Standards/Spec diff review).
 
 For governed work that requires independent acceptance verification, pass the Task Manifest, diff, validation commands/results, and
 residual risks to the registered read-only `verifier`.

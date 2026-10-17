@@ -37,8 +37,8 @@ $ARGUMENTS
 ## 🔵 PHASE 3: Execution (The RED-GREEN Loop)
 **Execution role**: `test-author` (viết test), `verifier` / `test-author` (chạy khi được phép)
 **Mission**: Automate the verification.
-- **Action**: Viết unit, integration và E2E tests trong scope được cấp; chỉ chạy khi có quyền execution riêng.
-- **Audit**: Khi được phép chạy, ghi bằng chứng RED rồi GREEN để xác nhận test kiểm chứng hành vi; chưa chạy thì không tuyên bố đã xác thực.
+- **Action**: Viết unit, integration tests trong scope được cấp; chỉ chạy khi có quyền execution riêng và test runner (như PHPUnit) thực sự đã được cài đặt trong project. Không bịa đặt kết quả chạy test khi chưa có test runner.
+- **Audit**: Khi được phép chạy và có test runner, ghi bằng chứng RED rồi GREEN để xác nhận test; nếu chưa có test runner hoặc chưa được phép chạy, ghi nhận `Validation: not run - test runner not configured / not requested`.
 
 ## 🔴 PHASE 4: Coverage & Quality Sign-off
 **Execution role**: `verifier`

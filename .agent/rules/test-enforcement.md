@@ -1,83 +1,63 @@
 ---
 trigger: glob
-glob: "backend/**/*,frontend/**/*"
+glob: "**/*.php,tests/**"
+description: "Quy tắc kiểm thử và phân định ranh giới vai trò: ON-DEMAND ONLY, tách quyền viết test, verifier, test-author và các lệnh kiểm tra PHP an toàn."
 ---
 
-# TEST-ENFORCEMENT.MD - Bắt Buộc Có Test
+# TEST-ENFORCEMENT.MD - Quy Tắc Kiểm Thử & Ranh Giới Vai Trò
 
-> Tách từ `AI_RULES.md` mục 9. `AI_RULES.md` vẫn là nguồn sự thật cao nhất.
-> File này nói về nghĩa vụ chạy/viết test khi đổi code production.
-> Chuẩn viết test xem `.agent/rules/testing-standard.md`.
+> Mục tiêu: Đảm bảo chất lượng mã nguồn PHP/JS, phân định ranh giới vai trò rõ ràng giữa người triển khai (`implementer`) và người kiểm thử (`test-author`, `verifier`), ngăn ngừa tình trạng test giả hoặc tự ý chạy lệnh tốn tài nguyên.
 
-## 1. Khi nào phải chạy test và ranh giới Agent
+---
 
-- **Phân định vai trò:** Việc chạy test suite (`dotnet test`) và kiểm chứng tự động thuộc về Agent nghiệm thu (`verifier`).
-- **Trong task phân tích hoặc task triển khai cục bộ/đơn giản:**
-  - Agent triển khai (`backend-specialist` / implementer) **TUYỆT ĐỐI CẤM** tự ý chạy `dotnet test`.
-  - **DO NOT RUN `dotnet build` automatically. ON-DEMAND ONLY:** chỉ chạy khi user
-    yêu cầu rõ build project/scope tương ứng.
-  - Cấm tự tiện chạy test làm phiên làm việc kéo dài bất hợp lý (treo máy, tốn token, phát sinh lỗi từ test không liên quan).
-- **ON-DEMAND ONLY:** activate test execution only when the user explicitly requests
-  `verifier` or a test command/scope. `/orchestrate`, risk level, task manifest, or
-  test-author assignment does not authorize test execution.
-- **IDEMPOTENT BUILD:** explicit authorization permits one build of the requested
-  scope for the current relevant source state. DO NOT rerun after success when
-  relevant inputs have not changed.
+## 1. Khi Nào Chạy Kiểm Thử Và Ranh Giới Vai Trò
 
-### Cưỡng chế ở runtime, không phải lời dặn
+1. **Phân định vai trò (Role Separation)**:
+   - Việc chạy bộ kiểm thử và kiểm chứng tự động thuộc về Agent nghiệm thu (`verifier`).
+   - Agent triển khai (`backend-specialist`, `frontend-specialist`, `implementer`): **TUYỆT ĐỐI CẤM** tự ý chạy các lệnh kiểm thử tự động, lint hoặc build giữa phiên làm việc.
+2. **Nguyên tắc ON-DEMAND ONLY (BẮT BUỘC)**:
+   - **DO NOT RUN test or lint automatically.**
+   - Chỉ kích hoạt lệnh kiểm thử khi người dùng yêu cầu rõ ràng đích danh vai trò `verifier` hoặc một lệnh/phạm vi kiểm tra cụ thể (`php -l`, `composer validate`, `test`).
+   - Các chỉ thị lập kế hoạch, task manifest, hoặc phân công `test-author` KHÔNG cấp quyền tự động chạy kiểm thử.
+3. **Tính Idempotent**:
+   - Khi có sự cho phép rõ ràng từ người dùng, chỉ chạy kiểm thử 1 lần cho trạng thái mã nguồn hiện tại. Không chạy lại khi các file liên quan chưa có thay đổi.
 
-Ba luật dưới đây do PreToolUse hook `.agent/scripts/agent-boundary-guard.mjs` thực thi (wiring tại `.claude/settings.json`), đọc cấu hình từ `.agent/contracts/agent-registry.json`:
+---
 
-| Rule | Chặn gì | Role được phép |
-| --- | --- | --- |
-| R1 | Lệnh chạy test suite: `dotnet test`, `vitest`, `jest`, `playwright test`, `npm/pnpm/yarn test` | `verifier`, `test-author` |
-| R2 | Ghi vào cây test, qua Edit/Write hoặc qua shell (`sed -i`, `cp`, `mv`, `>`, `git checkout`) | `test-author` |
-| R3 | Sửa chính file cấu hình enforcement (registry, guard, settings) | `maintainer` |
+## 2. Ranh Giới Bảo Vệ Ở Tầng Runtime
 
-`verifier` và `test-author` là subagent thật trong `.claude/agents/`, nên `verifier` không được cấp Edit/Write ở tầng runtime.
-Harness không có hook (Codex, Antigravity, CI) dùng chung bộ luật qua CLI: `node .agent/scripts/agent-boundary-guard.mjs --check-command "<cmd>"`, exit 2 là bị chặn.
+Quy định phân quyền thực thi qua boundary guard và các biến môi trường:
 
-Role mặc định là `implementer`, chặt nhất. Người dùng mở cổng bằng `! .agent/scripts/agent-role.sh verifier`, hiệu lực 8 giờ rồi tự hết hạn.
-Khai báo cho đúng một lệnh thì đặt `COGAIN_AGENT_ROLE=verifier` ở đầu dòng lệnh; cách này luôn hiện trong transcript nên không giấu được.
-Agent bị chặn thì dừng và báo lại, tuyệt đối không tự chạy lệnh mở cổng cho chính mình. Mọi lần chặn và mọi lần đổi role đều ghi vào `.agent/reports/boundary-guard.log`.
+| Rule | Mục tiêu chặn | Role được phép |
+|---|---|---|
+| **R1** | Chạy lệnh kiểm thử / test suite: `phpunit`, `jest`, `vitest`, `playwright`, `npm test` | `verifier`, `test-author` |
+| **R2** | Ghi vào thư mục kiểm thử (`tests/**`, `*Test.php`) qua Edit/Write hoặc shell | `test-author` |
+| **R3** | Sửa các file cấu hình enforcement (boundary guard, settings) | `maintainer` |
 
-## 2. Tách quyền viết test (chống test xanh giả)
+- **Biến môi trường vai trò**: Biến `COGAIN_AGENT_ROLE` được giữ nguyên (tên biến lịch sử để đảm bảo tương thích hệ thống). Ví dụ khi thực thi với role verifier: `COGAIN_AGENT_ROLE=verifier`.
+- Role mặc định là `implementer` (chặt nhất). Agent bị chặn thì dừng lại và báo cáo, tuyệt đối không tự ý mở quyền cho chính mình.
 
-Agent viết code production **không được viết test cho chính code đó**, vì nó sẽ
-mã hoá hành vi nó vừa tạo ra, kể cả hành vi sai. Việc viết test thuộc về
-`test-author` (xem `.agent/contracts/agent-registry.json`, mục `invariants`).
+---
 
-- Cấm sửa/xoá assertion, thêm `Skip`, hay chỉnh expected value cho khớp output
-  quan sát được, chỉ để build xanh.
-- Test mâu thuẫn spec → dừng, báo `test-spec-conflict`, để user quyết.
-- `test-author` chạy **song song** với specialist (write path rời nhau), không
-  waterfall. Cả hai nhận cùng một spec và không thấy output của nhau khi đang chạy,
-  đó chính là cơ chế giữ test độc lập.
-- `verifier` kiểm tra biên bằng checksum, không bằng `git diff`: cây test cố tình
-  nằm ngoài git (`.git/info/exclude`) nên `git diff` không thấy chúng.
+## 3. Tách Quyền Viết Test (Chống Test Xanh Giả)
 
-Chặn ghi test chỉ bịt **1 trong 4** đường gian lận. Ba đường còn lại nằm ngay
-trong `backend/src/**` (vùng ghi hợp lệ của specialist) nên checksum không thấy:
+1. **Người viết code không viết test cho chính mình**:
+   - Agent triển khai code tính năng (`backend-specialist`) **không được viết test cho chính code đó**, nhằm tránh việc vô tình hợp thức hóa các hành vi sai lệch vừa tạo ra.
+   - Việc viết test độc lập thuộc về vai trò `test-author` (sở hữu thư mục `tests/**`, `*Test.php`).
+2. **Cấm các hành vi gian lận test**:
+   - Cấm sửa assertion, xóa test, hoặc hardcode giá trị fixture vào code production chỉ để test vượt qua.
+   - Cấm nuốt exception hoặc nới lỏng khối `catch` để che giấu lỗi thực tế.
+3. **Đánh giá dựa trên diff thực tế**:
+   - `verifier` phải đọc kỹ diff thay đổi của implementation và so khớp với yêu cầu nghiệp vụ, không chỉ dựa vào việc test chạy thành công.
 
-1. Hardcode giá trị fixture vào code production, hoặc nhánh rẽ theo đúng input mà chỉ test truyền vào.
-2. Override so sánh/`Equals`/`GetHashCode` cho assertion luôn đúng.
-3. Giữ state ẩn (đếm lần gọi) để cùng input trả kết quả khác nhau giữa các lần.
-4. Early return, nuốt exception, hoặc nới `catch` để lỗi thật thành pass.
+---
 
-`verifier` phải đọc diff implementation, không chỉ nhìn kết quả xanh. Kết luận
-dựa trên diff và task manifest, không dựa trên màu xanh của test. Điểm nào còn
-tranh cãi thì đưa vào `residual_risks` và hỏi user, đừng tự quyết.
+## 4. Các Lệnh Kiểm Tra Thực Tế Trong Ứng Dụng PHP
 
-## 3. Red hồi tố (bù cho việc chạy song song)
-
-Khi user đã yêu cầu test execution, `verifier` có thể dựng lại Red: `git stash`
-phần `backend/src`, chạy test mới trên code cũ, **bắt buộc phải đỏ**. Test nào xanh
-trên cả code cũ lẫn code mới thì không kiểm chứng được gì → loại (`vacuous-test`).
-
-## 4. SQLite ≠ PostgreSQL
-
-Unit test chạy SQLite in-memory, production chạy PostgreSQL. Case-sensitivity của
-so sánh chuỗi, xử lý ngày/giờ, JSON column và `EF.Functions` đều có thể khác nhau
-⇒ test xanh trên SQLite vẫn có thể hỏng trên Postgres. Hành vi nào phụ thuộc ngữ
-nghĩa của DB thì phải có integration test chạy Postgres thật, không được coi unit
-test SQLite là đủ.
+1. **Kiểm tra cú pháp PHP (Syntax Lint)**:
+   - Lệnh: `php -l <file.php>` (ví dụ: `php -l db.php` hoặc `php -l index.php`).
+   - *Lưu ý môi trường runtime*: Lệnh `php -l` chỉ khả dụng khi máy chủ hoặc môi trường container đã cài đặt CLI `php`. Nếu môi trường chỉ có Node.js mà chưa có binary `php`, không cố chạy lệnh này để tránh phát sinh lỗi `command not found`; thay vào đó thực hiện static inspection.
+2. **Kiểm tra tính hợp lệ của Composer**:
+   - Lệnh: `composer validate` (chỉ khi có Composer CLI).
+3. **Kiểm thử đơn vị (PHPUnit)**:
+   - Chỉ chạy khi dự án đã được cài đặt và cấu hình PHPUnit trong `composer.json` (hiện tại repo chưa cài đặt PHPUnit, không giả định sự tồn tại của nó).

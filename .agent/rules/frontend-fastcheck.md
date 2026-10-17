@@ -1,57 +1,57 @@
 ---
 trigger: model_decision
-description: "When validating frontend changes, choosing between quick/full check, running or modifying frontend/fast-check.sh, or reporting frontend build results."
+description: "When validating frontend and PHP UI changes, choosing between PHP syntax lint, browser/DOM checks, and asset path verification."
 ---
 
-# FRONTEND-FASTCHECK.MD - ON-DEMAND ONLY
+# FRONTEND-FASTCHECK.MD - ON-DEMAND ONLY (Kiểm Tra Giao Diện & Template PHP)
 
-> Tách từ `.agent/rules/frontend.md` mục 12.3 để không nạp vào mọi lần chạm file frontend.
+> Mục tiêu: Hướng dẫn các phương thức kiểm tra giao diện server-rendered PHP, CSS, JS an toàn và có sẵn trong dự án.
+>
+> ⚠️ **CẤM TUYỆT ĐỐI**: Không bao giờ gợi ý, tìm kiếm hoặc chạy script hư cấu `./frontend/fast-check.sh`. Script đó không tồn tại trong hệ thống.
 
-`./frontend/fast-check.sh` is optional and local-only.
+---
 
-**DO NOT RUN THIS SCRIPT AUTOMATICALLY. ON-DEMAND ONLY.**
+## 1. Nguyên Tắc ON-DEMAND ONLY (BẮT BUỘC)
 
-- Run it only when the user explicitly requests frontend typecheck or build validation.
-- An agent, skill, workflow, handoff checklist, governed task, or changed route/shared
-  file must not activate it by inference.
-- Always pass the target app explicitly. Do not infer scope from the dirty worktree.
-- Do not use `--all` unless the user explicitly requests all frontend apps.
-- **IDEMPOTENT:** do not repeat the same mode for unchanged relevant inputs.
+1. **KHÔNG CHẠY TỰ ĐỘNG**:
+   - Tuyệt đối không tự ý chạy các lệnh lint, validate, browser check hoặc test tự động sau khi sửa code.
+   - Các từ khóa như `fix`, `implement`, `xong`, `đã sửa` hoặc trạng thái bàn giao bình thường **KHÔNG** cấp quyền chạy lệnh kiểm tra.
+2. **Chỉ chạy khi có yêu cầu rõ ràng**:
+   - Chỉ thực thi lệnh kiểm tra khi người dùng nêu đích danh yêu cầu như: `lint`, `check cú pháp`, `verify`, `kiểm tra giao diện`.
+3. **Tính Idempotent**:
+   - Khi đã được yêu cầu kiểm tra, chỉ chạy lệnh đúng 1 lần cho trạng thái mã nguồn hiện tại. Không lặp lại cùng một lệnh khi code chưa thay đổi.
 
-## Nấc 1 - Quick Mode
+---
 
-`./frontend/fast-check.sh <app> --quick` - incremental TypeScript typecheck.
+## 2. Các Công Cụ Kiểm Tra Thực Tế Trong Dự Án
 
-Giới hạn: CHỈ bắt lỗi type. Không bắt được import CSS/asset sai đường dẫn, CJS/ESM
-export mismatch, hay lỗi resolve của TanStack Router. Đó là lỗi tầng Rollup, tsc mù
-hoàn toàn.
+### Nấc 1: Kiểm Tra Cú Pháp PHP Template (`php -l`)
+- **Mục đích**: Phát hiện lỗi cú pháp, thiếu dấu chấm phẩy, quên đóng ngoặc trong file PHP view/template.
+- **Lệnh**: `php -l <path/to/file.php>` (ví dụ: `php -l layout/header.php` hoặc `php -l admin/tour/index.php`).
+- **Điều kiện môi trường runtime**:
+  - Lệnh này **chỉ thực hiện được khi CLI `php` đã được cài đặt trên môi trường/máy chủ**.
+  - Nếu môi trường chưa có binary `php` (ví dụ trong container rút gọn chỉ có Node.js), Agent **KHÔNG ĐƯỢC** gọi lệnh `php` dẫn đến lỗi `command not found`, mà chuyển sang rà soát cú pháp tĩnh bằng mắt/đọc file.
 
-## Nấc 2 - Full Mode
+### Nấc 2: Kiểm Tra Đường Dẫn Tài Nguyên Tĩnh (Asset Path Verification)
+- **Mục đích**: Phát hiện liên kết hỏng (404) của file CSS, JavaScript, hình ảnh hoặc font chữ.
+- **Cách thực hiện**:
+  - Đọc file PHP template và rà soát các thẻ:
+    - `<link rel="stylesheet" href="...">`
+    - `<script src="...">`
+    - `<img src="...">`
+  - Đối chiếu đường dẫn với các tệp thực tế nằm trong `css/`, `js/`, `images/`, `uploads/`. Đảm bảo đường dẫn chính xác cho cả trang root và trang con trong `admin/`.
 
-`./frontend/fast-check.sh <app>` (typecheck + Vite build).
+### Nấc 3: Kiểm Tra Trình Duyệt & Console (Browser & DOM Check)
+- **Mục đích**: Kiểm tra giao diện render thực tế trên trình duyệt và các lỗi JavaScript tại console.
+- **Cách thực hiện**:
+  - Kiểm tra DOM tree được sinh ra từ PHP có thẻ HTML hợp lệ, không bị lồng thẻ sai quy cách.
+  - Mở Developer Tools Console kiểm tra xem có lỗi JavaScript runtime, lỗi cú pháp hoặc cảnh báo thư viện (như jQuery, CKEditor) hay không.
 
-Chỉ dùng full mode khi người dùng yêu cầu build/validation có kiểm tra import, CSS,
-asset hoặc module resolution. Thời gian phụ thuộc mạnh vào từng app: `erp` ~25s,
-`interactive` ~59s, lần build đầu khi cache Vite còn nguội có thể lên ~112s.
+---
 
-Full mode bắt được lỗi import/CSS/asset/dynamic-import của Vite. Nó không phải điều
-kiện để báo implementation đã hoàn tất.
+## 3. Trạng Thái Bàn Giao (Handoff Status)
 
-## Route Generation
-
-`./frontend/fast-check.sh <app> --routes` chỉ dùng khi route tree hoặc router config
-thay đổi và người dùng yêu cầu validation. `--quick` không tự generate routes.
-
-`--all` là lựa chọn explicit cho người dùng. Agent không tự dùng `--all` vì thay đổi
-shared hoặc vì không xác định được target app.
-
-## Ghi chú kỹ thuật (đừng "tối ưu" ngược lại)
-
-- `--incremental` truyền qua CLI, KHÔNG sửa `tsconfig.app.json` (file này Git đang
-  theo dõi). `tsBuildInfoFile` đã có sẵn trong config nên cache hoạt động ngay.
-- Vite build trong script chạy `--minify false` và ghi ra
-  `node_modules/.tmp/fastcheck-dist`, nên KHÔNG đè `dist/` production và không làm
-  bẩn git status. Bỏ minify không giảm khả năng bắt lỗi vì lỗi import/CSS/route xảy
-  ra ở khâu resolve + bundle, trước minify.
-- Log tsc/vite bị nuốt, chỉ in khi FAIL (warning của `@tanstack/router-plugin` rất
-  ồn, ~87KB mỗi lần build). Khi PASS output chỉ còn vài dòng.
+- Sau khi hoàn thành sửa đổi mã nguồn: `Status: implemented`.
+- Khi người dùng không yêu cầu chạy kiểm tra: `Validation: not run - not requested`.
+- Khi người dùng yêu cầu kiểm tra và đã có kết quả cụ thể: `Status: verified`.
+- **TUYỆT ĐỐI KHÔNG** chặn bàn giao mã nguồn chỉ vì chờ đợi một bước kiểm tra không được yêu cầu.

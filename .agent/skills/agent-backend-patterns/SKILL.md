@@ -1,114 +1,76 @@
 ---
 name: agent-backend-patterns
-description: >
-  Backend patterns for the Cogain ASP.NET Core 8 microservices backend (C#).
-  Layered architecture (API -> Services -> Repositories -> Data), Result<T> contract,
-  BaseService hooks, EF Core / PostgreSQL optimization, transactions & compensation,
-  Redis caching, permission-based authorization, Serilog logging.
-  Use when writing, reviewing, or auditing anything under `backend/**`.
+description: Backend patterns for PHP/PDO procedural applications. Covers PDO prepared statements, input sanitization, CSRF, session auth, file uploads, PHPMailer, transaction boundaries, and MySQL query optimization. Use when writing, reviewing, or auditing PHP backend code.
 metadata:
-  version: "5.0.0-csharp"
+  version: "2.0.0-php"
 ---
 
-# Backend Patterns (C# / ASP.NET Core 8)
+# Backend Patterns (PHP / PDO / MySQL)
 
-Patterns and review criteria for `backend/src/**`. All examples are C# and follow the
-conventions that already exist in this repository — not generic textbook patterns.
+Patterns and review criteria for the PHP backend of this project. All examples reflect the actual conventions used in this repository — plain procedural PHP pages, `db.php` PDO MySQL connection, `admin/**` management scripts, and Composer PHPMailer — not framework abstractions.
 
 ## Stack facts (do not contradict these)
 
 | Concern | What this repo actually uses |
 | --- | --- |
-| Runtime | .NET 8, ASP.NET Core 8 microservices, `backend/CogainSolution.sln` |
-| Layers | `<Service>.API` -> `<Service>.Services` -> `<Service>.Repositories` -> `<Service>.Data` |
-| Shared code | `backend/src/BuildingBlocks/{Contracts,Infrastructure,Shared}` |
-| Gateway | `OcelotApiGw` (Ocelot + Polly + CacheManager) |
-| Database | PostgreSQL + EF Core 8, snake_case columns, soft delete via `DeletedDate` |
-| API contract | `Result`, `Result<T>`, `PagedResult<T>` (`Contracts.Domain.Entities`) |
-| CRUD engine | `BaseService<...>` + `BaseController` / `BaseExcelController` |
-| Data access | `IBaseRepository<TEntity>`, `IUnitOfWork` (`Contracts.Domain.Interfaces`) |
-| Cache | Redis via `StackExchange.Redis` (`IDatabase`, `IConnectionMultiplexer`) |
-| Messaging | `IEventBus` -> Kafka (`KafkaEventBus`) or MassTransit (`MassTransitEventBus`) |
-| Inter-service | gRPC clients (e.g. `MasterDataInfoGrpc.MasterDataInfoGrpcClient`) |
-| Auth | Authentik OIDC + `AddJwtBearer`; permissions as `Resource.Action` |
-| Validation | FluentValidation (`AbstractValidator<T>`) |
-| Logging | Serilog — `Serilog.ILogger` in services, `ILogger<T>` in middleware |
-| Mapping | AutoMapper 14 |
+| Runtime | Plain procedural PHP (`*.php`, `admin/**`), Apache/Nginx web server |
+| Package manager | Composer with `phpmailer/phpmailer: ^6.10` (`vendor/autoload.php`) |
+| Database | MySQL via PDO (`mysql:host=$host;dbname=$db;charset=$charset`) in `db.php` |
+| Presentation | Server-rendered templates (`layout/header.php`, `layout/footer.php`) |
+| Authentication | Native PHP sessions (`$_SESSION`), cookie-based, password hashing (`password_hash`, `password_verify`) |
+| Data access | Direct PDO prepared statements (`$pdo->prepare()`, `bindValue()`, `execute()`) |
+| Transactions | Explicit `$pdo->beginTransaction()`, `$pdo->commit()`, `$pdo->rollBack()` |
+| File uploads | Native `$_FILES` with server-side MIME type verification and randomized file names |
+| Email | `PHPMailer\PHPMailer\PHPMailer` via Composer autoload |
 
 ## Use this skill when
 
-- Implementing or changing a service under `backend/src/Services/**`
-- Reviewing / auditing a backend diff (`/audit` Medium & High risk)
-- Touching transactions, cross-service writes, caching, or authorization
-- Optimizing EF Core queries or gRPC fan-out
+- Implementing or changing a backend script (`*.php`, `admin/**`).
+- Reviewing or auditing a PHP backend diff or bugfix.
+- Handling database queries, transactions, or schema updates with PDO MySQL.
+- Implementing authentication, session checks, CSRF guards, or form handlers.
+- Adding secure file upload logic or email dispatch via PHPMailer.
 
 ## Do not use this skill when
 
-- The change is frontend-only (`frontend/**`) -> use `agent-frontend-patterns`
-- You need language-level C# guidance only -> use `csharp-latest-standards` / `csharp-pro`
-- You need deep .NET architecture theory -> use `dotnet-backend-patterns`
+- The change is styling/client-script only -> use `agent-frontend-patterns` or `frontend-development`.
+- You need deep MySQL schema or index tuning only -> use `mysql` or `database-optimizer`.
+- You are writing automated tests -> use `testing-patterns`.
 
 ## Precedence
 
-`AI_RULES.md` > `.agent/rules/backend.md` > `.agent/rules/backend-pragmatic-solid.md` > this skill.
+`AI_RULES.md` > `.agent/rules/backend.md` > this skill.
 This skill shows *how* to implement those rules; it never overrides them.
 
 ## Audit checklist (fast pass)
 
-Contract & API
-- [ ] Returns `Result` / `Result<T>` / `PagedResult<T>`; no raw DTO or anonymous object
-- [ ] Business failures use **400** via `Result.Failure(msg)` — never ad-hoc 401/403/409
-- [ ] Controller stays thin; no business logic, no `DbContext`, no repository calls
+### SQL & Data Safety
+- [ ] Prepared statements used for 100% of dynamic queries; **zero** raw variable interpolation in SQL strings.
+- [ ] `bindValue()` uses explicit PDO parameter types (`PDO::PARAM_INT` for LIMIT/OFFSET/IDs, `PDO::PARAM_STR` for strings).
+- [ ] Multi-table writes wrapped in `try { $pdo->beginTransaction(); ... $pdo->commit(); } catch (\PDOException $e) { $pdo->rollBack(); }`.
+- [ ] Database credentials read from configuration/environment; never printed or committed.
 
-Service layer
-- [ ] No override of `ImportFromExcel` / `ExportTemplateAsync` / `ExportDataAsync`
-- [ ] Customization done through `BaseService` hooks, not by re-implementing core methods
-- [ ] `CancellationToken` propagated through every async path it can reach
+### Input, Output & Security
+- [ ] Output escaping: all user/DB data printed in HTML passes through `htmlspecialchars($val, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')`.
+- [ ] CSRF protection: POST requests validate `hash_equals($_SESSION['csrf_token'] ?? '', $_POST['csrf_token'] ?? '')`.
+- [ ] Authentication: Admin pages (`admin/**`) verify session login state before rendering or processing actions.
+- [ ] Session security: `session_regenerate_id(true)` invoked upon login; session cookie params set with `httponly: true` and `samesite: 'Lax'`.
+- [ ] Passwords hashed with `password_hash($password, PASSWORD_DEFAULT)` and verified with `password_verify()`.
 
-Data & performance
-- [ ] `.AsNoTracking()` on read-only queries over non-trivial sets
-- [ ] Projection / deliberate `Include` — no accidental N+1, no `Include` fan-out for unused data
-- [ ] Large `IN` sets use `array.Contains(x.Id)` with a materialized `.ToArray()`
-- [ ] gRPC calls skipped entirely when the id list is empty
-- [ ] Soft-delete respected; unique indexes carry `.HasFilter("\"deleted_date\" IS NULL")`
+### File Uploads & External Services
+- [ ] File uploads validate `error === UPLOAD_ERR_OK`, check file size against maximum limit.
+- [ ] Server-side MIME validation via `finfo` / `FILEINFO_MIME_TYPE`, never trusting client `type` or raw extension.
+- [ ] Uploaded files saved with unique randomized names into non-executable directories.
+- [ ] PHPMailer errors logged without exposing SMTP credentials; email bodies properly sanitized.
 
-Consistency
-- [ ] Multi-step writes wrapped in `ExecuteInTransactionAsync` (or explicit Begin/Commit/Rollback)
-- [ ] Cross-service writes declare their model: compensation, outbox, or saga
-- [ ] Read-check-write races protected (`AcquireAdvisoryLockAsync` or a DB constraint)
+### Code Organization
+- [ ] Database instance reused via `require_once 'db.php'` or equivalent; no duplicate connection instances.
+- [ ] Form submissions use PRG (Post-Redirect-Get) to prevent accidental resubmission on page refresh.
+- [ ] Clean separation between presentation (`layout/**`) and data processing logic.
 
-Security
-- [ ] `[HasPermission(resource, action)]` present; no static role checks, no auth bypass
-- [ ] Employee-scoped flows validate the `X-Employee-Id` GUID header
-- [ ] No hardcoded secrets / tokens / API keys
+## Reference Routing
 
-Observability & tests
-- [ ] Errors logged with structured Serilog properties; no silent `catch { }`
-- [ ] Cache writes have a TTL and a matching invalidation path
-- [ ] Tests under `backend/tests/**` cover money / permission / inventory / legal invariants
-
-## 🧠 Knowledge Modules (Fractal Skills)
-
-### 1. [Layered Architecture & Controllers](./sub-skills/layered-architecture-and-controllers.md)
-### 2. [Result Contract & Status Codes](./sub-skills/result-contract-and-status-codes.md)
-### 3. [Repository & Unit of Work](./sub-skills/repository-and-unit-of-work.md)
-### 4. [BaseService Hook Pattern](./sub-skills/baseservice-hook-pattern.md)
-### 5. [Validation with FluentValidation](./sub-skills/validation-with-fluentvalidation.md)
-### 6. [Middleware & Action Filters](./sub-skills/middleware-and-filters.md)
-### 7. [Centralized Error Handling](./sub-skills/centralized-error-handling.md)
-### 8. [EF Core Query Optimization](./sub-skills/ef-core-query-optimization.md)
-### 9. [N+1 Prevention & Batch Loading](./sub-skills/n1-prevention-and-batch-loading.md)
-### 10. [Soft Delete & Filtered Indexes](./sub-skills/soft-delete-and-filtered-indexes.md)
-### 11. [Transactions & Advisory Locks](./sub-skills/transactions-and-advisory-locks.md)
-### 12. [Cross-Service Compensation](./sub-skills/cross-service-compensation.md)
-### 13. [Redis Cache Layer](./sub-skills/redis-cache-layer.md)
-### 14. [Cache-Aside Pattern](./sub-skills/cache-aside-pattern.md)
-### 15. [Resilience & Retry](./sub-skills/resilience-and-retry.md)
-### 16. [JWT Authentication](./sub-skills/jwt-authentication.md)
-### 17. [Permission-Based Authorization](./sub-skills/permission-based-authorization.md)
-### 18. [Rate Limiting](./sub-skills/rate-limiting.md)
-### 19. [Background Jobs & Event Bus](./sub-skills/background-jobs-and-event-bus.md)
-### 20. [Structured Logging with Serilog](./sub-skills/structured-logging-serilog.md)
-
-**Remember**: prefer the simplest design that solves the current problem
-(`backend-pragmatic-solid.md`). Add abstraction only under real pressure to change.
+- Core PHP procedural procedures, session, uploads, PHPMailer -> [skill:php-development]
+- MySQL schema design, indexing, and query optimization -> [skill:mysql]
+- General clean code and refactoring principles -> [skill:clean-code]
+- REST / JSON API response patterns -> [skill:api-patterns]

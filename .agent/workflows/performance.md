@@ -1,6 +1,6 @@
 ---
 name: performance
-description: Muốn web chạy mượt? Tối ưu tốc độ và hiệu năng theo chuẩn Performance Expert.
+description: Tối ưu hóa tốc độ tải trang và hiệu năng cho ứng dụng PHP / MySQL
 ---
 
 # /performance - Speed & Efficiency Optimization
@@ -10,43 +10,50 @@ $ARGUMENTS
 ---
 
 ## 🟢 PHASE 1: Baseline Profiling
-**Execution role**: `performance-optimizer` & `codebase discovery role`
-**Mission**: Measure the "Starting Line."
-- **Action**: Run a Lighthouse Audit (Mobile & Desktop).
-- **Action**: Record Core Web Vitals (LCP, FID, CLS).
-- **Tool**: Check for "Network Waterfalls" and large asset sizes.
+**Execution role**: `orchestrator` & `verifier`
+**Nhiệm vụ**: Đo lường hiện trạng hiệu năng ban đầu.
+- Kiểm tra thời gian phản hồi máy chủ (TTFB - Time to First Byte) trên các trang chính (`index.php`, `tour-detail.php`).
+- Phân tích Network Waterfall: dung lượng trang, số lượng request CSS/JS/hình ảnh.
+- Ghi nhận các chỉ số Core Web Vitals (LCP, CLS, FID/INP).
 
 ## 🟡 PHASE 2: Bottleneck Identification
-**Execution role**: `performance-optimizer`
-**Mission**: Find the "Anchor."
-- **Checklist**:
-  - Unoptimized images?
-  - Unused JS/CSS?
-  - N+1 Database queries?
-  - Long hydration times?
+**Execution role**: `backend-specialist` & `frontend-specialist`
+**Nhiệm vụ**: Xác định nút thắt cổ chai gây chậm hệ thống.
+- **Backend / Database**:
+  - Truy vấn MySQL chậm (thiếu index trên các cột `status`, `noi_bat`, `category_id`, `slug`).
+  - Vấn đề N+1 query: Lặp câu lệnh query PDO trong vòng lặp `foreach` thay vì gộp truy vấn hoặc dùng `JOIN`.
+  - Truy vấn `SELECT *` lấy thừa dữ liệu các trường text/blob lớn không cần thiết trong danh sách.
+- **Frontend / Assets**:
+  - Ảnh kích thước quá lớn, chưa nén hoặc chưa chuyển sang định dạng WebP trong `images/**`.
+  - File CSS/JS chưa được tối ưu hoặc nạp chặn hiển thị (render-blocking).
 
 ## 🔵 PHASE 3: Surgical Optimization
-**Execution role**: `frontend-specialist` & `backend-specialist`
-**Mission**: Cut the weight.
-- **Action**: Implement Lazy Loading, Code Splitting, and Image Compression.
-- **Backend**: Add caching layers (Redis/CDN) and optimize DB indices.
+**Execution role**: `backend-specialist` & `frontend-specialist`
+**Nhiệm vụ**: Triển khai tối ưu hóa có trọng tâm:
+- **Backend**:
+  - Thêm index MySQL phù hợp cho các cột tìm kiếm và lọc.
+  - Tối ưu hóa câu truy vấn PDO, dùng câu lệnh JOIN thay thế các truy vấn lồng nhau.
+  - Tận dụng OPcache của PHP trên server.
+- **Frontend**:
+  - Thêm thuộc tính `loading="lazy"` cho hình ảnh dưới màn hình đầu tiên (below the fold).
+  - Tối ưu cấu trúc CSS trong `css/**`, nạp script không đồng bộ (`defer` hoặc đặt ở cuối thẻ `body`).
 
 ## 🔴 PHASE 4: Delta Verification & Reporting
-**Execution role**: `verification role`
-**Mission**: Prove the gain.
-- **Action**: Run a "Before vs After" Lighthouse Comparison.
-- **Artifact**: Include a performance "Flame Graph" snippet in the `walkthrough.md`.
+**Execution role**: `verifier`
+**Nhiệm vụ**: Chứng minh hiệu quả sau tối ưu.
+- So sánh thời gian tải trang và số lượng query trước vs sau khi tối ưu.
+- Báo cáo kết quả và số liệu cụ thể trong `walkthrough.md`.
 
 ---
 
-## Performance Targets:
-- **Lighthouse**: Target Score > 95 in all categories.
-- **LCP**: < 2.5s.
-- **Bundle Size**: Minimize main-thread JS execution.
+## Mục tiêu Hiệu năng:
+- **TTFB**: < 300ms đối với môi trường server có CSDL.
+- **LCP**: < 2.5s trên thiết bị di động.
+- **Tối ưu CSDL**: Không có truy vấn N+1 lặp trong vòng lặp render PHP.
 
 ---
 
-## Examples:
-- `/performance audit home page speed`
-- `/performance optimize images and fonts`
-- `/performance reduce bundle size`
+## Ví dụ:
+- `/performance audit tour listing page speed`
+- `/performance optimize mysql queries for search`
+- `/performance compress and optimize images`

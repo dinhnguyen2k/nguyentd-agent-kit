@@ -9,7 +9,7 @@ Each case contains:
 - `expected_behavior`: decisions/evidence that must appear in the work
 - `forbidden_behavior`: regressions that fail the case
 
-`node .agent/scripts/validate-agent-system.mjs` validates the case schema and confirms every `cogain-*` skill has coverage. Model execution remains harness-specific; compare behavior with and without the skill when changing a high-impact procedure.
+`node .agent/scripts/validate-agent-system.mjs` validates the case schema and confirms project skills have coverage. Model execution remains harness-specific; compare behavior with and without the skill when changing a high-impact procedure.
 
 ## Cadence
 

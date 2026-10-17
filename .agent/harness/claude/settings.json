@@ -2,12 +2,24 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "ask": [
-      "Bash(dotnet test:*)",
-      "Bash(dotnet test *)",
-      "Bash(npx vitest:*)",
-      "Bash(npx playwright test:*)",
-      "Bash(pnpm test:*)",
-      "Bash(npm test:*)"
+      "Bash(phpunit:*)",
+      "Bash(phpunit *)",
+      "Bash(vendor/bin/phpunit:*)",
+      "Bash(vendor/bin/phpunit *)",
+      "Bash(./vendor/bin/phpunit:*)",
+      "Bash(./vendor/bin/phpunit *)",
+      "Bash(php vendor/bin/phpunit:*)",
+      "Bash(php vendor/bin/phpunit *)",
+      "Bash(php ./vendor/bin/phpunit:*)",
+      "Bash(php ./vendor/bin/phpunit *)",
+      "Bash(composer test:*)",
+      "Bash(composer test *)",
+      "Bash(composer run test:*)",
+      "Bash(composer run test *)",
+      "Bash(composer run-script test:*)",
+      "Bash(composer run-script test *)",
+      "Bash(npm test:*)",
+      "Bash(npm test *)"
     ]
   },
   "hooks": {
@@ -17,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-/home/nguyentd/cogain/cogain-core}/.agent/scripts/agent-boundary-guard.mjs\"",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-$PWD}/.agent/scripts/agent-boundary-guard.mjs\"",
             "timeout": 10,
             "statusMessage": "Kiểm tra ranh giới agent..."
           }

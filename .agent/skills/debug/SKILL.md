@@ -61,7 +61,7 @@ $ARGUMENTS
 **Execution role**: `testing role` & `verification role`
 **Mission**: Ensure the "Bleeding" has stopped.
 
-- **Action**: Chỉ chạy failing test khi user yêu cầu chạy test đó; nếu không, ghi `Validation: not run - not requested`.
+- **Action**: Chỉ chạy validation/test khi user yêu cầu và công cụ/runtime có sẵn; nếu không, ghi `Validation: not run - not requested` hoặc `Validation: not run - runtime not installed`.
 - **Reporting**: Trả debug evidence trong câu trả lời.
   Khi user yêu cầu ghi lỗi, dùng `.planning/errors/ERRORS.md` và `rules/error-logging.md` cho incident material mới; giữ log/root cause/fix và kết quả thực sự quan sát, không secret.
   Link evidence cần thiết từ overview hiện có, không tạo report lặp; gate/CI evidence giữ immutable, không sửa kết quả cũ.
@@ -84,7 +84,7 @@ $ARGUMENTS
 ### Verification
 
 [Chỉ ghi command/kết quả đã thực sự chạy, evidence file:line, giới hạn chưa xác thực và rủi ro còn lại]
-[Nếu chưa được yêu cầu: Validation: not run - not requested]
+[Nếu chưa được yêu cầu hoặc chưa cài runtime: Validation: not run - not requested / runtime not installed]
 [Error log: path khi được yêu cầu ghi, hoặc not written]
 ```
 

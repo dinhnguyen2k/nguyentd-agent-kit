@@ -24,10 +24,7 @@
     }
   },
   "core_codebase_files": [
-    ".planning/codebase/STRUCTURE.md",
-    ".planning/codebase/ARCHITECTURE.md",
-    ".planning/codebase/CONVENTIONS.md",
-    ".planning/codebase/STACK.md"
+    ".agent/ARCHITECTURE.md"
   ],
   "limits": {
     "entrypoint_max_bytes": 6500,

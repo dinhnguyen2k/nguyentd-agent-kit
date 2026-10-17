@@ -82,9 +82,8 @@ Mỗi lỗi PHẢI tuân thủ cấu trúc sau trong `ERRORS.md`:
 ---
 
 ## 📍 4. VỊ TRÍ LƯU FILE
-1. **File chính**: `.planning/errors/ERRORS.md`
+1. **File chính**: `ERRORS.md` hoặc `.agent/reports/ERRORS.md`
 2. **Backup**: `.agent/logs/errors-[YYYY-MM].md` (theo tháng)
-
 ---
 
 ## ⚠️ 5. LƯU Ý QUAN TRỌNG

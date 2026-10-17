@@ -1,42 +1,29 @@
-# Cogain Agent Entry
+# NguyenTD PHP Agent Entry
 
-`AGENTS.md` là entry duy nhất; `CLAUDE.md`, `GEMINI.md`, `ANTIGRAVITY.md` là symlink của nó.
-Đọc và áp dụng `AI_RULES.md` (luật) và `OPINION.md` (cách nghĩ khi luật im lặng) trước.
-Rule miền trong `.agent/rules/` nạp theo trigger.
+Đọc `AI_RULES.md`, `OPINION.md` trước; rule miền nạp theo trigger.
+`CLAUDE.md`, `GEMINI.md`, `ANTIGRAVITY.md` trỏ về entry này sau khi cài harness.
 
-## Route
+## Stack và routing
 
-- `backend/**`, API, EF, gRPC, database, broker -> `backend-specialist`
-- `frontend/**`, React, route, query, form, Tailwind -> `frontend-specialist`
-- Cross-domain hoặc rủi ro cao -> `/orchestrate`
+Mặc định PHP thuần, PDO MySQL, Composer/PHPMailer, HTML render từ PHP, CSS/JavaScript thuần.
+Đối chiếu source, Composer lock, PHP version/extension; không tự thêm framework hoặc build pipeline.
 
-Vai trò và ranh giới ghi: `.agent/contracts/agent-registry.json`, cưỡng chế bằng `.agent/scripts/agent-boundary-guard.mjs`.
-Wiring từng harness là symlink về `.agent/`: xem `.agent/harness/README.md`.
-Catalog skill và workflow là động: đọc `.agent/SKILLS.md` và `.agent/workflows/README.md`, không chép danh sách vào file này.
+- PHP request, `admin/**`, PDO/session/POST/upload/email, `composer.*` -> `backend-specialist` + `backend-development`.
+- `css/**`, `js/**`, layout/HTML, responsive/DOM/accessibility -> `frontend-specialist` + `frontend-development`.
+- PHP trộn logic và HTML: một writer; frontend chỉ sửa presentation được giao, backend giữ auth/SQL/POST.
+- Test PHP/JS -> `test-author`; nghiệm thu độc lập -> `verifier`.
+- Cross-domain/rủi ro cao -> `/orchestrate`; task cục bộ không cần thêm agent.
 
-## Context Policy
+Registry: `.agent/contracts/agent-registry.json`; wiring: `.agent/harness/README.md`.
+Catalog: `.agent/SKILLS.md`, `.agent/workflows/README.md`.
+Không sửa vendor/CKEditor bên thứ ba hoặc upload để vá ứng dụng.
 
-Đọc source đang sửa và test/pattern gần nhất trước. Chỉ nạp thêm khi nó đổi được quyết định:
+## Context và session
 
-| Trigger | Load |
-| --- | --- |
-| Module mới, chưa rõ convention | `STRUCTURE.md`, `CONVENTIONS.md` |
-| Cross-service, auth, cache, broker, gRPC | `ARCHITECTURE.md`, `INTEGRATIONS.md` |
-| Hành vi rủi ro hoặc liên module | `CONCERNS.md` |
-| Triển khai một miền | 1 router + tối đa 2 skill đổi được quyết định |
-
-Cấm mở service/module khác chỉ để xem "bên đó làm thế nào" khi ranh giới đó không lỗi; cần convention thì đọc rule.
-Task Manifest và verifier độc lập chỉ dành cho governed work dưới `/orchestrate`.
-
-## Workflow
-
-Protocol nằm ở `.agent/workflows/<name>.md`.
-Gặp `/plan`, `Run /test`, hay `workflow <name>`: đọc đúng file đó và coi nó là protocol của lượt; `AI_RULES.md` vẫn thắng khi xung đột.
-Không có file thì nói rõ và liệt kê `.agent/workflows/README.md`.
-
-## Session Policy
-
-Không `git commit` trừ khi được yêu cầu rõ ràng.
-Architecture mặc định QUICK ASK; mở rộng khi được yêu cầu hoặc khi quyết định có tác động lớn.
-Mentor mode chỉ bật bằng `@mentor`.
-Chạy test suite thuộc `verifier`, không thuộc agent triển khai: `.agent/rules/test-enforcement.md`.
+Đọc file đang sửa, pattern/test gần nhất; nạp một router và tối đa hai skill thay đổi quyết định.
+PHP/PDO/form/auth/upload/email -> `php-development`; schema/index/transaction -> `mysql`.
+Framework/database khác chỉ khi source/dependency chứng minh cần; không bắt đọc `.planning/` không tồn tại.
+Task Manifest chỉ dành cho governed work.
+Slash command đọc đúng `.agent/workflows/<name>.md`; thiếu file thì báo, không bịa protocol.
+Không tự commit; validation theo `.agent/rules/test-enforcement.md`.
+Mentor chỉ bật bằng `@mentor`.

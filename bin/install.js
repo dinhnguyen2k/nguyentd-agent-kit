@@ -2,19 +2,17 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const sourceDir = path.resolve(__dirname, '..');
 const targetDir = process.cwd();
 
-console.log('\x1b[36m%s\x1b[0m', '🌸 Đang cài đặt NguyenTD Agent Kit vào thư mục hiện tại...');
+console.log('Đang cài đặt NguyenTD PHP Agent Kit vào thư mục hiện tại...');
 
 const itemsToCopy = [
   'AI_RULES.md',
   'OPINION.md',
   'AGENTS.md',
-  'GEMINI.md',
-  'CLAUDE.md',
-  'ANTIGRAVITY.md',
   '.agent',
 ];
 
@@ -43,19 +41,27 @@ function copyRecursive(src, dest) {
 for (const item of itemsToCopy) {
   const src = path.join(sourceDir, item);
   const dest = path.join(targetDir, item);
-  if (fs.existsSync(src)) {
+  if (sourceDir !== targetDir && fs.existsSync(src)) {
     try {
       copyRecursive(src, dest);
-      console.log(`  \x1b[32m✔\x1b[0m Đã sao chép: ${item}`);
+      console.log(`Đã sao chép: ${item}`);
     } catch (err) {
-      console.error(`  \x1b[31m✖\x1b[0m Lỗi khi chép ${item}:`, err.message);
+      console.error(`Lỗi khi chép ${item}:`, err.message);
+      process.exitCode = 1;
     }
   }
 }
 
-console.log('\n\x1b[32m%s\x1b[0m', '✨ Cài đặt hoàn tất!');
-console.log('📌 Danh mục đã trang bị:');
-console.log('   - 📜 AI_RULES.md (Luật cốt lõi)');
-console.log('   - 💡 OPINION.md (Cách nghĩ & ưu tiên của NguyenTD)');
-console.log('   - 🤖 AGENTS.md, GEMINI.md, CLAUDE.md, ANTIGRAVITY.md');
-console.log('   - 🧠 .agent/ (92 skills, rules, workflows, agents, contracts)');
+if (!process.exitCode) {
+  try {
+    execFileSync('bash', ['.agent/scripts/install-harness-wiring.sh'], {
+      cwd: targetDir,
+      env: { ...process.env, AGENT_PROJECT_DIR: targetDir },
+      stdio: 'inherit',
+    });
+    console.log('Cài đặt hoàn tất: PHP/PDO/MySQL skills, rules, workflows và harness links.');
+  } catch (err) {
+    console.error('Không thể cài harness wiring:', err.message);
+    process.exitCode = 1;
+  }
+}

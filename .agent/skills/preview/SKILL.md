@@ -5,7 +5,7 @@ description: "Xem trước ứng dụng web hoạt động. Use when previewing 
 
 # /preview - Preview Management
 
-$ARGUMENTS
+Quản lý xem trước ứng dụng web PHP: kiểm tra trạng thái, khởi động máy chủ thử nghiệm cục bộ khi được yêu cầu.
 
 ---
 
@@ -17,27 +17,26 @@ Manage preview server: start, stop, status check.
 
 ```
 /preview           - Show current status
-/preview start     - Start server
+/preview start     - Start local development server (e.g. php -S localhost:8000)
 /preview stop      - Stop server
-/preview restart   - Restart
-/preview check     - Health check
+/preview check     - Health check endpoint
 ```
 
 ---
 
 ## Usage Examples
 
-### Start Server
+### Start Local PHP Server (khi có runtime PHP CLI và user yêu cầu)
 ```
 /preview start
 
 Response:
 🚀 Starting preview...
-   Port: 3000
-   Type: Next.js
+   Command: php -S localhost:8000
+   Type: PHP Web Application
 
 ✅ Preview ready!
-   URL: http://localhost:3000
+   URL: http://localhost:8000
 ```
 
 ### Status Check
@@ -47,36 +46,16 @@ Response:
 Response:
 === Preview Status ===
 
-🌐 URL: http://localhost:3000
-📁 Project: C:/projects/my-app
-🏷️ Type: nextjs
+🌐 URL: http://localhost:8000
+📁 Project: /home/nguyentd/longphat
+🏷️ Type: PHP Procedural App
 💚 Health: OK
 ```
 
-### Port Conflict
+### Khi chưa cài đặt runtime PHP:
+Nếu môi trường thực thi chưa cài đặt lệnh `php`:
 ```
-/preview start
-
 Response:
-⚠️ Port 3000 is in use.
-
-Options:
-1. Start on port 3001
-2. Close app on 3000
-3. Specify different port
-
-Which one? (default: 1)
+⚠️ Runtime PHP CLI chưa khả dụng trong môi trường hiện tại.
+Vui lòng cấu hình máy chủ web (Apache/Nginx/PHP-FPM) hoặc cài đặt PHP CLI để xem trước ứng dụng trực tiếp.
 ```
-
----
-
-## Technical
-
-Auto preview uses `auto_preview.py` script:
-
-```bash
-python .agent/scripts/auto_preview.py start [port]
-python .agent/scripts/auto_preview.py stop
-python .agent/scripts/auto_preview.py status
-```
-

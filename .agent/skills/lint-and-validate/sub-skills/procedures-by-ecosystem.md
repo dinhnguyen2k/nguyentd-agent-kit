@@ -1,5 +1,11 @@
 # Procedures by Ecosystem
 
+#### PHP
+1. **Cú pháp (Syntax check):** `php -l <path-to-file.php>` (khi môi trường có `php` CLI và user yêu cầu xác thực).
+2. **Composer:** `composer validate --no-check-publish` (kiểm tra tính hợp lệ của `composer.json`).
+3. **Kiểm thử (Unit tests):** `vendor/bin/phpunit` (chỉ khi PHPUnit được cài đặt và cấu hình; không chạy khi chưa có test runner).
+4. **Khi chưa có runtime:** Nếu môi trường chưa cài `php` CLI, ghi rõ `Validation: not run - runtime not installed` và thẩm định logic qua đọc code.
+
 #### Node.js / TypeScript
 1. **Lint/Fix:** `npm run lint` or `npx eslint "path" --fix`
 2. **Types:** `npx tsc --noEmit`

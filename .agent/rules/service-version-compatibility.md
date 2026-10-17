@@ -1,77 +1,58 @@
 ---
 trigger: glob
-glob: "{**/*appsettings*.json,**/*.proto,**/required-backend-versions.ts,.gitlab/**}"
+glob: "composer.json,composer.lock"
+description: "Quy trình kiểm soát tương thích phiên bản PHP, Composer dependencies (PHPMailer) và môi trường CSDL MySQL."
 ---
 
-# SERVICE-VERSION-COMPATIBILITY.MD - Quy Trình Kiểm Soát Tương Thích Version (BE gRPC + FE)
+# SERVICE-VERSION-COMPATIBILITY.MD - Tương Thích Phiên Bản PHP, MySQL & Composer
 
-> **Mục tiêu**: Ngăn chặn rủi ro lệch contract / version giữa các Microservice Backend (gRPC) và các ứng dụng Frontend khi deploy độc lập.
-> **Lưu ý Token**: Rule này chỉ kích hoạt khi đụng tới file cấu hình version (`appsettings.json`, `required-backend-versions.ts`, `.proto`, `.gitlab/**`). Khi code tính năng thông thường, rule này KHÔNG tốn token context.
-
----
-
-## 1. Phía Backend (gRPC Service-to-Service): CI/CD Gate
-
-### 1.1. Khai báo Version sàn phụ thuộc
-Mỗi service Backend tự khai trong `appsettings.json` (mục `RequiredServiceVersions`) phiên bản tối thiểu cần có ở các service mà nó gọi qua gRPC:
-```json
-"RequiredServiceVersions": {
-  "MasterData": "1.0.34",
-  "HR": "1.0.23",
-  "ERP": "1.0.10"
-}
-```
-
-### 1.2. CI/CD Gate (`.gitlab/ci/publish.yml`)
-Job `check-version:<caller>:<dependency>:<env>` sẽ gọi `GET /version` của service bị gọi để kiểm tra 2 chiều trước khi build image:
-- **Sàn**: Phiên bản đang chạy thật $\ge$ Version yêu cầu trong `RequiredServiceVersions` (nếu thấp hơn $\rightarrow$ **Chặn build**).
-- **Trần (MAJOR)**: Cùng MAJOR version (nếu bên bị gọi đã lên MAJOR mới mà bên gọi chưa cập nhật $\rightarrow$ **Chặn build**).
-
-### 1.3. Quy ước SemVer (BẮT BUỘC)
-- **CHỈ BUMP MAJOR** (ví dụ `1.x.x` $\rightarrow$ `2.0.0`) khi có **Breaking Change**:
-  - Xóa field, đổi kiểu dữ liệu, đổi RPC method/parameters, đổi number trong `.proto`.
-  - Thay đổi hành vi nghiệp vụ phá vỡ tính tương thích ngược.
-- **BUMP MINOR/PATCH** (ví dụ `1.0.30` $\rightarrow$ `1.0.31`): Khi thêm mới method/field optional, fix bug, tối ưu hiệu năng (luôn Backward-Compatible).
+> **Mục tiêu**: Đảm bảo tính tương thích và vận hành ổn định giữa môi trường runtime PHP của máy chủ, các gói phụ thuộc Composer (hiện tại `phpmailer/phpmailer ^6.10`), và hệ quản trị CSDL MySQL.
 
 ---
 
-## 2. Phía Frontend: Runtime Warning
+## 1. Tương Thích Phiên Bản Môi Trường PHP
 
-### 2.1. Khai báo Version Backend yêu cầu
-Mỗi app FE khai báo riêng trong `src/lib/required-backend-versions.ts`:
-```typescript
-export const REQUIRED_BACKEND_VERSIONS: Record<string, string> = {
-  BusinessDocument: '1.0.15',
-  CRM: '1.0.10',
-  ERP: '1.0.10',
-  HR: '1.0.23',
-  MasterData: '1.0.34',
-  ServiceDesk: '1.0.30',
-};
-```
-
-### 2.2. Cơ chế Hook `useBackendVersionWatch`
-- Mount tại `MainLayout` của từng app FE.
-- Kiểm tra mỗi 5 phút + khi focus lại tab:
-  - Nếu BE đang chạy thấp hơn version yêu cầu hoặc lệch MAJOR $\rightarrow$ Báo toast vàng cảnh báo không tương thích.
-  - Nếu BE vừa deploy phiên bản mới trong lúc tab đang mở $\rightarrow$ Báo toast vàng nhắc người dùng reload trang (F5).
+1. **Không giả định phiên bản PHP quá mới**:
+   - Xác nhận PHP version thực tế từ runtime/deployment và Composer platform constraints trước khi chọn cú pháp.
+   - Không tự nâng runtime hoặc ép tương thích phiên bản cũ đã hết hỗ trợ; báo rủi ro và đề xuất nâng cấp riêng nếu phát hiện.
+2. **Kiểm tra extension theo đường chạy thực tế**:
+   - PDO và `pdo_mysql` cho kết nối MySQL.
+   - `fileinfo` nếu dùng kiểm MIME upload; `mbstring` nếu code thực sự gọi hàm `mb_*`.
+   - `openssl` nếu SMTP dùng TLS; PHPMailer SMTP không mặc định cần `curl`.
+   - Đối chiếu Composer platform requirements và runtime; không khẳng định extension đã cài khi chưa kiểm.
 
 ---
 
-## 3. Quy Tắc Cảnh Báo Local & Tạo Commit Khi Có Thay Đổi
+## 2. Quản Lý Phụ Thuộc Composer & SemVer
 
-Khi Agent hoặc Developer chuẩn bị commit / push code có liên quan đến gRPC hoặc API Contract:
-1. **Không chặn cứng thao tác**: Vẫn chấp nhận đẩy code bình thường.
-2. **Cho phép tách Commit riêng**: Khuyến khích tách phần update `RequiredServiceVersions` / `REQUIRED_BACKEND_VERSIONS` thành 1 commit riêng hoặc gom gọn gàng để dễ track trong MR.
-3. **BẮT BUỘC Hiển thị Khung Cảnh Báo Nổi Bật (Big Warning Banner)**:
-   Agent PHẢI xuất thông báo cảnh báo trực quan để Developer nắm rõ trước khi push:
+1. **Nguồn sự thật về phụ thuộc**:
+   - `composer.json` và `composer.lock` là nguồn sự thật cho các thư viện bên thứ ba.
+   - Hiện tại ứng dụng sử dụng: `phpmailer/phpmailer: ^6.10`.
+   - **CẤM** tự ý cài đặt thêm các framework hoặc thư viện nặng (như Laravel, Symfony components, ORM cồng kềnh) khi chưa có yêu cầu rõ ràng từ người dùng.
+2. **Quy ước SemVer (Semantic Versioning)**:
+   - Khi cập nhật thư viện trong `composer.json`:
+     - Giữ nguyên ràng buộc phiên bản tương thích ngược (`^6.10`).
+     - Chỉ nâng cấp Minor/Patch để nhận bản vá lỗi bảo mật.
+3. **Kiểm tra tính hợp lệ của Composer**:
+   - Khi có thay đổi trong `composer.json`, kiểm tra tính hợp lệ bằng lệnh: `composer validate` (chỉ thực hiện theo yêu cầu on-demand và khi môi trường có sẵn Composer CLI).
 
-```markdown
-> [!WARNING]
-> ### ⚠️ CẢNH BÁO TƯƠNG THÍCH VERSION LIÊN SERVICE
-> - **Service đang sửa**: `<Tên Service/App>`
-> - **Thay đổi gRPC / API Contract**: `<Mô tả ngắn gọn>`
-> - **Tính chất**: `[Backward-Compatible (Minor/Patch)]` HOẶC `[Breaking Change (Major)]`
-> - **Kiểm tra RequiredServiceVersions**: Đã khớp với version sàn của dependency chưa?
-> - **Lưu ý Tag Release**: Khi tag release, chỉ bump Patch/Minor nếu không breaking để tránh bị CI/CD chặn!
-```
+---
+
+## 3. Tương Thích Hệ Quản Trị CSDL MySQL
+
+1. **Chuẩn hóa cú pháp SQL**:
+   - Xác nhận engine và phiên bản MySQL/MariaDB thực tế trước khi chọn cú pháp SQL.
+   - Không mặc định MySQL 5.7 hoặc 8.0; không buộc hạ cú pháp nếu runtime hiện có hỗ trợ.
+2. **Bộ mã ký tự UTF-8 (Charset & Collation)**:
+   - Dùng `utf8mb4` khi thiết kế mới; kiểm charset/collation hiện có trước khi đổi kết nối/schema, không tự migrate bảng hoặc áp collation cố định.
+
+---
+
+## 4. Tương Thích Giữa Trang Khách (Public) & Module Quản Trị (Admin)
+
+1. **Đồng bộ khi thay đổi dữ liệu**:
+   - Khi cập nhật logic nghiệp vụ hoặc trường dữ liệu (ví dụ: thêm thông tin giá tour, trạng thái visa, banner liên kết), bắt buộc rà soát và cập nhật đồng bộ ở cả hai phía:
+     - Phía hiển thị khách: các trang root `*.php` (`index.php`, `tour-detail.php`, `visa.php`...).
+     - Phía quản trị: các module tương ứng trong `admin/**` (`admin/tour/**`, `admin/visa/**`...).
+2. **Không để đứt gãy luồng người dùng**:
+   - Không xóa hoặc đổi tên các cột CSDL mà phía giao diện khách đang truy vấn để tránh làm vỡ giao diện website.

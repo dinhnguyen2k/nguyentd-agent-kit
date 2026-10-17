@@ -1,4 +1,4 @@
-# Cogain Agent Sources
+# Long Phat PHP Agent Kit Sources
 
 `AI_RULES.md` là bắt buộc; entry là `AGENTS.md`. Nạp chi tiết theo nhu cầu.
 

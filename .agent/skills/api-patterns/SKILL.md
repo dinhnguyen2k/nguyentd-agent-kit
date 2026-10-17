@@ -26,7 +26,7 @@ metadata:
 | `rest.md`             | Resource naming, HTTP methods, status codes | Designing REST API             |
 | `response.md`         | Envelope pattern, error format, pagination  | Response structure             |
 | `graphql.md`          | Schema design, when to use, security        | Considering GraphQL            |
-| `trpc.md`             | TypeScript RPC contrast reference           | Explicit non-Cogain evaluation |
+| `trpc.md`             | TypeScript RPC contrast reference           | RPC evaluation                 |
 | `versioning.md`       | URI/Header/Query versioning                 | API evolution planning         |
 | `auth.md`             | JWT, OAuth, Passkey, API Keys               | Auth pattern selection         |
 | `rate-limiting.md`    | Token bucket, sliding window                | API protection                 |
@@ -50,7 +50,7 @@ metadata:
 Before designing an API:
 
 - [ ] **Asked user about API consumers?**
-- [ ] **Chosen API style for THIS context?** Cogain defaults to REST plus gRPC unless an ADR says otherwise.
+- [ ] **Chosen API style for THIS context?** This project defaults to REST/JSON endpoints unless an ADR says otherwise.
 - [ ] **Defined consistent response format?**
 - [ ] **Planned versioning strategy?**
 - [ ] **Considered authentication needs?**

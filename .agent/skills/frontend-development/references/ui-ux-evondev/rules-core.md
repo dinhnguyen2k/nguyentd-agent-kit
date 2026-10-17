@@ -1,6 +1,6 @@
 # Luật nền: phạm vi (S), nguyên tắc (N), bảng trạng thái (D2)
 
-> Trích nguyên văn từ evondevKit `skills/ui-ux` commit `dff15b4` (MIT). Cogain override trong `frontend-development/SKILL.md` (mục "UI reference") thắng nội dung dưới đây.
+> Trích nguyên văn từ evondevKit `skills/ui-ux` commit `dff15b4` (MIT). Project override trong `frontend-development/SKILL.md` (mục "UI reference") thắng nội dung dưới đây.
 
 <!-- nguồn: SKILL.md:263-265 -->
 **S1. Không tự đẻ thêm section.** Đề bài có mấy khối thì dựng đúng mấy khối.

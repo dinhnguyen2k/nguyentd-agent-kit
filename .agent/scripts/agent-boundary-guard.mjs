@@ -22,7 +22,17 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(HERE, "..", "..");
+// `.agent` có thể là symlink; boundary phải theo project gọi tool, không theo nơi chứa kit.
+let projectRoot = resolve(process.env.AGENT_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.cwd());
+while (!existsSync(join(projectRoot, ".agent", "contracts", "agent-registry.json"))) {
+  const parent = dirname(projectRoot);
+  if (parent === projectRoot) {
+    projectRoot = resolve(HERE, "..", "..");
+    break;
+  }
+  projectRoot = parent;
+}
+const ROOT = projectRoot;
 const REGISTRY_PATH = join(ROOT, ".agent", "contracts", "agent-registry.json");
 const RUNTIME_DIR = join(ROOT, ".agent", "scratch", ".runtime");
 const ROLE_FILE = join(RUNTIME_DIR, "agent-role");
@@ -66,23 +76,27 @@ function deny(rule, role, reason) {
   process.exit(0);
 }
 
-/** Glob rút gọn: `**` vượt thư mục, `*` trong một segment. */
+/** Glob: `**/` khớp 0 hoặc nhiều segment, `/**` cuối khớp cả thư mục lẫn bên trong, `*` trong một segment. */
 function globToRegExp(glob, { anchored = true } = {}) {
   let out = "";
   for (let i = 0; i < glob.length; i++) {
-    const ch = glob[i];
-    if (ch === "*") {
+    if (glob.slice(i, i + 3) === "/**" && i + 3 === glob.length) {
+      out += "(?:/[^\\s\"']*)?";
+      i += 2;
+    } else if (glob.slice(i, i + 3) === "**/") {
+      out += "(?:[^/\\s\"']+/)*";
+      i += 2;
+    } else if (glob[i] === "*") {
       if (glob[i + 1] === "*") {
         out += "[^\\s\"']*";
         i++;
-        if (glob[i + 1] === "/") i++;
       } else {
         out += "[^/\\s\"']*";
       }
-    } else if (ch === "?") {
+    } else if (glob[i] === "?") {
       out += "[^/]";
     } else {
-      out += ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+      out += glob[i].replace(/[.+^${}()|[\]\\]/g, "\\$&");
     }
   }
   return new RegExp(anchored ? `^${out}$` : out);
@@ -140,8 +154,8 @@ function resolveRole(payload, registry) {
  * Hai chế độ chạy:
  *   1. Hook (Claude Code PreToolUse): đọc payload JSON từ stdin, trả JSON quyết định.
  *   2. CLI (harness không có hook: Codex, Antigravity, CI, git hook):
- *        node agent-boundary-guard.mjs --check-command "dotnet test --filter X" [--role verifier]
- *        node agent-boundary-guard.mjs --check-write backend/tests/Foo.cs
+ *        node agent-boundary-guard.mjs --check-command "vendor/bin/phpunit --filter X" [--role verifier]
+ *        node agent-boundary-guard.mjs --check-write tests/FooTest.php
  *      exit 0 = cho phép, exit 2 = bị chặn kèm lý do ở stderr.
  */
 let payload = {};
@@ -203,7 +217,7 @@ try {
     const raw = String(input.command || "");
     const cmd = raw.replace(/\s+/g, " ").trim();
 
-    // Khai báo role ngay trên dòng lệnh: `COGAIN_AGENT_ROLE=verifier dotnet test ...`.
+    // Khai báo role ngay trên dòng lệnh: `COGAIN_AGENT_ROLE=verifier vendor/bin/phpunit ...`.
     // Harness nào cũng dùng được vì nó chỉ là chuỗi lệnh, và nó luôn hiện trong transcript.
     const inline = cmd.match(/^COGAIN_(?:AGENT_)?ROLE=([a-z-]+)\s+/);
     if (inline && knownRoles(registry).has(inline[1])) {
@@ -222,8 +236,8 @@ try {
         `${r1.deny_message}\n\n` +
           `Lệnh bị chặn: ${cmd.slice(0, 200)}\n` +
           `Role hiện tại: ${role} (nguồn: ${source}).\n\n` +
-          `Agent triển khai chỉ được xác thực bằng \`dotnet build <project>\`. Build xanh là bằng chứng hợp lệ: DỪNG và bàn giao.\n` +
-          `Chạy test là quyết định của người dùng. Nếu người dùng muốn mở cổng, người dùng chạy:\n` +
+          `Agent triển khai chỉ được xác thực theo yêu cầu bằng \`php -l <file>\` hoặc \`composer validate\` (khi công cụ có sẵn). Cú pháp hợp lệ là bằng chứng: DỪNG và bàn giao.\n` +
+          `Chạy test suite (PHPUnit/composer test) là quyết định của người dùng. Nếu người dùng muốn mở cổng, người dùng chạy:\n` +
           `  ! .agent/scripts/agent-role.sh verifier\n` +
           `Không tự ý mở cổng rồi chạy tiếp.`
       );
@@ -270,7 +284,7 @@ try {
         `Permission Denied: writing to the test tree is reserved for 'test-author'.\n\n` +
           `Lệnh bị chặn: ${cmd.slice(0, 200)}\n` +
           `Role hiện tại: ${role} (nguồn: ${source}).\n\n` +
-          `Test biên dịch lỗi hay đỏ do đổi contract thì báo \`test-spec-conflict\` kèm tên test, không tự sửa test.`
+          `Test lỗi cú pháp hay đỏ do đổi contract thì báo \`test-spec-conflict\` kèm tên test, không tự sửa test.`
       );
     }
     allow();

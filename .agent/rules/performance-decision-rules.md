@@ -1,80 +1,66 @@
 ---
 trigger: model_decision
-description: "When optimizing algorithms, solving N+1 queries, selecting data structures (hash/binary search/caching), or performance tuning."
+description: "When optimizing algorithms, solving N+1 queries, selecting data structures (hash/lookup/caching), or performance tuning for PHP and MySQL."
 ---
 
-# Performance-Decision-Rules - Quy Tắc Ra Quyết Định & Tối Ưu Hóa Thuật Toán
+# PERFORMANCE-DECISION-RULES.MD - Quy Tắc Hiệu Năng & Tối Ưu Hóa Cho PHP & MySQL
 
-> **Mục tiêu**: Định hướng Agent cách phân tích, lựa chọn thuật toán và cấu trúc dữ liệu tối ưu nhất trước khi triển khai mã nguồn tại hệ thống `cogain-core`. Ngăn ngừa các vấn đề về hiệu năng (Query N+1, nghẽn luồng xử lý, rò rỉ bộ nhớ, treo DB).
-
----
-
-## 🧭 1. MA TRẬN QUYẾT ĐỊNH (7 THUẬT TOÁN TỐI ƯU CỐT LÕI)
-
-Agent BẮT BUỘC phải đối chiếu nghiệp vụ cần triển khai với 7 kỹ thuật tối ưu hóa sau:
-
-### 1.1. Hashing (Dictionary / HashSet / Map / Set)
-*   **Vấn đề:** Quét mảng lặp đi lặp lại hoặc các vòng lặp lồng nhau có độ phức tạp $O(n^2)$ hoặc $O(n)$ để tìm phần tử tồn tại/liên kết.
-*   **Quy chuẩn áp dụng:**
-    *   **Backend (.NET):** Dùng `Dictionary<TKey, TValue>` hoặc `HashSet<T>` để tra cứu trong $O(1)$.
-    *   **Frontend (React/TS):** Dùng `Map` hoặc `Set` cho tra cứu nhanh (ví dụ: danh sách vai trò, danh sách phân quyền).
-    *   **Import Excel (ClosedXML):** *BẮT BUỘC* truy vấn toàn bộ dữ liệu tham chiếu (MasterData, Projects, Employees...) ra trước vòng lặp, đưa vào Dictionary và tra cứu $O(1)$ khi xử lý dòng. Nghiêm cấm query DB hoặc gọi gRPC trong vòng lặp parse Excel.
-
-### 1.2. Binary Search (Tìm kiếm nhị phân & B-Tree Index)
-*   **Vấn đề:** Tìm kiếm phần tử trên tập dữ liệu lớn không có Index khiến CSDL phải thực hiện Table Scan ($O(n)$).
-*   **Quy chuẩn áp dụng:**
-    *   Khi thiết lập các trường tìm kiếm chính (ví dụ: `Code`, `DeletedDate`, `Status`), bắt buộc cấu hình Index trong file `Configuration.cs` của EF Core.
-    *   Cấu hình Filtered Index cho cơ chế xóa mềm:
-        ```csharp
-        builder.HasIndex(x => x.Code)
-               .HasFilter("\"deleted_date\" IS NULL")
-               .IsUnique();
-        ```
-    *   Truy vấn phải đảm bảo đi qua các trường đã được đánh Index.
-
-### 1.3. Prefix Sum (Mảng cộng dồn)
-*   **Vấn đề:** Tính toán lũy kế / tổng tích lũy cho một khoảng thời gian hoặc một đoạn dữ liệu lặp đi lặp lại.
-*   **Quy chuẩn áp dụng:**
-    *   **CSDL:** Ưu tiên dùng Window Function của PostgreSQL (`SUM() OVER (ORDER BY)`) để tính lũy kế tại tầng DB thay vì kéo hết về memory rồi dùng vòng lặp cộng dồn.
-    *   **Workflow SLA:** Khi tính thời gian xử lý còn lại tại mỗi bước duyệt của WorkItem, tiền xử lý và lưu trữ mốc thời gian tĩnh để truy xuất ngay trong $O(1)$.
-
-### 1.4. Sliding Window (Cửa sổ trượt)
-*   **Vấn đề:** Tính toán lại toàn bộ khoảng dữ liệu liên tục hoặc hiển thị danh sách khổng lồ làm nghẽn DOM / API.
-*   **Quy chuẩn áp dụng:**
-    *   **Frontend UI:** Đối với các bảng dữ liệu chi tiết lệnh sản xuất hoặc danh mục có số lượng dòng lớn (> 100), áp dụng kỹ thuật Virtual Scrolling (chỉ render các dòng hiển thị trong vùng nhìn thấy).
-    *   **Rate Limiting:** Sử dụng Redis Sorted Set để triển khai sliding window giới hạn số lượng request API của Client theo thời gian thực (tránh brute force hoặc dồn ứ request).
-
-### 1.5. Dynamic Programming & Memoization (Quy hoạch động & Caching)
-*   **Vấn đề:** Tính toán lại các kết quả của các bài toán con lặp lại nhiều lần (ví dụ: phân bổ ngân sách, lập lịch sản xuất, tính toán sơ đồ cây tổ chức/phân quyền).
-*   **Quy chuẩn áp dụng:**
-    *   Sử dụng Redis (Cache phân tán) hoặc `MemoryCache` (Cục bộ tại API) cho các phép tính đắt đỏ.
-    *   Thiết lập cơ chế tự động xóa/reset cache (Cache Eviction) khi dữ liệu nguồn thay đổi thông qua Redis Publish/Subscribe hoặc gRPC compensation.
-
-### 1.6. Heap / Priority Queue (Hàng đợi ưu tiên)
-*   **Vấn đề:** Quản lý công việc hoặc xử lý tác vụ tuần tự mà không có sự phân biệt về độ khẩn cấp (SLA).
-*   **Quy chuẩn áp dụng:**
-    *   Dùng `PriorityQueue<TElement, TPriority>` của .NET 8 để quản lý các tác vụ nền (background tasks) tại service như: gửi thông báo khẩn cấp duyệt WorkItem, xử lý lệnh sản xuất độ ưu tiên cao.
-    *   Tránh việc sắp xếp lại toàn bộ danh sách mỗi lần chèn phần tử mới ($O(n \log n)$), thay vào đó chèn và lấy ra trong $O(\log n)$ qua Heap.
-
-### 1.7. Pruning (Cắt tỉa & Tiền lọc)
-*   **Vấn đề:** Duyệt qua các nhánh vô ích hoặc tải quá nhiều dữ liệu thừa từ DB.
-*   **Quy chuẩn áp dụng:**
-    *   **SQL Query:** Luôn đặt các điều kiện lọc `WHERE` chặt chẽ và sớm nhất có thể. Sử dụng `.Select()` để chỉ lấy các trường DTO cần thiết, không dùng `Select *` hoặc lấy nguyên Entity khi chỉ cần xem danh sách.
-    *   **Workflow/Graph Traversal:** Khi duyệt tìm đường đi hoặc quyền hạn trong sơ đồ duyệt Workflow sâu, nếu một nút cha không thỏa mãn điều kiện, cắt tỉa ngay toàn bộ nhánh con của nút đó (`early exit`).
+> Mục tiêu: Định hướng Agent cách phân tích, lựa chọn cấu trúc dữ liệu và tối ưu hóa truy vấn CSDL trong hệ thống PHP + PDO MySQL. Ngăn ngừa các vấn đề: Query N+1, cạn kiệt bộ nhớ RAM (`memory_limit`), chậm CSDL do quét bảng toàn bộ (Table Scan), và tải dữ liệu dư thừa.
 
 ---
 
-## ⚡ 2. RÀNG BUỘC KỸ THUẬT BẮT BUỘC (MANDATORY TECHNICAL GUIDELINES)
+## 1. Ma Trận Tối Ưu Hóa Cốt Lõi
 
-### 2.1. Backend C# & EF Core
-1.  **AsNoTracking:** Luôn thêm `.AsNoTracking()` cho tất cả các câu truy vấn GET (Read-only) để tránh EF Core theo dõi trạng thái thực thể, giảm tải RAM và CPU.
-2.  **Tránh Query N+1:** Tuyệt đối không dùng vòng lặp để truy vấn DB. Sử dụng `.Include()` (Eager Loading) hoặc gom danh sách IDs lại và query `WHERE Id IN (ids)` (Query Batching).
-3.  **Split Queries:** Đối với các truy vấn kết hợp nhiều `.Include()` trên các collection lớn, sử dụng `.AsSplitQuery()` để tránh bị nhân dòng (Cartesian Explosion) ở SQL.
-4.  **DbSet.AnyAsync() vs CountAsync():** Khi chỉ muốn kiểm tra sự tồn tại của dữ liệu, sử dụng `AnyAsync()` để Postgres trả về True/False ngay lập tức, tuyệt đối không dùng `CountAsync() > 0` hoặc `.ToListAsync()`.
-5.  **Zero-Allocation gRPC Collections:** Danh sách lặp trả về từ Protobuf (`RepeatedField<T>`) bản chất đã là in-memory list (`IReadOnlyList<T>`, `IList<T>`). Tuyệt đối không gọi `.ToList()` hoặc clone `[..]` sang `List<T>` mới; khai báo hàm trả về `IReadOnlyList<T>` và trả trực tiếp `RepeatedField<T>`.
+### 1.1. Hashing & Tra Cứu $O(1)$ Trong PHP
+*   **Vấn đề:** Quét mảng lặp đi lặp lại hoặc các vòng lặp lồng nhau có độ phức tạp $O(n^2)$ để tìm phần tử liên kết.
+*   **Quy chuẩn áp dụng:**
+    *   Sử dụng mảng kết hợp (Associative Array) trong PHP để tra cứu nhanh theo khóa trong $O(1)$ qua `isset($map[$key])` hoặc `$map[$key] ?? null`.
+    *   **Import / Xử lý dữ liệu hàng loạt:** *BẮT BUỘC* truy vấn toàn bộ dữ liệu tham chiếu (Danh mục, Tour, Khách hàng...) ra trước vòng lặp, đưa vào mảng kết hợp `$lookupMap[$code] = $id` và tra cứu trong $O(1)$ khi xử lý từng dòng. Nghiêm cấm chạy câu query PDO bên trong vòng lặp.
 
-### 2.2. Frontend React / Zustand / TanStack Query
-1.  **Stable Query Keys:** Đảm bảo key của `useQuery` luôn nhất quán để tận dụng tối đa cơ chế cache của TanStack Query, tránh fetch lại dữ liệu không cần thiết.
-2.  **Memoize Computations:** Sử dụng `useMemo` cho các hàm biến đổi dữ liệu, filter mảng phức tạp tại client, và `useCallback` cho các event handler truyền xuống component con để giảm re-render.
-3.  **Clean State Updates:** Không cập nhật Zustand store hoặc Local state liên tục trong vòng lặp hoặc các sự kiện scroll/resize mà không có `debounce`/`throttle`.
+### 1.2. B-Tree Index & Truy Vấn MySQL
+*   **Vấn đề:** Tìm kiếm phần tử trên tập dữ liệu lớn không có Index khiến MySQL phải thực hiện Full Table Scan ($O(n)$), gây nghẽn CPU và I/O đĩa.
+*   **Quy chuẩn áp dụng:**
+    *   Đảm bảo các trường tìm kiếm chính và lọc thường xuyên (ví dụ: `status`, `category_id`, `created_at`, `code`) đã được đánh Index trong MySQL.
+    *   Các trường khóa ngoại (`FOREIGN KEY`) liên kết bảng bắt buộc phải có Index.
+    *   Khi viết câu query phức tạp, sử dụng `EXPLAIN SELECT ...` để kiểm tra `type` và `key` xem MySQL có sử dụng Index hiệu quả hay không (tránh `type: ALL`).
 
+### 1.3. Phòng Chống Truy Vấn N+1 (N+1 Query Prevention) - MUST
+*   **Vấn đề:** Truy vấn danh sách cha, sau đó với mỗi bản ghi cha lại chạy thêm 1 câu query để lấy thông tin con (ví dụ: lấy 50 tour, sau đó chạy 50 câu query để lấy ảnh đại diện của từng tour).
+*   **Quy chuẩn áp dụng:**
+    *   **TUYỆT ĐỐI CẤM** gọi câu lệnh PDO `$stmt->execute()` bên trong vòng lặp `foreach` hoặc `while`.
+    *   *Giải pháp 1 (JOIN)*: Kết hợp các bảng ngay trong câu lệnh `SELECT ... LEFT JOIN ...`.
+    *   *Giải pháp 2 (Query Batching)*: Lấy toàn bộ danh sách cha, thu thập danh sách IDs (`$ids = array_column($tours, 'id')`), rồi chạy 1 câu query duy nhất:
+        `SELECT * FROM tour_images WHERE tour_id IN (?, ?, ...)`. Sau đó dùng PHP nhóm lại theo `tour_id`.
+
+### 1.4. Phân Trang (Pagination) Bảng Dữ Liệu Lớn - MUST
+*   **Vấn đề:** Chạy `SELECT *` lấy toàn bộ hàng nghìn bản ghi vào bộ nhớ PHP làm vượt ngưỡng `memory_limit` và kéo dài thời gian tải trang.
+*   **Quy chuẩn áp dụng:**
+    *   Đối với mọi trang danh sách (bài viết, tour, liên hệ, ảnh), bắt buộc áp dụng phân trang với `LIMIT :limit OFFSET :offset`.
+    *   Kết hợp câu lệnh phân trang với `ORDER BY` trên cột đã có Index (ví dụ `id` hoặc `created_at`) để MySQL tối ưu việc duyệt bản ghi.
+
+### 1.5. Cắt Tỉa & Chọn Cột Cụ Thể (Pruning & Projection)
+*   **Vấn đề:** Dùng `SELECT *` lấy cả những cột văn bản dài (`content`, `description`, `schedule_details`) khi chỉ cần hiển thị danh sách thẻ tóm tắt.
+*   **Quy chuẩn áp dụng:**
+    *   Chỉ chọn các cột cần thiết cho màn hình hiện tại:
+        `SELECT id, title, thumbnail, price, status FROM tours WHERE status = 1 ORDER BY id DESC LIMIT 12`.
+    *   Giảm tải đáng kể bộ nhớ RAM của PHP và băng thông mạng truyền tải giữa MySQL và máy chủ web.
+
+### 1.6. Quản Lý Bộ Nhớ PHP (Memory Management)
+*   **Vấn đề:** Đọc toàn bộ file ảnh, tài liệu hoặc file dữ liệu lớn vào một biến chuỗi làm sập tiến trình PHP (`Fatal error: Allowed memory size of ... bytes exhausted`).
+*   **Quy chuẩn áp dụng:**
+    *   Sử dụng cơ chế luồng (Streaming): Dùng `fopen()`, `fgetcsv()`, `readfile()`, `fpassthru()` khi đọc hoặc trả về file tải xuống.
+    *   Khi xử lý batch dữ liệu lớn: Giải phóng biến trung gian bằng `unset($largeData)` và gán `$stmt = null` sau khi duyệt xong.
+
+---
+
+## 2. Ràng Buộc Kỹ Thuật Bắt Buộc
+
+### 2.1. Backend PHP & PDO MySQL
+1.  **Kiểm tra sự tồn tại bản ghi**: Khi chỉ muốn kiểm tra xem dữ liệu có tồn tại hay không, dùng `SELECT 1 FROM table WHERE ... LIMIT 1` và gọi `fetchColumn()`. Tuyệt đối không dùng `SELECT *` hoặc `COUNT(*)` trên toàn bảng rồi kiểm tra `> 0`.
+2.  **Duyệt từng dòng với dữ liệu lớn**: Với các câu lệnh lấy số lượng bản ghi lớn để xử lý nền hoặc xuất file, dùng vòng lặp `while ($row = $stmt->fetch())` thay vì gọi `fetchAll()` nạp toàn bộ vào một mảng lớn trong RAM.
+3.  **Prepared Statements**: Luôn dùng Prepared Statements để MySQL có thể tái sử dụng kế hoạch thực thi (execution plan) và đảm bảo an toàn tuyệt đối trước SQL Injection.
+
+### 2.2. Frontend HTML, CSS & JavaScript
+1.  **Hạn chế thao tác DOM liên tục**: Lưu cache các phần tử DOM vào biến thay vì gọi `document.querySelector()` lặp lại trong vòng lặp JavaScript.
+2.  **Debounce các sự kiện nhanh**: Áp dụng debounce hoặc throttle cho các sự kiện kích hoạt liên tục như `scroll`, `resize`, hoặc `keyup` (khi người dùng gõ phím tìm kiếm tour/bài viết tức thì).
+3.  **Tối ưu tải tài nguyên**: Đảm bảo hình ảnh được nén dung lượng hợp lý trước khi lưu và hiển thị; sử dụng thuộc tính `loading="lazy"` trên thẻ `<img>` cho các hình ảnh nằm ngoài khung nhìn đầu tiên (below the fold).

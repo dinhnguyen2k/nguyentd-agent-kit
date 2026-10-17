@@ -24,18 +24,18 @@ Tương đương slash command:
 
 | Command           | Description                                                                                           |
 | ----------------- | ----------------------------------------------------------------------------------------------------- |
-| `api`             | Master API Design & Documentation following OpenAPI 3.1 standards.                                    |
+| `api`             | Thiết kế và triển khai API / AJAX endpoint trong ứng dụng PHP.                                        |
 | `audit`           | Sắp bàn giao khách? Kiểm tra lại toàn diện cho chắc theo chuẩn Auditor.                               |
 | `blog`            | Personal or enterprise blogging system with Markdown support.                                         |
 | `brainstorm`      | Bí ý tưởng? Dùng cái này để AI gợi ý theo chuẩn Senior.                                               |
 | `compliance`      | Legal & Data Privacy Compliance (GDPR, HIPAA, SOC2).                                                  |
 | `create`          | Muốn tạo tính năng mới hoặc dự án từ A-Z? Sử dụng bộ máy nhân sự chuyên nghiệp.                       |
 | `debug`           | Gặp lỗi khó sửa? Để AI soi log và sửa giúp bạn theo quy trình chuyên nghiệp.                          |
-| `deploy`          | Code xong rồi? Đẩy lên Server/Vercel thôi.                                                            |
+| `deploy`          | Quy trình kiểm tra và chuẩn bị triển khai ứng dụng PHP.                                               |
 | `document`        | Lười viết docs? Để AI tự viết cho chuyên nghiệp và đầy đủ.                                            |
 | `enhance`         | Muốn sửa màu, thêm nút, sửa logic nhỏ? Vào đây.                                                       |
 | `explain`         | In-depth code explanation, teaching, and knowledge transfer.                                          |
-| `frontend-design` | Thiết kế frontend theo workflow orchestration: context -> UI spec -> build -> audit.                  |
+| `frontend-design` | Thiết kế và hoàn thiện giao diện Frontend cho ứng dụng PHP (HTML/CSS/JS/Layout).                      |
 | `log-error`       | Ghi lại lỗi vào Error Log để học tập và cải thiện                                                     |
 | `mobile`          | native mobile application development and optimization.                                               |
 | `monitor`         | Server và Pipeline có ổn không? Cài đặt giám sát ngay.                                                |
@@ -44,15 +44,15 @@ Tương đương slash command:
 | `performance`     | Muốn web chạy mượt? Tối ưu tốc độ và hiệu năng theo chuẩn Performance Expert.                         |
 | `plan`            | Chưa biết bắt đầu từ đâu? Lập kế hoạch theo chuẩn Senior Personnel.                                   |
 | `portfolio`       | Personalized portfolio and professional landing page setup.                                           |
-| `preview`         | Muốn xem trước web chạy thế nào? Bật Preview.                                                         |
-| `realtime`        | Realtime communication integration with Socket.io, WebRTC, or SSE.                                    |
+| `preview`         | Khởi động và quản lý preview server PHP nội bộ (127.0.0.1:8000).                                      |
+| `realtime`        | Tích hợp cập nhật thời gian thực (SSE, AJAX Polling) cho ứng dụng PHP.                                |
 | `release-version` | Tự động cập nhật phiên bản và đồng bộ toàn bộ tài liệu hệ thống                                       |
 | `security`        | Sợ bị hack? Quét lỗ hổng và bảo mật ngay theo chuẩn Security Senior.                                  |
 | `seo`             | Muốn lên Top Google và AI Search? Tối ưu SEO/GEO ngay.                                                |
 | `status`          | Dự án đang đến đâu rồi? Xem Dashboard báo cáo chuyên nghiệp.                                          |
-| `test`            | Sợ bug khi sửa code? Viết test tự động theo chuẩn TDD Master.                                         |
+| `test`            | Kiểm thử và xác minh chất lượng mã nguồn PHP theo nhu cầu (On-Demand).                                |
 | `ui-ux-pro-max`   | Thiết kế giao diện Visuals Premium với phong cách hiện đại                                            |
-| `update`          | Kiểm tra và cập nhật phiên bản Antigravity IDE                                                        |
+| `update`          | Kiểm tra và cập nhật bộ kit / mã nguồn từ kho lưu trữ Git.                                            |
 | `update-docs`     | Tự động cập nhật tài liệu khi có tính năng mới hoặc thay đổi hệ thống.                                |
 | `visually`        | Visualize complex logic, architecture, and mindmaps.                                                  |
 

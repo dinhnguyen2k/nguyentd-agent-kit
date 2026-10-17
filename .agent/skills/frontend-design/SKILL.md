@@ -9,7 +9,7 @@ metadata:
 
 # Frontend Design
 
-Design from product context and the existing Cogain interface, not from universal style bans or trend checklists.
+Design from product context and the existing application interface, not from universal style bans or trend checklists.
 
 ## Establish the Brief
 

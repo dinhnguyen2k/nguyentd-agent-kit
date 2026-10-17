@@ -6,19 +6,19 @@ This directory keeps lifecycle metadata for the shared agent system used by Clau
 
 ## Freshness Model
 
-Skills keep stable procedures and Cogain-specific rules. Current external facts should come from source documents, MCP tools, or references at run time.
+Skills keep stable procedures and project-specific rules. Current external facts should come from source documents, MCP tools, or references at run time.
 
 Do not crawl web content directly into `SKILL.md`. Use this path instead:
 
 1. Fetch from an allowlisted source and record provenance.
-2. Classify source tier, relevant versions, and Cogain applicability.
+2. Classify source tier, relevant versions, and project applicability.
 3. Produce a proposal with citations.
 4. Run static validation and behavior evals.
 5. Publish only after human approval.
 
 ## Source Tiers
 
-- `T0`: Cogain source code, tests, runtime config, `AI_RULES.md`.
+- `T0`: PHP application source code, composer.json, runtime config, `AI_RULES.md`.
 - `T1`: official docs, specs, release notes, maintainer repositories.
 - `T2`: official engineering blogs and security advisories.
 - `T3`: identified expert/founder writing with verifiable technical evidence.

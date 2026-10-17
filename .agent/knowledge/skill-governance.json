@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-09-08",
-  "scope": "Shared local agent system for Claude, Codex, and Antigravity in cogain-core",
+  "scope": "Shared local agent system for Claude, Codex, and Antigravity in PHP/MySQL project",
   "activeSkillRoot": ".agent/skills",
   "quarantineSkillRoot": ".agent/quarantine/skills",
   "decisions": {
     "repositoryPolicy": "Keep .agent and harness adapter files local-only under .git/info/exclude unless the owner later chooses a shared internal repo/package.",
     "publishGate": "No crawler, LLM, or MCP may write canonical SKILL.md content directly. External knowledge must move through evidence, proposal, eval, human approval, then publish.",
     "socialSources": "LinkedIn, Facebook, forums, and broad feeds are discovery leads only.",
-    "mcpPilot": "Start with Microsoft Learn and GitHub read-only. Add other MCP servers only after a scoped read-only pilot.",
+    "mcpPilot": "Start with GitHub and PHP/MySQL documentation in read-only mode. Add other MCP servers only after a scoped read-only pilot.",
     "evalCadence": "Run static validation for local changes; run behavior evals nightly and whenever skill/model/MCP behavior changes."
   },
   "sourceTiers": [
     {
       "tier": "T0",
       "examples": [
-        "Cogain source code",
-        "tests",
+        "PHP application source code",
+        "composer.json",
         "runtime config",
         "AI_RULES.md"
       ],
@@ -25,12 +25,14 @@
     {
       "tier": "T1",
       "examples": [
-        "official docs",
+        "official PHP documentation (php.net)",
+        "MySQL documentation (dev.mysql.com)",
+        "Composer documentation",
         "specifications",
         "release notes",
         "maintainer repositories"
       ],
-      "permission": "May create technical change proposals after Cogain applicability checks"
+      "permission": "May create technical change proposals after project applicability checks"
     },
     {
       "tier": "T2",
@@ -61,7 +63,7 @@
   "crawlPolicy": {
     "publishGate": "evidence -> proposal -> eval -> human approval -> publish",
     "hardStaleSignals": [
-      "Referenced Cogain path or symbol no longer exists",
+      "Referenced application path or symbol no longer exists",
       "Runtime or package major version no longer matches applies_to",
       "Official deprecation or security advisory affects the skill",
       "Relative link, script, or reference is broken",
@@ -85,9 +87,9 @@
   "mcpPilot": {
     "first": [
       {
-        "name": "Microsoft Learn MCP",
+        "name": "PHP & MySQL Docs",
         "mode": "read-only",
-        "purpose": ".NET, ASP.NET Core, EF Core, and Microsoft platform docs"
+        "purpose": "Official PHP manual, MySQL reference, and Composer docs"
       },
       {
         "name": "GitHub MCP",
@@ -110,9 +112,9 @@
   "ownerConsolidation": {
     "api": "api-patterns",
     "testing": "testing-patterns",
-    "react": "frontend-development",
-    "typescript": "typescript-pro",
-    "database": "postgresql",
+    "frontend": "frontend-development",
+    "php": "php-development",
+    "database": "mysql",
     "planning": "concise-planning"
   },
   "quarantinedSkills": [
@@ -147,6 +149,11 @@
       "ownerAfterCleanup": "api-documenter"
     },
     {
+      "name": "backend-csharp-optimization",
+      "reason": "C# LINQ, allocation, and compiler optimization obsolete in PHP procedural backend.",
+      "ownerAfterCleanup": "php-development"
+    },
+    {
       "name": "bash-linux",
       "reason": "Generic shell guidance outside the Cogain stack.",
       "ownerAfterCleanup": "none"
@@ -172,9 +179,49 @@
       "ownerAfterCleanup": "code-review"
     },
     {
+      "name": "cogain-agent-gotchas",
+      "reason": "Legacy Cogain-specific error prevention obsolete in PHP project; replaced by PHP patterns.",
+      "ownerAfterCleanup": "php-development"
+    },
+    {
+      "name": "cogain-baseservice-hooks",
+      "reason": "Legacy Cogain .NET BaseService hooks obsolete; replaced by procedural PHP and PDO patterns.",
+      "ownerAfterCleanup": "php-development"
+    },
+    {
+      "name": "cogain-child-sync",
+      "reason": "Legacy Cogain EF Core child collection sync obsolete; replaced by PDO relational operations.",
+      "ownerAfterCleanup": "php-development"
+    },
+    {
+      "name": "cogain-excel-import-export",
+      "reason": "Legacy Cogain ClosedXML spreadsheet handling obsolete in PHP project.",
+      "ownerAfterCleanup": "php-development"
+    },
+    {
+      "name": "cogain-form-rhf-zod",
+      "reason": "Legacy Cogain React Hook Form and Zod forms obsolete; replaced by PHP form handling.",
+      "ownerAfterCleanup": "php-development"
+    },
+    {
+      "name": "cogain-query-cache",
+      "reason": "Legacy Cogain TanStack Query cache management obsolete in server-rendered PHP.",
+      "ownerAfterCleanup": "php-development"
+    },
+    {
       "name": "cro-expert-kit",
       "reason": "Marketing/conversion content unrelated to the product surface.",
       "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "csharp-latest-standards",
+      "reason": "C# language and .NET version standards obsolete in PHP project.",
+      "ownerAfterCleanup": "php-development"
+    },
+    {
+      "name": "csharp-pro",
+      "reason": "C# async and records guidance obsolete in PHP project.",
+      "ownerAfterCleanup": "php-development"
     },
     {
       "name": "database-admin",
@@ -200,6 +247,16 @@
       "name": "docker-expert",
       "reason": "Container authoring is not current agent scope.",
       "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "dotnet-architect",
+      "reason": "ASP.NET Core and EF Core architecture guidance obsolete in PHP procedural project.",
+      "ownerAfterCleanup": "php-development"
+    },
+    {
+      "name": "dotnet-backend-patterns",
+      "reason": "ASP.NET Core 8 and C# backend patterns obsolete; replaced by PHP/PDO backend patterns.",
+      "ownerAfterCleanup": "agent-backend-patterns"
     },
     {
       "name": "frontend-developer",
@@ -278,7 +335,7 @@
     },
     {
       "name": "react-state-management",
-      "reason": "Zustand/Query guidance already owned by cogain-query-cache and react-patterns.",
+      "reason": "Zustand/Query guidance already owned by react-patterns.",
       "ownerAfterCleanup": "react-patterns"
     },
     {

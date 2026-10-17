@@ -1,9 +1,10 @@
-# NguyenTD's Opinions - Cách nghĩ và thứ tự ưu tiên
+# NguyenTD's Opinions
 
-**Description:** Ghi chép cách suy nghĩ và ưu tiên của NguyenTD để chọn hướng xử lý khi rule chưa quy định.
-Đây không phải rule; rule chính thức nằm ở `AI_RULES.md` và `.agent/rules/`.
+Chỉ áp dụng khi `AI_RULES.md` và rule miền chưa quyết định.
 
-## Xử lý lỗi khi resolve qua gRPC
-- Dùng `try/catch` khi gRPC chỉ lấy dữ liệu phụ và nghiệp vụ có fallback. 
-- Bắt `RpcException` ngay tại điểm gọi, log lỗi có cấu trúc rồi trả fallback. 
-- Không bắt rộng `Exception`, không nuốt lỗi lập trình hoặc lỗi hủy request.
+## PHP thực dụng
+
+- Giữ PHP thuần/PDO nếu nó giải quyết đúng bài toán; không thêm framework chỉ để chuẩn hóa cấu trúc.
+- Tách helper khi có logic lặp thật; không bọc PDO bằng repository chỉ để chuyển tiếp lời gọi.
+- Bắt lỗi PDO/PHPMailer tại boundary xử lý được nó; log an toàn, không lộ SQL/credential và không báo thành công giả.
+- Giữ URL, form và giao diện tiếng Việt hiện có trừ khi yêu cầu đổi.

@@ -9,7 +9,10 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT="${AGENT_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}"
+if [[ ! -f "$ROOT/.agent/contracts/agent-registry.json" ]]; then
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fi
 cd "$ROOT"
 CHECK_ONLY=0
 [[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
@@ -37,13 +40,13 @@ link() {
     fail=1
     return
   fi
+  mkdir -p "$dir"
   resolved="$dir/$target"
   if [[ ! -e "$resolved" ]]; then
     echo "  ERROR   target không tồn tại: $resolved"
     fail=1
     return
   fi
-  mkdir -p "$dir"
   ln -sfn "$target" "$linkpath"
   echo "  linked  $linkpath -> $target"
 }
@@ -51,6 +54,8 @@ link() {
 echo "== claude =="
 link ".claude/settings.json"        "../.agent/harness/claude/settings.json"
 link ".claude/skills"               "../.agent/skills"
+link ".claude/agents/backend-specialist.md"  "../../.agent/agents/backend-specialist.md"
+link ".claude/agents/frontend-specialist.md" "../../.agent/agents/frontend-specialist.md"
 link ".claude/agents/verifier.md"   "../../.agent/agents/verifier.md"
 link ".claude/agents/test-author.md" "../../.agent/agents/test-author.md"
 

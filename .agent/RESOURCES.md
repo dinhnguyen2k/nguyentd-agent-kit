@@ -19,6 +19,21 @@ Lưu trữ danh sách các repo nguồn để tiện cho việc cập nhật h�
     - **Key Document Skills**: PDF, DOCX, XLSX parsing.
     - **Creative Skills**: Art, Music, Design workflows.
 
+### 🐘 PHP & Web Stack Official Documentation (Long Phát Application)
+- **PHP Official Manual**: `https://www.php.net/manual/en/`
+  - **PDO (PHP Data Objects)**: `https://www.php.net/manual/en/book.pdo.php` (Prepared statements, transaction management, driver options)
+  - **Password Hashing**: `https://www.php.net/manual/en/book.password.php` (`password_hash`, `password_verify`)
+  - **Session Management**: `https://www.php.net/manual/en/book.session.php` (`session_start`, session security)
+  - **Security Best Practices**: `https://www.php.net/manual/en/security.php` (Input validation, SQL injection, XSS)
+- **Composer Official Documentation**: `https://getcomposer.org/doc/` (Dependency management, autoloader, `composer.json`)
+- **MySQL Reference Manual**: `https://dev.mysql.com/doc/refman/8.0/en/` (SQL syntax, indexing, transactions, utf8mb4 charset)
+- **PHPMailer Repository & Docs**: `https://github.com/PHPMailer/PHPMailer` (SMTP integration, exception handling, email templates)
+- **MDN Web Docs**: `https://developer.mozilla.org/`
+  - **HTML Reference**: `https://developer.mozilla.org/en-US/docs/Web/HTML` (Semantic HTML5 markup)
+  - **CSS Reference**: `https://developer.mozilla.org/en-US/docs/Web/CSS` (Responsive design, layout, styling)
+  - **JavaScript Guide**: `https://developer.mozilla.org/en-US/docs/Web/JavaScript` (DOM manipulation, event handling, AJAX fetch)
+  - **Web Security**: `https://developer.mozilla.org/en-US/docs/Web/Security` (CSP, HTTPS, CSRF, cookies)
+
 ### Official Documentation (The Source of Truth)
 - **Antigravity Docs**: `https://antigravity.google/docs`
 - **Agent Configuration**: `https://developers.google.com/antigravity/agent-configuration`
@@ -62,6 +77,5 @@ Lưu trữ danh sách các repo nguồn để tiện cho việc cập nhật h�
 ---
 
 ## 🔄 Hướng dẫn Cập nhật (Manual Update)
-Khi cần cập nhật từ các nguồn trên, sử dụng lệnh:
-1. `git pull <repo_url>`
-2. Hoặc dùng CLI: `npx antigravity-ide update`
+Khi cần cập nhật từ các nguồn trên, sử dụng lệnh git:
+`git pull`

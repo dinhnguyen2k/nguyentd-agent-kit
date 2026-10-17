@@ -8,7 +8,7 @@ metadata:
 **IMPORTANT - Path Resolution:**
 This skill can be installed in different locations (plugin system, manual installation, global, or project-specific). Before executing any commands, determine the skill directory based on where you loaded this SKILL.md file, and use that path in all commands below. Replace `$SKILL_DIR` with the actual discovered path.
 
-Do not assume a Claude-specific path. This Cogain repo exposes the skill through `.agent/skills` and harness symlinks.
+Do not assume a Claude-specific path. This repo exposes the skill through `.agent/skills` and harness symlinks.
 
 # Playwright Browser Automation
 

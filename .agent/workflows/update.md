@@ -1,32 +1,32 @@
 ---
 name: update
-description: Kiểm tra và cập nhật phiên bản Antigravity IDE
+description: Kiểm tra và cập nhật bộ kit / mã nguồn từ kho lưu trữ Git
 ---
 
-# /update - Hệ thống Cập nhật Tự động
+# /update - Quy trình Cập nhật Bộ Kit & Mã Nguồn
 
-Quy trình này hướng dẫn Agent cách kiểm tra và thực hiện cập nhật gói `antigravity-ide`.
+Quy trình này hướng dẫn cách kiểm tra và đồng bộ an toàn các bản cập nhật từ kho lưu trữ Git từ xa.
 
 ## 📋 Các bước thực hiện
 
-1. **Kiểm tra thông tin hiện tại**:
-   - Đọc `version` trong `package.json` tại thư mục dự án.
-   - Ghi nhớ số phiên bản này (Ví dụ: 4.0.0).
+1. **Kiểm tra trạng thái cục bộ**:
+   - Chạy `git status` để kiểm tra các thay đổi đang dở dang (uncommitted changes).
+   - Nếu có file đang sửa, đề xuất stash hoặc commit trước khi cập nhật: `git stash`.
 
-2. **Truy vấn NPM Registry**:
-   // turbo
-   - Chạy lệnh: `npm view antigravity-ide version`
-   - Lấy kết quả đầu ra.
+2. **Kiểm tra bản cập nhật từ xa**:
+   - Lấy thông tin mới từ remote: `git fetch`.
+   - Xem trước các thay đổi mới: `git log HEAD..@{u} --oneline`.
 
-3. **Phân tích so sánh**:
-   - Nếu `phiên bản NPM` > `phiên bản hiện tại`: Chuyển sang bước 4.
-   - Nếu bằng nhau: Thông báo "Bạn đang sử dụng phiên bản mới nhất (vX.X.X)".
+3. **Thực hiện cập nhật (Khi được người dùng đồng ý)**:
+   - Kéo cập nhật về nhánh hiện tại:
+     ```bash
+     git pull
+     ```
+   - Nếu trước đó có stash: `git stash pop` và giải quyết xung đột (conflict) nếu có.
 
-4. **Hành động**:
-   - Gửi tin nhắn: "Đã có phiên bản mới **v[LATEST]** (bạn đang dùng **v[CURRENT]**). Bạn có muốn cập nhật ngay không?"
-   - Đợi người dùng phản hồi.
-   - Nếu người dùng nói "Có/Ok/Ưm":
-     // turbo
-     - Chạy lệnh: `npm install -g antigravity-ide@latest`
-     - Thông báo thành công và nhắc người dùng chạy `antigravity-update` để đồng bộ skills (nếu cần).
-   - Nếu người dùng nói "Không": Kết thúc quy trình.
+4. **Kiểm tra tính toàn vẹn hệ thống**:
+   - Chạy script kiểm định cấu trúc agent kit:
+     ```bash
+     node .agent/scripts/validate-agent-system.mjs
+     ```
+   - Thông báo kết quả cập nhật cho người dùng.

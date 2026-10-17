@@ -34,9 +34,9 @@ Chỉ Claude Code có PreToolUse hook, nên chỉ ở đó ranh giới là cứn
 Cùng registry, cùng luật, không phụ thuộc harness:
 
 ```bash
-node .agent/scripts/agent-boundary-guard.mjs --check-command "dotnet test --filter X"
-node .agent/scripts/agent-boundary-guard.mjs --check-write backend/tests/Foo.cs
-node .agent/scripts/agent-boundary-guard.mjs --check-command "dotnet test" --role verifier
+node .agent/scripts/agent-boundary-guard.mjs --check-command "vendor/bin/phpunit --filter X"
+node .agent/scripts/agent-boundary-guard.mjs --check-write tests/FooTest.php
+node .agent/scripts/agent-boundary-guard.mjs --check-command "vendor/bin/phpunit" --role verifier
 ```
 
 exit 0 là cho phép, exit 2 là bị chặn kèm lý do ở stderr.

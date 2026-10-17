@@ -1,6 +1,6 @@
 ---
 name: debug
-description: Gặp lỗi khó sửa? Để AI soi log và sửa giúp bạn theo quy trình chuyên nghiệp.
+description: Điều tra và xử lý lỗi ứng dụng PHP theo quy trình chuyên nghiệp
 ---
 
 # /debug - Action-Oriented Debugging Workflow
@@ -9,73 +9,58 @@ $ARGUMENTS
 
 ---
 
-## 🟢 PHASE 1: Forensic Discovery & RCA (The "Crime Scene")
+## 🟢 PHASE 1: Forensic Discovery & RCA (Khám nghiệm Hiện trường)
+**Kỹ năng**: `debugging-master`, `php-development`
+**Nhiệm vụ**: Xác định chính xác vị trí lỗi và hình thành giả thuyết nguyên nhân gốc.
+- **Hành động**: Đọc PHP Error Log, PDO Exception message, hoặc Browser Console logs. Xác định rõ `file:dòng`.
+- **Hành động**: Dùng phương pháp "5 Whys" để tìm nguyên nhân gốc rễ (ví dụ: sai tên cột CSDL, thiếu session_start, biến rỗng, thiếu autoload Composer).
+- **Tham khảo**: Kiểm tra `ERRORS.md` xem đây có phải lỗi tái phát không.
 
-**Skill**: `debugging-master`
-**Mission**: Isolate the exact point of failure and formulate a hypothesis.
-
-- **Action**: Read the Stack Trace or Terminal Logs. Locate the failing file:line.
-- **Action**: Use "The 5 Whys" to form a hypothesis about the root cause.
-- **DNA Link**: Consult `rules/error-logging.md` to see if this is a known recurring issue.
-
-## 🟡 PHASE 2: Strategic Instrumentation (If needed)
-
-**Skill**: `debugging-master`
-**Mission**: Gather more evidence if the root cause is unclear.
-
-- **Action**: Suggest strategic debug logging, or breakpoint placement.
-- **Action**: Ask the user to reproduce with the new instrumentation.
+## 🟡 PHASE 2: Strategic Instrumentation (Nếu cần thiết)
+**Kỹ năng**: `debugging-master`
+**Nhiệm vụ**: Thu thập thêm dữ liệu nếu chưa rõ nguyên nhân gốc.
+- **Hành động**: Đặt log nội bộ có chủ đích (`error_log()` trong PHP) để kiểm tra giá trị biến trước điểm lỗi.
+- **Lưu ý**: Tuyệt đối không log mật khẩu CSDL hoặc thông tin đăng nhập nhạy cảm. Xóa bỏ log debug sau khi hoàn tất.
 
 ## 🟠 PHASE 2.5: Fix Proposal & Risk Critique
-
-**Execution role**: current routed specialist
-**Mission**: Evaluate the proposed fix before touching any code.
-
-- **Action**: The specialist proposes a fix.
-- **Action**: Check regressions, edge cases, side effects, and whether the hypothesis is falsifiable.
-- **Rule**: Do not proceed until material risk is mitigated or reported.
+**Execution role**: `backend-specialist` hoặc `frontend-specialist`
+**Nhiệm vụ**: Đánh giá bản sửa trước khi sửa code.
+- Đề xuất giải pháp sửa tận gốc với mức thay đổi tối thiểu.
+- Đánh giá rủi ro hồi quy (regression), các trường hợp biên (edge cases), và tính tương thích với cấu trúc procedural hiện tại.
 
 ## 🔵 PHASE 3: Surgical Repair
-
-**Execution role**: `backend-specialist` or `frontend-specialist`
-**Mission**: Apply the targetted fix based on `debugging-master`'s analysis.
-
-- **Correction**: Apply the smallest root-cause fix; add defensive code only when it preserves the intended contract.
+**Execution role**: `backend-specialist` (lỗi logic PHP/PDO/MySQL) hoặc `frontend-specialist` (lỗi CSS/JS/Layout)
+**Nhiệm vụ**: Áp dụng bản sửa chữa đúng trọng tâm.
+- Sửa đúng nguyên nhân, không dùng giải pháp tạm thời (như dùng toán tử dập lỗi `@` để che giấu PHP notice).
 
 ## 🔴 PHASE 4: Verification & Post-Mortem
-
-**Execution role**: `testing role` & `verification role`
-**Mission**: Ensure the "Bleeding" has stopped.
-
-- **Action**: Run the failing test case to confirm FIX.
-- **Reporting**: Add to `.planning/errors/ERRORS.md` only for a material new incident; create extra artifacts only when requested or useful for handoff.
+**Execution role**: `test-author` & `verifier`
+**Nhiệm vụ**: Xác minh lỗi đã được xử lý triệt để.
+- **Kiểm tra**: Chạy kiểm tra cú pháp `php -l <file>` hoặc kịch bản kiểm tra tương ứng khi có yêu cầu.
+- **Ghi nhận**: Ghi lại sự cố mới vào `ERRORS.md` nếu là lỗi nghiêm trọng hoặc có tính học hỏi cao.
 
 ---
 
 ## Output Format:
 
 ```markdown
-## 🐞 Debug Report: [Bug Title]
+## 🐞 Debug Report: [Tên Lỗi / Sự cố]
 
 ### Root Cause
-
-[One sentence explanation]
+[Một câu giải thích rõ nguyên nhân gốc]
 
 ### The Fix
-
-[Diff or explanation]
+[Mô tả thay đổi hoặc code diff]
 
 ### Verification
-
-- [ ] Test case passed
-- [ ] No regression found
-- [ ] Error logged in ERRORS.md
+- [ ] Lỗi không còn tái phát
+- [ ] Không phát sinh lỗi hồi quy
+- [ ] Cập nhật ERRORS.md (nếu là lỗi mới quan trọng)
 ```
 
 ---
 
-## Key Principles:
-
-- **Evidence-First**: Don't guess, use the logs.
-- **Regression-Aware**: Every fix must come with a test case to prevent it from returning.
-- **Clean Fix**: Don't use "band-aid" fixes unless it's a critical production outage.
+## Nguyên tắc Cốt lõi:
+- **Dựa trên Bằng chứng**: Không đoán mò, dựa vào thông báo lỗi và log thực tế.
+- **Fix Đúng > Fix Nhanh**: Sửa đúng bản chất, không che giấu triệu chứng.
+- **An toàn Dữ liệu**: Thao tác sửa chữa không làm hỏng dữ liệu MySQL hiện có.

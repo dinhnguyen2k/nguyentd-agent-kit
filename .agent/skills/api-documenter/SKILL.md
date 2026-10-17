@@ -9,7 +9,7 @@ metadata:
 
 # 📄 API Documenter Master Kit
 
-Create API documentation that is accurate against the current code and useful to internal consumers. For Cogain, backend source and generated Swagger/OpenAPI output outrank hand-written examples.
+Create API documentation that is accurate against the current code and useful to internal consumers. For this project, backend source and actual endpoint contracts outrank hand-written examples.
 
 ---
 

@@ -1,4 +1,4 @@
-# Kiến trúc Agent Cogain
+# Kiến trúc Agent PHP / Long Phát
 
 Tài liệu chuẩn đã được hợp nhất tại `.agent/ARCHITECTURE.md` để tránh hai bản kiến trúc bị lệch nhau.
 

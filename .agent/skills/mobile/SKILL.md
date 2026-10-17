@@ -5,7 +5,7 @@ description: "Native mobile application development and optimization. Use when d
 
 ## 📱 Quy trình Phát triển Di động
 
-> Scope warning: Cogain currently registers no mobile runtime agent or mobile
+> Scope warning: Currently registers no mobile runtime agent or mobile
 > skill. Do not dispatch `mobile-developer`; pause and request an approved mobile
 > profile/project boundary before executing this workflow.
 

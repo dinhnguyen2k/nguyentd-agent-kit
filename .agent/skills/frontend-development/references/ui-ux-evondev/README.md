@@ -6,11 +6,11 @@ Nội dung là trích nguyên văn các luật đã chọn; mỗi khối có com
 Trigger: bảng "UI reference" trong `../../SKILL.md` chỉ định đọc đúng một file theo việc đang làm; bản tóm tắt override ở đó là bản model đọc, bảng dưới đây là bản đầy đủ cho người.
 Reviewer đọc `review-taxonomy.md` qua symlink `.agent/skills/code-review/references/ui-review-taxonomy.md`.
 
-## Cogain override (thắng mọi nội dung trong thư mục này)
+## Project override (thắng mọi nội dung trong thư mục này)
 
-Nội dung nguồn viết cho dự án trống nên có gu riêng; trong Cogain các điểm dưới đây giữ cách Cogain.
+Nội dung nguồn viết cho dự án trống nên có gu riêng; trong dự án các điểm dưới đây giữ theo convention hiện tại.
 
-| Luật nguồn | Cogain giữ |
+| Luật nguồn | Dự án giữ |
 | --- | --- |
 | `I1`, nút mặc định là `outline` | `Button` mặc định `variant: 'default'` (`frontend/shared/ui/button.tsx`) |
 | `I4`, nút nguy hiểm nền mờ `rose`, không đỏ đặc | `variant="destructive"` nền đặc `bg-destructive` |
@@ -21,7 +21,7 @@ Nội dung nguồn viết cho dự án trống nên có gu riêng; trong Cogain 
 | `F24`, không `transition-all` | `Button` giữ `transition-all` |
 | `T15`, nhãn nút được xuống dòng | `Button` giữ `whitespace-nowrap` |
 | `T25`, placeholder không lặp nhãn | Giữ quy ước placeholder "Nhập..." hiện có |
-| `F1`, `F11`, bo 12px, control `h-10`/`h-11`, padding 20-24px | Thang Cogain: control `h-9` (`h-8` compact), `rounded-md`, mật độ ERP |
+| `F1`, `F11`, bo 12px, control `h-10`/`h-11`, padding 20-24px | Thang kích thước: control `h-9` (`h-8` compact), `rounded-md` |
 | Màu cụ thể trong ví dụ (`rose-*`, `emerald-*`, `bg-surface`, `bg-item-hover`, `--border-strong`, `shadow-modal`, `shadow-popover`) | Token Figma và token trong `frontend/erp/src/index.css`; không thêm token mới theo nguồn |
 | Ô trống hiển thị dấu gạch dài | Dùng `-` |
 | Mũi tên sắp xếp (`sortable-header.md`: lên là tăng dần) | Giữ hướng hiện tại của `custom-table.tsx` |

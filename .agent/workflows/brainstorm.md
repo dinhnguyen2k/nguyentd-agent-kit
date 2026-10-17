@@ -12,6 +12,7 @@ $ARGUMENTS
 ---
 
 ## 🟢 PHASE 1: Domain Discovery
+**Execution role**: `orchestrator`
 
 - Inspect only the source/docs needed to identify current behavior, constraints, and affected boundaries.
 - Use an explorer subagent only when codebase discovery is substantial, independently scoped, and delegation is available/authorized.
@@ -54,12 +55,14 @@ Một option ghi điểm ở câu 5 bằng cách thêm generic layer là dấu h
 - Option chạm risk surface production (transaction, external call, broker, job, bảng lớn, endpoint public, migration) thì soi thêm bằng mục tương ứng trong `.agent/rules/architecture-review.md`.
 
 ## 🔵 PHASE 4: Synthesis
+**Execution role**: `orchestrator`
 
 - **Action**: Từ 3 bản tóm tắt nhận được, tổng hợp bảng so sánh A/B/C.
 - **Trong chat**: chỉ hiển thị bảng rút gọn (không viết lại toàn bộ lý luận của Phase 2+3).
 - **Artifact**: Ghi bản đầy đủ (Pros/Cons/Risks/Effort chi tiết) vào 1 file markdown tại thư mục artifacts (ví dụ `brainstorm_options.md`) — đây là nơi DUY NHẤT chứa bản chi tiết, tránh nhân đôi nội dung giữa chat và file.
 
 ## 🔴 PHASE 5: Recommendation & Handoff
+**Execution role**: `orchestrator`
 
 - **Action**: Đưa ra **1 đề xuất chuyên môn** tốt nhất, giải thích ngắn gọn lý do so với 2 option còn lại.
 - **Action**: Hỏi user chọn Option nào (A/B/C).

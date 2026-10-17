@@ -1,8 +1,8 @@
 # Button
 
 > Rút gọn từ `references/components/button.md` (evondevKit `dff15b4`).
-> Đã bỏ phần variant, hover, nút xoá vì Cogain giữ `frontend/shared/ui/button.tsx` (xem `../README.md`).
-> Trong ví dụ, `variant="primary"` của nguồn tương ứng `variant="default"` của Cogain.
+> Đã bỏ phần variant, hover, nút xoá vì dự án giữ cấu trúc UI hiện có (xem `../README.md`).
+> Trong ví dụ, `variant="primary"` của nguồn tương ứng `variant="default"` của dự án.
 
 ## Đang xử lý (loading)
 
