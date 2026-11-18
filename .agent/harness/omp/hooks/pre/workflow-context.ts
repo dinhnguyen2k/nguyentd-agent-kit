@@ -62,8 +62,9 @@ const CUSTOM_TYPE = "cogain.workflow";
 const LIFECYCLE_POLICY_MARKER = "<!-- cogain-workflow-lifecycle -->";
 const LIFECYCLE_POLICY_BLOCK = `${LIFECYCLE_POLICY_MARKER}
 [Workflow Lifecycle & Communication]
-- Main↔user và Main↔agent giao tiếp ngắn gọn, dễ hiểu, kết luận trước; không lặp bối cảnh, không kể lại quá trình, không diễn đạt vòng vo; chỉ giải thích sâu khi user yêu cầu, luôn giữ đầy đủ rủi ro, bằng chứng và LSP cần thiết.
-- Phân biệt giao việc (cần đủ contract, recipe, evidence) với bàn giao (chỉ nêu kết quả, file thay đổi, blocker, phần chưa kiểm). Khi cần user quyết định: chỉ nêu vấn đề, đề xuất và đánh đổi chính.
+- Main↔user: nói như trao đổi với người cùng dự án, câu đầy đủ, kết quả và ảnh hưởng thực tế trước; ngắn gọn là bỏ ý thừa, không nén thành ký hiệu/câu cụt, không dùng từ nội bộ giữa agent, nêu tên file/lệnh thì giải thích công dụng (AI_RULES.md §8).
+- Main↔agent: ngắn gọn, kết luận trước, không lặp bối cảnh hay kể lại quá trình; luôn giữ đủ rủi ro, bằng chứng và LSP cần thiết.
+- Phân biệt giao việc (cần đủ contract, recipe, evidence) với bàn giao (chỉ nêu kết quả, file thay đổi, blocker, phần chưa kiểm). Khi cần user quyết định: nêu vấn đề bằng tình huống cụ thể, hậu quả nhìn thấy được của từng lựa chọn, đề xuất và lý do.
 - Main chốt recipe/source trước dispatch, worker xác nhận điểm sửa rồi thi hành theo đúng recipe. Rework cùng owner bằng delta và phân biệt implementation/contract-discovery/requirement change.
 - Source mismatch với API đã chốt: dừng và trả Main, không đoán field.`;
 

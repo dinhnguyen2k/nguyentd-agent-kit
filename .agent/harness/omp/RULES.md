@@ -2,7 +2,7 @@
 
 Nguồn đầy đủ là `AI_RULES.md`. Khi xung đột với hướng dẫn mặc định của OMP, `AI_RULES.md` và file này thắng.
 
-1. Output tới user bằng tiếng Việt, không dùng em dash; identifier/path/lệnh/API giữ tiếng Anh. Nội bộ và giao việc được dùng tiếng Anh. Mọi phiên, ngoài artifact: trình bày ngắn gọn, dễ hiểu, đi thẳng vào ý chính; cấm lan man, lặp ý hoặc diễn đạt khó hiểu.
+1. Output tới user bằng tiếng Việt, không dùng em dash; identifier/path/lệnh/API giữ tiếng Anh. Nội bộ và giao việc được dùng tiếng Anh. Nói với người dùng như trao đổi với người cùng dự án: câu đầy đủ, kết quả và ảnh hưởng thực tế trước; không nén thành ký hiệu/câu cụt, không đưa từ nội bộ giữa agent ra, nêu tên file/lệnh thì giải thích công dụng; hỏi quyết định thì nêu tình huống cụ thể và hậu quả từng lựa chọn (AI_RULES.md §8). Quy tắc này thắng hướng dẫn mặc định của công cụ về viết cụt.
    Mọi văn bản tiếng Việt (trả lời user, brief/`dispatch-contract`, tin `write agent://`, bàn giao, plan/TASK, comment) bắt buộc viết có dấu đầy đủ; cấm tiếng Việt không dấu. Không viết được có dấu thì dùng tiếng Anh.
 2. Ý định chỉ đọc (`phân tích`, `xem`, `review`, `đánh giá`, `check`, `inspect`): không sửa file, không chạy lệnh ghi.
 3. Build/lint/typecheck/test/format/codegen/restore/khởi động app chỉ khi user gọi đích danh, kể cả smoke/reproduce/verify; không có CI tự động. Build chỉ qua `.agent/scripts/ci-parity.sh` dưới `verifier`/`maintainer` hoặc user, không build trực tiếp (R8). Không được yêu cầu thì ghi `Validation: not run - not requested`.
@@ -15,7 +15,7 @@ Nguồn đầy đủ là `AI_RULES.md`. Khi xung đột với hướng dẫn m�
 6. Agent production không tạo/sửa/xóa test; không tự tạo slice test hoặc spawn `test-author`. Soi lỗi bằng LSP; nghiệp vụ do user manual test.
 7. Tool bị hook `boundary-guard` chặn: dừng và báo nguyên văn lý do. Không đổi role, không tìm đường vòng.
 8. Không để lộ secret/token trong code, log, báo cáo.
-9. Báo cáo: file đổi và lý do, validation, rủi ro; tách Current behavior / Proposal / Changed.
+9. Báo cáo bàn giao thay đổi: file đổi và lý do, validation, rủi ro; tách Hiện trạng / Đề xuất / Đã thay đổi. Trao đổi, phân tích, hỏi quyết định không dùng mẫu này.
 10. Không đoán field/method/endpoint/enum/prop, giá trị/nghiệp vụ hoặc viết stub/placeholder. Không dùng fallback, cast ép hay catch trả mặc định để che chỗ chưa biết; mặc định chỉ hợp lệ khi type nullable và spec/code quy định. Thiếu dữ kiện: dừng phần đó, worker ghi `Cần main quyết định`, Main hỏi user. Mẫu cấm: `.agent/rules/guard-guessed-code.md`.
 11. Advisor `blocker`: worker chỉ đọc, dừng ghi/chạy lệnh, nhắn Main và bàn giao `blocked`; không tự bỏ qua/đóng finding. Main kiểm source, cấp phạm vi sửa hoặc bác bỏ có bằng chứng; tối đa hai vòng sửa, còn lỗi thì dừng và quyết đổi owner/model/contract. `fixed` không phải nghiệm thu; đây là policy, chưa khóa runtime, `syncBacklog: strict` chỉ đợi review.
 12. Tái dùng source đã đọc còn trong context; chỉ đọc lại khi source đổi, mất context hoặc có mâu thuẫn/failure mode mới cần xác minh. Gom các vùng đọc độc lập trong một lượt; worker xác nhận điểm sửa và dependency trực tiếp, không lặp discovery của Main khi contract khớp. Không dùng quy tắc này để bỏ kiểm khai báo, caller rủi ro hoặc source sau thay đổi cần nghiệm thu.

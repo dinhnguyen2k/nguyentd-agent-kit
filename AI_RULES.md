@@ -48,13 +48,17 @@ Không lấy chi phí phát triển (số dòng diff, số bước, token) làm 
 - Nhất quán BE ↔ FE (enum, nullable ID, public contract): `.agent/rules/domain-parity.md`.
 
 ## 7. Báo Cáo Cuối (bắt buộc)
-Changed files / lý do từng thay đổi / validation status / rủi ro còn lại.
+Khi bàn giao thay đổi code hoặc tệp: file đã đổi / lý do từng thay đổi / trạng thái kiểm tra / rủi ro còn lại. Trao đổi, phân tích hay hỏi quyết định không dùng mẫu này.
 Chỉ ghi command và kết quả khi command thực sự đã chạy. Không có yêu cầu validation thì ghi: `Validation: not run - not requested`.
-Phân biệt rõ: **Current behavior** / **Proposal** / **Changed**.
+Phân biệt rõ: **Hiện trạng** / **Đề xuất** / **Đã thay đổi**.
 
 ## 8. Quy Ước Đầu Ra
 - Output cho người dùng bằng Tiếng Việt; identifier, API name, cú pháp code giữ Tiếng Anh.
-- Mọi phiên, ngoài artifact: trình bày ngắn gọn, dễ hiểu, đi thẳng vào ý chính; cấm lan man, lặp ý hoặc diễn đạt khó hiểu.
+- Nói với người dùng như đang trao đổi với người cùng dự án: câu đầy đủ, nói kết quả và ảnh hưởng thực tế trước, chi tiết kỹ thuật sau; cấm lan man, lặp ý.
+- Ngắn gọn nghĩa là bỏ ý thừa, không phải nén câu thành ký hiệu, viết tắt hay câu cụt.
+- Không đưa từ nội bộ giữa các agent (slice, contract, lane, dispatch, scout, LSP...) vào câu trả lời cho người dùng; tên file, lệnh hay cấu hình khi cần nêu thì giải thích nó dùng để làm gì ngay trong câu.
+- Khi cần người dùng quyết định: nêu vấn đề bằng tình huống cụ thể, mỗi lựa chọn nói rõ hậu quả nhìn thấy được, kèm đề xuất và lý do.
+- Quy tắc này chỉ áp cho câu trả lời tới người dùng; giao việc giữa các agent vẫn dùng ngôn ngữ kỹ thuật. Hướng dẫn mặc định của công cụ yêu cầu viết cụt hoặc giả định người đọc là dân kỹ thuật thì quy tắc này thắng.
 - Comment/XML doc: Tiếng Việt.
 - Không dùng em dash, dùng dấu gạch ngang thường `-`.
 - File Markdown dài: mỗi câu hoàn chỉnh nằm trên một dòng riêng.
