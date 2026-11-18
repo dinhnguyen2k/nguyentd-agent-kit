@@ -6,61 +6,42 @@ metadata:
   source: "https://github.com/mattpocock/skills (MIT License, Copyright (c) 2026 Matt Pocock)"
 ---
 
-# Research
+# Nghiên cứu
 
-Produce a decision-useful answer from the smallest high-signal context.
-Do not optimize for the number of searches, sources, agents, or tokens consumed.
+Chỉ tìm những gì giúp Main chọn cách làm. Ưu tiên ít nguồn có bằng chứng tốt; đừng tìm cho đủ số lượng.
 
-## 1. Normalize the request
+## 1. Chốt câu hỏi
 
-Define the decision, only the questions that can change it, relevant constraints, explicit exclusions, freshness, and expected output before searching.
-DO NOT inject the full conversation, repository documentation, source tree, or previously opened pages by default.
-Pass paths or short references first, then load content only when it can resolve an active question.
+Trước khi tìm, làm rõ quyết định cần hỗ trợ và những câu hỏi có thể làm thay đổi quyết định đó. Nắm các dữ kiện đã biết, ràng buộc, nội dung không cần tìm, độ mới cần thiết và dạng kết quả mong muốn.
+Đừng đưa toàn bộ hội thoại, kho mã hay trang đã mở vào ngữ cảnh. Gửi đường dẫn hoặc tham chiếu ngắn trước; chỉ đọc thêm khi cần trả lời câu hỏi.
 
-## 2. Select one research level
+## 2. Chọn cấp độ
 
-`FOCUSED` is the default.
-Source budgets are upper bounds, not completion targets.
-Stop early when sufficient evidence already exists.
+Mặc định dùng `FOCUSED`. Các giới hạn nguồn dưới đây là mức tối đa, không phải chỉ tiêu; dừng sớm khi đã đủ bằng chứng.
 
-| Level | Use when | Default input and source limit |
+| Cấp độ | Dùng khi | Giới hạn mặc định |
 | --- | --- | --- |
-| `LOOKUP` | One bounded fact, API option, syntax, version, or current status | One question; inspect up to 3 discovery results; open 1 primary source and at most 1 confirming source |
-| `FOCUSED` | A technical decision with up to 3 decision-changing questions | Up to 3 questions; open at most 6 relevant sources total; use at most 2 sources per claim by default |
-| `DEEP` | The user explicitly requests deep research, or an active governed workflow explicitly authorizes it | A bounded lane manifest with an explicit lane count and source budget; no open-ended browsing |
+| `LOOKUP` | Một dữ kiện cụ thể, tùy chọn API, cú pháp, phiên bản hoặc trạng thái hiện tại | Một câu hỏi; xem tối đa 3 kết quả tìm kiếm; mở 1 nguồn chính và tối đa 1 nguồn xác nhận |
+| `FOCUSED` | Một quyết định kỹ thuật có tối đa 3 câu hỏi ảnh hưởng đến quyết định | Tối đa 3 câu hỏi; mở tổng cộng tối đa 6 nguồn liên quan; thường không quá 2 nguồn cho mỗi nhận định |
+| `DEEP` | Người dùng yêu cầu rõ nghiên cứu chuyên sâu, hoặc quy trình có kiểm soát cho phép rõ ràng | Phạm vi, số nhánh và ngân sách nguồn phải được chốt trước; không tìm không giới hạn |
 
-Routing rules:
+`LOOKUP` là việc nhỏ, Main tự tra cứu tại chỗ. Với `FOCUSED`, nếu cần so sánh nhiều nguồn, Main có thể giao trọn câu hỏi cho một Researcher, nếu dự án cho phép. Researcher không tự mở rộng sang `DEEP`. Chỉ dùng `DEEP` khi được yêu cầu hoặc cho phép rõ ràng.
 
-```text
-IF one bounded factual question:
-  USE LOOKUP
+Nếu câu hỏi vượt quá ba điểm có thể làm đổi quyết định mà chưa được cho phép nghiên cứu `DEEP`, thu hẹp về `FOCUSED` và nêu rõ điều chưa giải quyết. Rủi ro có thể đòi hỏi bằng chứng mạnh hơn, nhưng không cho phép tìm kiếm hay giao việc không giới hạn.
 
-ELSE IF the decision can be resolved by up to three questions:
-  USE FOCUSED
+## 3. Làm theo hướng dẫn cấp độ
 
-ELSE IF DEEP research is explicitly authorized:
-  USE DEEP
-
-ELSE:
-  REDUCE the request to FOCUSED and report any unresolved research need
-```
-
-DO NOT silently escalate from `LOOKUP` or `FOCUSED` to `DEEP`.
-Risk alone permits stronger evidence requirements, not unlimited research or delegation.
-
-## 3. Load one level contract
-
-After routing, read exactly one matching reference:
+Chỉ đọc hướng dẫn của cấp độ đã chọn:
 
 - `LOOKUP`: [references/lookup.md](references/lookup.md)
 - `FOCUSED`: [references/focused.md](references/focused.md)
 - `DEEP`: [references/deep.md](references/deep.md)
 
-DO NOT load the other level references.
+Không đọc hướng dẫn của các cấp độ còn lại.
 
-## 4. Retain evidence, not pages
+## 4. Ghi bằng chứng
 
-Keep a compact evidence ledger:
+Với mỗi nhận định quan trọng, ghi ngắn gọn nhận định, phát hiện, nguồn trực tiếp, loại bằng chứng, mức độ chắc chắn và giới hạn liên quan:
 
 ```yaml
 - claim: "Decision-changing statement"
@@ -71,18 +52,14 @@ Keep a compact evidence ledger:
   limitation: "Relevant caveat or null"
 ```
 
-Do not retain raw HTML, long quotations, duplicate snippets, navigation text, or full search responses after extraction.
-Structured notes are the handoff boundary between research steps and between agents.
+Đừng giữ HTML thô, trích dẫn dài, đoạn trùng lặp, nội dung điều hướng hay toàn bộ kết quả tìm kiếm. Ghi chú ngắn là phần bàn giao giữa các bước và người tham gia.
 
-## 5. Stop condition
+## 5. Khi nào dừng
 
-STOP when every decision-changing claim has direct support and another independent source is unlikely to change the conclusion.
-Do not consume the remaining source budget after the stop condition is met.
+Dừng khi các nhận định có thể làm đổi quyết định đã có bằng chứng trực tiếp và khó có khả năng nguồn độc lập khác làm thay đổi kết luận. Đừng dùng hết ngân sách nguồn nếu không cần.
 
-## 6. Output
+## 6. Bàn giao
 
-- Return concise findings with direct citations, limitations, confidence, and unresolved questions.
-- Label material claims as `fact`, `reported experience`, `inference`, or `open question`.
-- For substantial standalone research, write one Markdown artifact using the repo convention.
-- When nested inside another workflow, contribute to its designated artifact or return a bounded summary.
-- Do not create a duplicate artifact or repeat the full evidence ledger in chat.
+- Trả lời ngắn gọn trong hội thoại, có nguồn, giới hạn, mức độ chắc chắn và câu hỏi còn bỏ ngỏ.
+- Phân biệt rõ `fact`, `reported-experience`, `inference` và `open-question`.
+- Researcher chỉ trả kết quả trong chat; không tự lưu hay tạo artifact. Main hoặc người có quyền chỉ lưu khi người dùng yêu cầu.

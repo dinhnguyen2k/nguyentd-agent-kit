@@ -1,48 +1,23 @@
-# FOCUSED research
+# Nghiên cứu FOCUSED
 
-Use for a technical decision that can be resolved by no more than 3 decision-changing questions.
-This is the default research level.
+Dùng `FOCUSED` cho quyết định kỹ thuật có thể giải quyết bằng tối đa 3 câu hỏi ảnh hưởng đến quyết định. Đây là cấp độ mặc định.
 
-## Input contract
+## Giao câu hỏi
 
-```yaml
-mode: FOCUSED
-decision: "One decision this research must support"
-questions:
-  - "No more than 3 questions that can change the decision"
-known_context:
-  - "Relevant facts already established"
-constraints:
-  - "Version, ecosystem, scope, or operational constraint"
-exclude:
-  - "Topics that must not be explored"
-freshness: "current | time-bounded | timeless"
-source_seeds:
-  - "Optional direct URL or local source reference"
-output: "comparison | recommendation | reusable-note"
-```
+Main giao trọn câu hỏi cho một Researcher nếu dự án cho phép. Nêu quyết định cần hỗ trợ, tối đa 3 câu hỏi, dữ kiện đã biết, ràng buộc, điều cần loại trừ, độ mới cần thiết, nguồn gợi ý và dạng kết quả mong muốn. Đừng gửi cả hội thoại hay toàn bộ kho mã; chỉ đưa tham chiếu ngắn trước. Đừng tìm lại phần người trước đã kiểm tra.
 
-Do not pass the full conversation, source tree, repository documentation, or previously opened pages.
-Pass paths or short references first and load their content only when it can resolve an active question.
+## Quy tắc về nguồn
 
-## Source policy
+- Một Researcher sở hữu việc tìm hiểu từ đầu đến cuối. Không tạo Researcher con, nhánh nghiên cứu hay lượt tìm kiếm trùng lặp.
+- Mở tổng cộng tối đa 6 nguồn liên quan; thường không quá 2 nguồn cho mỗi nhận định. Một nguồn là đủ nếu nó trực tiếp giải đáp mà không còn mơ hồ đáng kể.
+- Ưu tiên tài liệu chính thức, đặc tả, mã nguồn upstream, API của bên cung cấp, cảnh báo và báo cáo hậu kiểm trực tiếp.
+- Với đánh đổi vận hành quan trọng, thêm một nguồn từ người thực hành hoặc phản ví dụ nếu điều đó có thể làm thay đổi khuyến nghị.
+- Tìm theo nhóm nhỏ. Tiêu đề, đoạn trích và mức phổ biến chỉ giúp chọn nguồn để xem, không thay thế bằng chứng.
+- Mở đúng phần cần thiết, loại URL trùng và không mở lại nguồn trừ khi cần kiểm tra phần khác.
+- Chỉ mở rộng khi nguồn mâu thuẫn, không hợp bối cảnh, còn thiếu bằng chứng cho nhận định then chốt hoặc Main cho phép rõ ràng. Nêu lý do trước khi mở rộng.
 
-- Open no more than 6 relevant sources total and use at most 2 sources per claim by default.
-- One source is sufficient when it directly resolves all active claims without material ambiguity.
-- Treat this source budget as an upper bound, not a completion target.
-- Prefer official documentation, specifications, upstream source, first-party APIs, advisories, and direct postmortems.
-- For a material production trade-off, add 1 relevant practitioner source or counterexample when it can change the recommendation.
-- Search in small batches and treat titles, snippets, and popularity only as discovery signals.
-- Open targeted sections instead of full pages.
-- Deduplicate URLs and do not reopen a source unless a new claim requires another section.
-- Do not delegate ordinary focused research.
+## Ghi chú và điểm dừng
 
-Expand only when evidence conflicts, context fit is weak, a key claim remains unresolved, or the brief explicitly authorizes expansion.
-Record the reason before expanding.
+Ghi ngắn gọn nhận định, phát hiện, nguồn trực tiếp, loại bằng chứng (`fact`, `reported-experience`, `inference`, `open-question`), mức độ chắc chắn và giới hạn. Bỏ HTML thô, trích dẫn dài, nội dung điều hướng, đoạn trùng và phản hồi công cụ đầy đủ sau khi trích xuất.
 
-## Retained context
-
-Keep only the shared evidence ledger defined in the research entry skill.
-Discard raw HTML, long quotations, navigation text, duplicate snippets, and complete tool responses after extraction when the harness allows it.
-
-STOP when all decision-changing questions have direct support and another independent source is unlikely to change the recommendation.
+Dừng khi các câu hỏi có thể làm đổi quyết định đã có bằng chứng trực tiếp và khó có khả năng nguồn độc lập khác làm thay đổi khuyến nghị. Trả lời trong chat; chỉ Main hoặc người có quyền mới lưu khi người dùng yêu cầu.
