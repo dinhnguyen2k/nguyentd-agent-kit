@@ -1,9 +1,10 @@
 # Cách phối hợp
 
-- Yêu cầu là một dữ kiện nhỏ, có thể kiểm tra trực tiếp? Main tự tra cứu; không cần giao việc.
+- Dữ kiện đơn giản, có thể kiểm tra trực tiếp (`LOOKUP`)? Main tự tra cứu; không cần giao việc.
 - Nếu có Scout, chỉ nhờ Scout tìm vị trí mã liên quan. Scout không quyết định nghiệp vụ hay thay thế điều tra.
-- Giao một câu hỏi thực sự cần so sánh, xử lý bằng chứng mâu thuẫn, hoặc tìm phản ví dụ cho đúng một Researcher. Gửi quyết định cần hỗ trợ, phạm vi, dữ kiện đã biết và điều không được làm.
-- Main kiểm tra bằng chứng then chốt, tự đưa ra quyết định và chịu trách nhiệm về chính sách nghiệp vụ. Researcher chỉ điều tra, không được giao triển khai hay quyết định thay Main.
+- Với quyết định cần nghiên cứu, mặc định giao một Researcher (`FOCUSED`); xem `.agent-core/research/SKILL.md` về phạm vi và ngân sách.
+- Chỉ khi người dùng yêu cầu hoặc quy trình cho phép rõ `DEEP`, Main mới giao câu hỏi độc lập cho nhiều Researcher; chốt ngân sách tổng và từng nhánh trước khi giao. Researcher chỉ đọc, được tự chia câu hỏi trong phạm vi đã giao nhưng không tạo agent con hay giao lại cho người khác.
+- Main kiểm tra bằng chứng then chốt, tự đưa ra quyết định và chịu trách nhiệm về chính sách nghiệp vụ. Tái dùng findings, không lặp nghiên cứu; chỉ mở lại câu hỏi bị ảnh hưởng, ở cấp độ đã được phép và trong ngân sách còn lại, khi có bằng chứng mới cần xử lý.
 - Nếu không có Researcher phù hợp hoặc không có cách đọc an toàn, nói rõ giới hạn. Main chỉ tự nghiên cứu khi được phép, và cần nói rõ cách đã làm.
 - Quyền hạn của dự án và ý định của người dùng luôn được ưu tiên. Không để hướng dẫn chung này vượt qua chúng.
 
