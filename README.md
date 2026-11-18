@@ -1,66 +1,72 @@
 # NguyenTD Agent Kit
 
-Bộ khung agent dùng được với nhiều harness, giữ nguyên luật và cách làm riêng của dự án. Nội dung chia thành ba phần: vai trò và cách phối hợp dùng chung; chính sách riêng của từng dự án, không tự động đưa vào kit; và hồ sơ mỏng theo từng công cụ để nối cấu hình với hướng dẫn dùng chung.
+Bộ kit giúp trợ lý lập trình biết khi nào nên trả lời ngay và khi nào cần tìm bằng chứng trước khi đề xuất thay đổi.
+Bạn nói chuyện với một đầu mối là **Main** bằng lời bình thường, không cần nhớ tên các chế độ hay tự chia việc cho từng trợ lý.
 
-## Cài phần cốt lõi vào dự án
+## Từ câu hỏi đến quyết định
 
-Clone kit riêng, rồi chạy installer từ thư mục dự án cần dùng. Ví dụ:
+```mermaid
+flowchart TD
+    U["Bạn nêu việc cần giải quyết"] --> M{"Main cần biết gì để trả lời?"}
+    M -->|"Một dữ kiện"| F["Main kiểm tra trực tiếp"]
+    M -->|"Vị trí trong mã"| S["Main tìm hoặc nhờ Scout chỉ đúng chỗ"]
+    M -->|"Căn cứ để chọn cách làm"| R["Researcher tách câu hỏi, đối chiếu nguồn và tìm phản ví dụ"]
+    F --> A["Main trả lời và nói rõ căn cứ"]
+    S --> A
+    R --> A
+    A -->|"Kết quả thực tế trái với dự kiến"| B{"Điều này có thể đổi quyết định không?"}
+    B -->|"Có"| Q["Main mở lại đúng câu hỏi bị ảnh hưởng"]
+    Q --> M
+    B -->|"Không"| K["Giữ kết luận và nêu lý do"]
+```
+
+Ví dụ, bạn hỏi: *“Trang đơn hàng mở chậm. Có nên thêm bộ nhớ đệm không?”*
+Thay vì mặc định đề xuất cache, Researcher cần tách hai câu hỏi: **thời gian đang mất ở đâu**, và **dữ liệu có được phép hiển thị chậm sau khi đơn hàng thay đổi không**?
+Nếu sau đó bạn cho biết nhân viên vừa sửa đơn nhưng vẫn thấy trạng thái cũ, Main có lý do xem lại đề xuất cache mà không cần làm lại phần điều tra độ trễ.
+
+Thông thường, một Researcher phụ trách tối đa ba câu hỏi và dùng chung tối đa sáu nguồn qua các lượt, không phải sáu nguồn cho mỗi câu.
+Chỉ khi bạn yêu cầu nghiên cứu sâu hoặc quy trình dự án cho phép rõ ràng, Main mới chia các câu hỏi độc lập cho nhiều Researcher và chốt trước giới hạn tìm kiếm.
+Researcher chỉ đọc và trả lời kèm nguồn; Main chịu trách nhiệm về khuyến nghị cuối cùng.
+Nếu cùng một sai sót lặp lại ở nhiều việc, Main có thể đề xuất cải tiến cách làm và cách đánh giá; bộ kit không tự chạy nghiên cứu nền hay tự sửa quy tắc.
+
+## Cài vào dự án
+
+Bạn cần Git và Node.js. Tải kit vào một thư mục riêng, rồi **chạy lệnh cài từ thư mục dự án muốn sử dụng**:
 
 ```bash
 git clone https://github.com/dinhnguyen2k/nguyentd-agent-kit.git ~/nguyentd-agent-kit
-cd /path/to/your-project
+cd /duong/dan/toi/du-an
 node ~/nguyentd-agent-kit/bin/install.js --core
 ```
 
-`--core` chép nội dung `core/` vào thư mục hiện tại và bốn tài liệu research vào `.agent-core/research/`:
-
-```text
-.agent-core/
-├── team.md
-├── researcher.md
-└── research/
-    ├── SKILL.md
-    └── references/
-        ├── lookup.md
-        ├── focused.md
-        └── deep.md
-```
-
-`team.md` hướng dẫn Main phân công và nghiệm thu công việc; `researcher.md` là hướng dẫn dùng chung cho Researcher. Cấu hình của mỗi harness chỉ dẫn tới các tệp này. OMP có quy tắc mỏng chỉ áp dụng cho Main, yêu cầu đọc `.agent-core/team.md`; hãy bắt đầu phiên mới để OMP nạp quy tắc. Những hồ sơ harness khác cũng chỉ làm nhiệm vụ nối tới hướng dẫn dùng chung. Nội dung nguồn nằm trong `core/` và `.agent/skills/research/` của bản clone kit.
-
-Installer chỉ tạo tệp hoặc thư mục còn thiếu. Tệp trùng khớp được giữ nguyên; tệp khác nội dung, liên kết khác đích hoặc thư mục bị chặn được báo lỗi, không ghi đè. Các tệp độc lập khác vẫn được cài. Nếu dự án đã có tệp điều hướng như `AGENTS.md`, installer giữ nguyên tệp đó. Hãy tự thêm dòng này vào tệp hiện có:
+`--core` thêm hướng dẫn phối hợp, cách nghiên cứu và các tệp cấu hình để công cụ của bạn đọc được những hướng dẫn đó.
+Nếu dự án đã có `AGENTS.md` hoặc một tệp hướng dẫn tương tự và bộ cài báo xung đột, giữ nội dung của dự án rồi thêm dòng sau vào tệp được báo:
 
 ```markdown
 Đọc `.agent-core/team.md` để biết khi nào giao việc cho Researcher.
 ```
 
-Sau khi cài hoặc cập nhật, hãy bắt đầu phiên agent mới để công cụ nạp cấu hình và hướng dẫn mới. Khi có xung đột, xem báo cáo installer, tự đối chiếu nội dung dự án với kit và chỉ xử lý từng tệp sau khi đã quyết định nội dung nào cần giữ. Chạy lại installer an toàn với tệp đã trùng khớp. Khi cập nhật thủ công, chỉ chọn các hướng dẫn dùng chung và hồ sơ công cụ phù hợp; không đồng bộ hoặc đẩy các tệp runtime, cấu hình cục bộ, dữ liệu hay chính sách riêng của dự án lên kit. Việc kéo nội dung từ kit vào dự án cũng không thay thế việc giữ nguyên và rà soát chính sách hiện có.
+Mở **phiên làm việc mới** sau khi cài.
+Bạn có thể bắt đầu bằng chính câu hỏi về trang đơn hàng ở trên; không cần lệnh riêng để gọi Researcher.
 
-## Các vai trò
+## Cài đầy đủ cho Cogain trên máy mới
 
-- **Scout** tìm hiểu nhanh cấu trúc và mã liên quan, sau đó bàn giao phát hiện ngắn gọn.
-- **Researcher** điều tra câu hỏi kỹ thuật theo phương pháp trong `.agent-core/research/`, ưu tiên nguồn có căn cứ và kết luận dùng được.
-- **Main** nắm yêu cầu, giữ ngữ cảnh dự án, định tuyến công việc và tổng hợp kết quả từ các vai trò.
-
-Researcher phù hợp khi cần điều tra kỹ thuật và tổng hợp bằng chứng; Scout phù hợp cho việc dò tìm nhanh trong repo. Main vẫn chịu trách nhiệm kết luận cuối cùng.
-
-## Runtime và quyền
-
-Khả năng thực thi phụ thuộc harness và cấu hình người dùng:
-
-- **Claude Code** và **OMP** có thể dùng công cụ local và web theo quyền đã cấp.
-- **AGY** có thể làm việc với tài nguyên local theo khả năng và quyền của runtime.
-- **Codex** dùng các công cụ mà phiên cha cung cấp.
-- **Gemini CLI** không được giả định có sẵn khả năng nạp native các adapter của kit; hãy dùng cấu hình phù hợp với runtime thực tế.
-
-Các vai trò và hướng dẫn không tự cấp quyền truy cập. Hãy kiểm tra quyền của harness trước khi giao thao tác filesystem, shell, mạng hoặc các hành động có tác động.
-
-## Cài bộ đầy đủ kiểu cũ
-
-Chỉ khi chủ động muốn cài bộ tệp hướng dẫn và cấu hình công cụ kiểu cũ, chạy installer không có đối số từ thư mục dự án:
+Clone Cogain và bộ kit vào máy mới. Từ thư mục gốc của Cogain, chạy:
 
 ```bash
 node ~/nguyentd-agent-kit/bin/install.js
 ```
 
-Chế độ này tách biệt với `--core`; chỉ dùng khi bạn chủ động muốn cài bộ cấu hình kiểu cũ.
+Lệnh này thêm quy tắc, kỹ năng và cấu hình OMP gồm model, hook, giám sát và các trợ lý chuyên môn. Sau đó kết nối các công cụ:
+
+```bash
+bash .agent/scripts/install-harness-wiring.sh
+```
+
+Khai báo tài khoản OpenAI của bạn trong `auth.accountPolicies` tại `~/.omp/agent/config.yml`; bộ kit công khai không chứa thông tin tài khoản cá nhân. Chẩn đoán C# cần `csharp-ls` tại `~/.dotnet10/tools/csharp-ls` và .NET tại `/usr/lib/dotnet`, như khai báo trong `.agent/harness/omp/lsp.json`; nếu đường dẫn trên máy khác, hãy chỉnh tệp đó. Cuối cùng, mở một phiên OMP mới. Bộ cài không ghi đè các tệp đã có, vì vậy trên máy có bản cũ, hãy tự so sánh và thay các tệp xung đột.
+
+## Khi cập nhật hoặc đổi công cụ
+
+- **Cập nhật bản đã cài:** Lấy bản kit mới rồi chạy lại lệnh `--core` từ dự án. Bộ cài chỉ thêm tệp còn thiếu và bỏ qua tệp giống hệt. Nếu tệp đã có nội dung khác hoặc liên kết trỏ tới nơi khác, bộ cài báo lỗi và vẫn xử lý các mục độc lập còn lại. Hãy so sánh rồi chọn phần muốn giữ; chạy lại lệnh không tự ghi đè bản cũ.
+- **Quyền truy cập:** Kit không tự cấp quyền đọc máy, chạy lệnh hay lên mạng. Claude Code và OMP dùng công cụ được cấp; AGY phụ thuộc quyền đọc của phiên; Codex dùng công cụ từ phiên cha. Với Gemini CLI, đừng mặc định rằng công cụ sẽ tự nhận cấu hình Researcher.
+- **Quy tắc riêng:** Giữ dữ liệu, cấu hình máy và chính sách nội bộ trong dự án. Nếu muốn xem hoặc đề xuất sửa phần dùng chung, bắt đầu từ [cách phối hợp](core/.agent-core/team.md) và [cách nghiên cứu](.agent/skills/research/SKILL.md).
