@@ -20,6 +20,7 @@ Chọn phương án phù hợp nhất với bối cảnh thật, không biến c
 
 ### 2. Research Gate
 
+- Với câu hỏi cần so sánh nguồn, xử lý bằng chứng mâu thuẫn hoặc tìm phản ví dụ, Main gửi câu hỏi có phạm vi rõ ràng cho `researcher` sẵn có và tái dùng kết quả có dẫn chứng; Main giữ quyết định và kiểm tra bằng chứng then chốt. Dữ kiện đơn giản Main tự tra; nếu không có Researcher phù hợp hoặc không thể đọc nguồn an toàn, nêu rõ giới hạn.
 - Trước khi tạo option, nạp và dùng `.agent/skills/research/SKILL.md`; không bỏ qua gate khi delegation không khả dụng.
 - Set `mode: FOCUSED` by default and read only `.agent/skills/research/references/focused.md`.
 - Before browsing, prepare one in-memory research brief with one decision, at most 3 decision-changing questions, relevant constraints, and explicit exclusions.

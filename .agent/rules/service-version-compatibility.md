@@ -1,6 +1,9 @@
 ---
 trigger: glob
 glob: "{**/*appsettings*.json,**/*.proto,**/required-backend-versions.ts,.gitlab/**}"
+description: "gRPC/FE version compatibility process when touching appsettings, .proto, required-backend-versions.ts, or .gitlab."
+condition: ["**/*appsettings*.json", "**/*.proto", "**/required-backend-versions.ts", ".gitlab/**"]
+interruptMode: never
 ---
 
 # SERVICE-VERSION-COMPATIBILITY.MD - Quy Trình Kiểm Soát Tương Thích Version (BE gRPC + FE)

@@ -1,0 +1,75 @@
+# Project settings cho OMP (symlink: .omp/config.yml).
+# Array ở đây THAY THẾ array cùng tên ở ~/.omp/agent/config.yml, không gộp.
+textVerbosity: low
+defaultThinkingLevel: high
+modelRoles:
+  advisor: openai-codex/gpt-6-luna:high
+  plan: anthropic/claude-opus-5-5:high
+  slow: "@plan"
+lsp:
+  # Worker sửa code chủ yếu bằng `edit`; mặc định OMP chỉ chẩn đoán sau `write`.
+  diagnosticsOnEdit: true
+  formatOnWrite: false
+skills:
+  # Skill không thuộc phạm vi ERP; vẫn nằm ở .agent/skills cho harness khác.
+  ignoredSkills:
+    - blog
+    - portfolio
+    - seo
+    - mobile
+    - update
+# Số đo 28-30/09 và lý do: .agent/artifacts/omp-agent-lanes-quota-research.md
+compaction:
+  # Đo 28/09-03/10: request main trên 200k context chiếm 30% cost; mốc mặc định theo reserve để main phình tới 703k.
+  thresholdTokens: 150000
+advisor:
+  # Main (Opus) là nơi chốt; advisor main chiếm ~12.7% cost. Luật cứng máy kiểm được nằm ở boundary-guard (R1-R6); vẫn bật tay được bằng `/advisor on`.
+  enabled: false
+task:
+  # Đợi pre-dispatch gate kiểm brief đầy đủ trước khi worker có thể chạy.
+  speculativeLaunch: false
+  # Advisor chỉ gác lane viết code; lane read-only không sinh code để bắt lỗi. Map này thắng frontmatter `advisor`.
+  agentModelOverrides:
+    verifier: anthropic/claude-opus-5-5:medium
+    reviewer: "@advisor"
+    task: "@task"
+    scout: openai-codex/gpt-6-luna:high
+    sonic: "@task"
+    security-reviewer: "@advisor"
+    tech-lead: "@plan"
+    backend-specialist: "@task"
+    frontend-specialist: "@task"
+    test-author: "@task"
+    seance: "@task"
+  agentAdvisor:
+    backend-specialist: "on"
+    frontend-specialist: "on"
+    test-author: "on"
+    task: "off"
+    scout: "off"
+    sonic: "off"
+    reviewer: "off"
+    security-reviewer: "off"
+    verifier: "off"
+  # Lưới an toàn cho slice quá dài: nhắc gói lại ở 50 request, OMP dừng cứng ở 1.5x. Worker từ 80 turn trở lên chiếm 62% cost subagent (28/09-03/10).
+  softRequestBudget: 50
+  # Mặc định OMP tắt LSP cho subagent; không bật thì worker không có `xd://lsp` và `lsp.diagnosticsOnEdit` ở trên vô tác dụng.
+  enableLsp: true
+edit:
+  # POC: GPT quen `apply_patch`; với hashline, gpt-6-luna lỗi 22% lượt edit. Khớp substring của model id.
+  modelVariants:
+    "gpt-": apply_patch
+retry:
+  # Không chờ 10 lần retry với backoff tới 5 phút khi provider/quota không phục hồi.
+  maxRetries: 3
+  maxDelayMs: 30000
+  # Dùng quota đáng tin cậy để chọn account/fallback sẵn có, không đổi model policy.
+  usageAwareFallback: true
+  fallbackChains:
+    # Không hạ worker xuống flash âm thầm: pool khác trước, rồi Anthropic.
+    task:
+      - google-antigravity/claude-opus-4-6:high
+    # Main (Opus 5.5) rơi sang Opus 4.6 ở pool khác, hết pool đó mới xuống flash (user chọn 03/10).
+    anthropic/claude-opus-5-5:
+      - google-antigravity/claude-opus-4-6:high
+      - google-antigravity/gemini-3.8-flash:high

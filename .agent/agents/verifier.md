@@ -2,7 +2,7 @@
 name: verifier
 description: Read-only verification gate for Cogain changes; runs only user-authorized checks and otherwise verifies from source evidence without editing.
 model: inherit
-skills: lint-and-validate, testing-patterns, code-reviewer
+skills: lint-and-validate, testing-patterns, requesting-code-review
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -19,7 +19,9 @@ carries the commands, not the rationale.
 ## Start Here
 
 1. Apply `AI_RULES.md`; it overrides this profile.
-2. Read the task manifest; inspect only the declared scope plus nearest tests.
+2. Read canonical TASK through `readTaskContract(repoRoot, contract_ref)` and validate the manifest with `validateContractSchema` and exact comparison against `deriveTaskManifest(contract)` from `.agent/scripts/task-contract.mjs`.
+   Accept only manifest_version 2 matching task/slice, contract_version, contract_hash and lifecycle_hash; inactive/archived/historical-only metadata cannot certify implementation.
+   Inspect only the declared scope plus nearest tests.
 3. Use direct source evidence by default. Run only the exact command and scope the
    user explicitly authorized. Do not expand scope by inference.
 
@@ -47,8 +49,8 @@ Nobody witnesses Red live, so reconstruct it:
 
 ```
 git stash push -- backend/src            # park the implementation only
-dotnet build tests/<Project>/<Project>.csproj --no-restore -v q
-dotnet test  tests/<Project>/<Project>.csproj --no-build --filter "<new tests>"
+backend/fast-build.sh backend/tests/<Project>/<Project>.csproj --no-restore -v q
+dotnet test  backend/tests/<Project>/<Project>.csproj --no-build --filter "<new tests>"
 git stash pop
 ```
 

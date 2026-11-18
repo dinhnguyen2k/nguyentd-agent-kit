@@ -3,7 +3,7 @@
   "version": 3,
   "invariants": {
     "test_authorship_separation": "An agent that writes production code must never create or modify test files, and must never weaken an existing assertion to make a build pass. Test authorship belongs to `test-author` only. Enforced at runtime by `.agent/scripts/agent-boundary-guard.mjs` (rule R2), not by prose.",
-    "execution_role_separation": "DO NOT RUN build, lint, typecheck, format, restore, code generation, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action. Test suites remain restricted to verifier/test-author by rule R1."
+    "execution_role_separation": "DO NOT RUN build, lint, typecheck, format, restore, code generation, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action. Test suites remain restricted to verifier/test-author by rule R1. CI parity chỉ chạy qua verifier/maintainer khi user yêu cầu CI/build; build trực tiếp của main/worker vẫn bị rule R8 chặn."
   },
   "test_paths": [
     "backend/tests/**",
@@ -11,12 +11,20 @@
     "frontend/**/*.test.ts",
     "frontend/**/*.test.tsx",
     "frontend/**/*.spec.ts",
-    "frontend/**/*.spec.tsx"
+    "frontend/**/*.spec.tsx",
+    ".agent/evals/gate-identity-refresh.test.mjs"
+  ],
+  "migration_paths": [
+    "backend/src/**/Migrations/**",
+    "backend/src/**/Persistence/Migrations/**"
   ],
   "protected_config_paths": [
     ".agent/contracts/agent-registry.json",
     ".agent/scripts/agent-boundary-guard.mjs",
     ".agent/scripts/agent-role.sh",
+    ".agent/harness/agy/hooks.json",
+    ".agent/harness/agy/boundary-guard.mjs",
+    ".agents/hooks.json",
     ".claude/settings.json",
     ".claude/settings.local.json",
     "AI_RULES.md",
@@ -26,7 +34,7 @@
   "enforcement": {
     "guard": ".agent/scripts/agent-boundary-guard.mjs",
     "guard_modes": {
-      "hook": "stdin JSON -> JSON quyết định (Claude Code PreToolUse)",
+      "hook": "stdin JSON -> JSON quyết định (Claude Code PreToolUse; OMP tool_call qua .agent/harness/omp/hooks/pre/boundary-guard.ts; AGY PreToolUse qua .agent/harness/agy/boundary-guard.mjs)",
       "cli": "--check-command <cmd> | --check-write <path> [--role <role>], exit 2 khi bị chặn"
     },
     "harness": {
@@ -37,8 +45,17 @@
         "symlink": ".claude/settings.json -> ../.agent/harness/claude/settings.json",
         "enforcement": "hook (cứng)"
       },
+      "omp": {
+        "wiring": ".agent/harness/omp/ (RULES.md, WATCHDOG.md, WATCHDOG.yml, config.yml, rules/, hooks/, agents/)",
+        "symlink": ".omp/{RULES.md,WATCHDOG.md,WATCHDOG.yml,config.yml,rules,hooks} -> ../.agent/harness/omp/*; .omp/agents/*.md là file sinh (header OMP + thân .agent/agents/)",
+        "enforcement": "hook (cứng): tool_call dịch bash/edit/write/ast_edit/eval/MCP filesystem sang payload Bash/Write; role subagent lấy từ ctx.agent.name"
+      },
       "codex": { "enforcement": "CLI mode + prose", "note": "chưa có PreToolUse hook" },
-      "antigravity": { "enforcement": "CLI mode + prose", "note": "chưa có PreToolUse hook" }
+      "antigravity": {
+        "wiring": ".agent/harness/agy/ (hooks.json, boundary-guard.mjs, agents/)",
+        "symlink": ".agents/hooks.json -> ../.agent/harness/agy/hooks.json; .agents/{skills,workflows} -> ../.agent/*; .agents/agents/*.md là file sinh (header AGY + thân .agent/agents/)",
+        "enforcement": "hook (cứng cho R1/R2/R3/R5/R6/R7/R8/R9): PreToolUse dịch run_command/write_file/edit_file/MCP filesystem/run_workflow sang payload Bash/Write; stdin chưa có agent_name nên R4 dựa vào toolset/prompt hoặc env"
+      }
     },
     "role_state": ".agent/scratch/.runtime/agent-role",
     "role_control": ".agent/scripts/agent-role.sh",
@@ -48,6 +65,11 @@
     "role_ttl_hours": 8,
     "role_semantics": "State file và inline chỉ CẤP THÊM năng lực (R1/R2). Ràng buộc write_paths (R4) chỉ áp khi role đến từ danh tính subagent thật hoặc env, để không gông nhầm seat đang chạy song song.",
     "fail_mode": "open-on-crash",
+    "task_contract": {
+      "contract_engine": ".agent/scripts/task-contract.mjs",
+      "contract_requirement": "Dùng canonical TASK khi công việc yêu cầu contract lưu trên đĩa; task nhỏ có thể ghi allowed_paths, Reuse, Acceptance ngay trong assignment.",
+      "checkpoint_owners": ["orchestrator", "maintainer"]
+    },
     "limits": "Guard chặn được nhầm lẫn và thói quen, không chặn được cố ý mạo danh role trong cùng một process. Nó làm việc vượt ranh giới trở nên tường minh và có log, thay vì âm thầm.",
     "rules": {
       "test_runner": {
@@ -103,12 +125,75 @@
         "id": "R4",
         "applies_to": ["Edit", "Write", "MultiEdit", "NotebookEdit"],
         "note": "write_paths/deny_write_paths chỉ được áp khi một role cụ thể đang bật. Role mặc định `implementer` chỉ chịu R1/R2/R3 để phiên làm việc thường không bị chặn oan."
+      },
+      "secret_inline": {
+        "id": "R5",
+        "applies_to": ["Bash"],
+        "allowed_roles": [],
+        "echo_command": false,
+        "deny_message": "Permission Denied: lệnh viết thẳng credential trên dòng lệnh, credential sẽ lộ vào transcript và shell history (AI_RULES.md §4). Cách đúng: đọc password từ file cấu hình vào env ngay trong lệnh, ví dụ `PGPASSWORD=\"$(jq -r '.ConnectionStrings.DefaultConnection' <appsettings.json> | sed -E 's/.*Password=([^;]*).*/\\1/')\" psql -h <host> -U <user> -d <db> -c '<SELECT ...>'`, hoặc dùng ~/.pgpass; không echo/in giá trị.",
+        "patterns": [
+          "(^|[\\s;&|(])PGPASSWORD=(['\"]?)[^\\s'\"$\\[{(;&|]+\\2([\\s;&|]|$)",
+          "\\bpostgres(ql)?://[^\\s/:@]+:[^\\s/@$]+@",
+          "\\bpassword=[^\\s;\"'$\\[{(\\\\]"
+        ]
+      },
+      "db_destructive": {
+        "id": "R6",
+        "applies_to": ["Bash"],
+        "allowed_roles": [],
+        "echo_command": true,
+        "deny_message": "Permission Denied: lệnh phá huỷ dữ liệu DB (drop, truncate, delete không có WHERE, drop migration) chỉ do người dùng tự chạy (AI_RULES.md §4).",
+        "patterns": [
+          "\\b(psql|pg_restore|sqlite3)\\b.*\\bdrop\\s+(table|database|schema)\\b",
+          "\\b(psql|pg_restore|sqlite3)\\b.*\\btruncate\\s+(table\\b|[\\w.]+\\s*[;\"'])",
+          "\\b(psql|pg_restore|sqlite3)\\b.*\\bdelete\\s+from\\s+[\\w.\"]+\\s*(;|$)",
+          "\\bdropdb\\b",
+          "\\bdotnet\\s+ef\\s+database\\s+(drop|update\\s+0)\\b"
+        ]
+      },
+      "build_runner": {
+        "id": "R8",
+        "applies_to": ["Bash"],
+        "allowed_roles": ["verifier", "test-author", "maintainer"],
+        "echo_command": true,
+        "deny_message": "Permission Denied: build/typecheck ON-DEMAND ONLY, chỉ chạy khi user yêu cầu rõ ràng. CI parity qua verifier/maintainer; test-author chỉ chạy trong phạm vi test được cấp. Worker và main không tự build.",
+        "known_false_positive": "Lệnh chỉ đọc có nhắc tên script (`cat backend/fast-build.sh`) cũng bị chặn; đọc file bằng tool `read`.",
+        "patterns": [
+          "\\bdotnet\\s+(build|publish|msbuild)\\b",
+          "\\bmsbuild\\b",
+          "fast-build\\.sh",
+          "fast-check\\.sh",
+          "ci-parity\\.sh",
+          "\\bvite\\s+build\\b",
+          "\\btsc\\b[^;&|]*\\s(-b|--build|-p|--project|--noEmit)\\b",
+          "\\b(pnpm|npm|yarn)\\b[^;&|]*\\s(run\\s+)?build(:|\\s|$)",
+          "\\b(nx|turbo)\\b[^;&|]*\\sbuild\\b"
+        ]
+      },
+      "migration_runner": {
+        "id": "R9",
+        "applies_to": ["Bash"],
+        "allowed_roles": ["maintainer"],
+        "echo_command": true,
+        "deny_message": "Permission Denied: Agent không chạy trực tiếp dotnet ef migrations add/remove, dotnet ef database update hoặc update-db. Chỉ sinh/gỡ migration chưa apply qua ./dev.sh add-migration|remove-migration khi user yêu cầu rõ ràng; không tự áp DB hoặc sửa tay migration/snapshot (backend.md §4.6).",
+        "patterns": [
+          "\\bdotnet\\s+ef\\s+migrations\\s+(add|remove)\\b",
+          "\\bdotnet\\s+ef\\s+database\\s+update\\b",
+          "\\bupdate-db\\b"
+        ]
+      },
+      "migration_write": {
+        "id": "R7",
+        "applies_to": ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"],
+        "allowed_roles": ["maintainer"],
+        "deny_message": "Permission Denied: CẤM TUYỆT ĐỐI Agent tự viết tay hoặc chỉnh sửa file migration/snapshot EF Core. Phải sửa Entity/Fluent API Configuration rồi sinh migration qua ./dev.sh add-migration <Service> <MigrationName> khi user yêu cầu rõ ràng (backend.md §4.6)."
       }
     }
   },
   "command_policy": {
     "note": "Whitelist mô tả ý định; cưỡng chế thật nằm ở enforcement.rules và permissions trong .claude/settings.json.",
-    "build_only": ["dotnet build <project>", "dotnet format style --verify-no-changes", "tsc --noEmit", "eslint <changed files>"],
+    "build_only": [".agent/scripts/ci-parity.sh (verifier/maintainer, chỉ khi user yêu cầu CI/build, R8)", "backend/fast-build.sh <tests project> (test-author/verifier, R8)", "dotnet format style --verify-no-changes", "eslint <changed files>"],
     "verification_only": ["dotnet test", "vitest", "playwright test"]
   },
   "agents": [
@@ -127,12 +212,12 @@
       "profile": ".agent/agents/backend-specialist.md",
       "kind": "worker",
       "write_paths": ["backend/**"],
-      "deny_write_paths": ["backend/tests/**"],
+      "deny_write_paths": ["backend/tests/**", "backend/src/**/Migrations/**"],
       "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
       "skills": ["backend-development"],
       "commands": {
-        "allow": ["dotnet build <project>", "dotnet format style", "dotnet restore"],
-        "deny": ["dotnet test", "dotnet ef database update"]
+        "allow": ["dotnet format style", "dotnet restore"],
+        "deny": ["dotnet test", "dotnet ef database update", "add-migration", "build/typecheck (R8: chỉ verifier/maintainer chạy CI parity khi user yêu cầu)"]
       },
       "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN build, format, restore, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action."
     },
@@ -151,8 +236,8 @@
       "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
       "skills": ["frontend-development"],
       "commands": {
-        "allow": ["tsc --noEmit", "eslint <changed files>", "vite build"],
-        "deny": ["vitest", "playwright test"]
+        "allow": ["eslint <changed files>"],
+        "deny": ["vitest", "playwright test", "tsc/vite build/fast-check.sh (R8: chỉ verifier/maintainer chạy CI parity khi user yêu cầu)"]
       },
       "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN lint, typecheck, route generation, build, browser checks, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the validation action by name. Use `verified` only with command evidence."
     },
@@ -166,13 +251,14 @@
         "frontend/**/*.test.ts",
         "frontend/**/*.test.tsx",
         "frontend/**/*.spec.ts",
-        "frontend/**/*.spec.tsx"
+        "frontend/**/*.spec.tsx",
+        ".agent/evals/gate-identity-refresh.test.mjs"
       ],
       "deny_write_paths": ["backend/src/**", "frontend/src/**"],
       "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
       "skills": ["testing-patterns", "tdd-workflow"],
       "commands": {
-        "allow": ["dotnet build tests/<Project>", "dotnet test --filter <new tests>", "vitest run <file>"],
+        "allow": ["backend/fast-build.sh backend/tests/<Project>", "dotnet test --filter <new tests>", "vitest run <file>", "node --test .agent/evals/gate-identity-refresh.test.mjs"],
         "deny": ["dotnet test (toàn bộ suite không filter)"]
       },
       "parallel_safe_with": ["backend-specialist", "frontend-specialist"],
@@ -185,13 +271,39 @@
       "write_paths": [],
       "deny_write_paths": ["backend/**", "frontend/**"],
       "tools": ["Read", "Grep", "Glob", "Bash"],
-      "skills": ["lint-and-validate", "testing-patterns", "code-reviewer"],
+      "skills": ["lint-and-validate", "testing-patterns", "requesting-code-review"],
       "commands": {
         "allow": ["dotnet test", "dotnet format --verify-no-changes", "vitest run", "git stash/diff"],
         "deny": ["mọi lệnh ghi vào backend/src/** hoặc frontend/src/**"]
       },
       "activation": "A governed task may activate read-only source verification. DO NOT RUN validation commands unless the user explicitly requests the action and scope.",
       "runtime_registration": "subagent thật: .claude/agents/verifier.md -> ../../.agent/agents/verifier.md. Không có Edit/Write ở tầng runtime, đó là ranh giới cứng thật sự."
+    },
+    {
+      "name": "researcher",
+      "profile": ".agent/agents/researcher.md",
+      "kind": "gate",
+      "write_paths": [],
+      "deny_write_paths": ["**"],
+      "tools": ["Read", "Grep", "Glob", "WebSearch", "WebFetch"],
+      "skills": ["research"],
+      "commands": {
+        "allow": [],
+        "deny": ["mọi lệnh shell"]
+      },
+      "activation": "Main giao một cuộc điều tra có phạm vi cụ thể; Researcher trả lời kèm nguồn và không triển khai."
+    },
+    {
+      "name": "reviewer",
+      "profile": null,
+      "kind": "gate",
+      "write_paths": [],
+      "deny_write_paths": ["backend/**", "frontend/**"],
+      "tools": ["Read", "Grep", "Glob", "Bash"],
+      "skills": ["code-reviewer", "clean-code"],
+      "commands": { "allow": ["git diff/log (chỉ đọc)"], "deny": ["build, test, format"] },
+      "activation": "Chỉ khi user yêu cầu review rõ ràng và Main quyết định cần subagent read-only. Không tự kích hoạt sau task triển khai; dùng skill code-reviewer/code-review phù hợp phạm vi.",
+      "runtime_registration": "OMP: .agent/harness/omp/agents/reviewer.md chứa toàn bộ profile; không có thân trong .agent/agents/."
     }
   ]
 }

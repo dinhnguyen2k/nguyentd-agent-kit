@@ -2,6 +2,7 @@
 
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { deriveTaskManifest, readLegacyEvidence, readTaskContract, readTaskLifecycle, validateContractSchema } from './task-contract.mjs';
 
 const repoRoot = process.cwd();
 const skillRoot = join(repoRoot, '.agent', 'skills');
@@ -250,17 +251,55 @@ function validateTaskManifestSchema() {
   const schema = readJson(manifestSchemaPath);
   if (!schema) return;
   const required = new Set(schema.required ?? []);
-  for (const field of ['manifest_version', 'tier', 'task_id', 'goal', 'mode', 'owner', 'independent_verification', 'allowed_paths', 'acceptance_criteria', 'validation_commands', 'stop_conditions']) {
+  for (const field of ['manifest_version', 'tier', 'task_id', 'slice_id', 'contract_ref', 'contract_version', 'contract_hash', 'lifecycle_hash', 'goal', 'mode', 'owner', 'independent_verification', 'allowed_paths', 'source_paths', 'acceptance_criteria', 'dependencies', 'validation_commands', 'stop_conditions']) {
     if (!required.has(field)) errors.push(`.agent/contracts/task-manifest.schema.json: required field '${field}' is missing`);
   }
-  if (schema.properties?.manifest_version?.const !== 1) {
-    errors.push('.agent/contracts/task-manifest.schema.json: manifest_version const must be 1');
+  if (schema.properties?.manifest_version?.const !== 2) {
+    errors.push('.agent/contracts/task-manifest.schema.json: manifest_version const must be 2; legacy manifests require migration');
   }
   if (schema.properties?.tier?.const !== 'governed') {
     errors.push('.agent/contracts/task-manifest.schema.json: tier const must be governed');
   }
   if (schema.properties?.independent_verification?.const !== true) {
     errors.push('.agent/contracts/task-manifest.schema.json: independent_verification const must be true');
+  }
+  const legacyPins = new Map();
+  for (const overview of walk(join(repoRoot, '.agent', 'planning'), (file) => file.endsWith('/00-OVERVIEW.md'))) {
+    if (!/^```(?:json[ \t]+)?task-lifecycle[ \t]*\r?$/m.test(readFileSync(overview, 'utf8'))) continue;
+    const label = relative(repoRoot, overview);
+    try {
+      const lifecycle = readTaskLifecycle(repoRoot, label);
+      for (const pin of readLegacyEvidence(repoRoot, lifecycle)) {
+        if (legacyPins.has(pin.resolved_path)) {
+          errors.push(`${label}: duplicate/conflicting legacy pin '${pin.path}' also owned by ${legacyPins.get(pin.resolved_path).overview}`);
+        } else {
+          legacyPins.set(pin.resolved_path, { ...pin, overview: label });
+          warnings.push(`${pin.path}: historical-not-dispatchable; pinned by ${label}; ${pin.reason}`);
+        }
+      }
+    } catch (error) {
+      errors.push(`${label}: ${error.message}`);
+    }
+  }
+  for (const path of walk(join(repoRoot, '.agent', 'task-manifests'), (file) => file.endsWith('.json'))) {
+    const manifest = readJson(path);
+    if (!manifest) continue;
+    const label = relative(repoRoot, path);
+    if (manifest.manifest_version !== 2) {
+      if (!legacyPins.has(realpathSync(path))) errors.push(`${label}: legacy/unversioned manifest requires explicit hash-pinned historical-only classification or migration; not task-bound evidence`);
+      continue;
+    }
+    try {
+      validateContractSchema(manifest);
+      const expected = deriveTaskManifest(readTaskContract(repoRoot, manifest.contract_ref));
+      for (const key of Object.keys(expected)) {
+        if (JSON.stringify(manifest[key]) !== JSON.stringify(expected[key])) {
+          errors.push(`${label}: derived field '${key}' differs from canonical contract; regenerate when authorized`);
+        }
+      }
+    } catch (error) {
+      errors.push(`${label}: ${error.message}`);
+    }
   }
 }
 

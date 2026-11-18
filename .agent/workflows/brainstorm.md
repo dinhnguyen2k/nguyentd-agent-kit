@@ -18,9 +18,11 @@ $ARGUMENTS
 
 ## 🟠 RESEARCH MODE GATE
 
+- Main giao một câu hỏi nghiên cứu có phạm vi rõ ràng cho `researcher` sẵn có khi cần so sánh nguồn, xử lý bằng chứng mâu thuẫn hoặc tìm phản ví dụ; không tự lặp lại nghiên cứu đó. Dữ kiện đơn giản Main tự tra; nếu không có Researcher phù hợp hoặc không thể đọc nguồn an toàn, nêu rõ giới hạn và không giả định đã nghiên cứu.
 - Load `.agent/skills/research/SKILL.md` before web research.
 - Set `mode: FOCUSED` by default and read only `.agent/skills/research/references/focused.md`.
-- Before browsing, create one research brief with one decision, at most 3 decision-changing questions, relevant constraints, and explicit exclusions.
+- Before browsing, prepare one in-memory research brief with one decision, at most 3 decision-changing questions, relevant constraints, and explicit exclusions.
+- Analysis returns an answer with citations; do not persist the brief, evidence ledger, or options automatically, including when the research skill suggests an artifact.
 - If the request reduces to one isolated factual question, stop this workflow and route it to `mode: LOOKUP`.
 - DO NOT escalate to `mode: DEEP` unless the user explicitly requests deep research.
 - Source budgets are upper bounds, not completion targets; stop as soon as the decision-changing claims have sufficient evidence.
@@ -55,9 +57,11 @@ Một option ghi điểm ở câu 5 bằng cách thêm generic layer là dấu h
 
 ## 🔵 PHASE 4: Synthesis
 
-- **Action**: Từ 3 bản tóm tắt nhận được, tổng hợp bảng so sánh A/B/C.
-- **Trong chat**: chỉ hiển thị bảng rút gọn (không viết lại toàn bộ lý luận của Phase 2+3).
-- **Artifact**: Ghi bản đầy đủ (Pros/Cons/Risks/Effort chi tiết) vào 1 file markdown tại thư mục artifacts (ví dụ `brainstorm_options.md`) — đây là nơi DUY NHẤT chứa bản chi tiết, tránh nhân đôi nội dung giữa chat và file.
+- **Action**: Tổng hợp các option đã phân tích thành bảng so sánh, kèm evidence, citation, confidence và câu hỏi còn mở.
+- **Trong chat**: Trả lời đủ để user quyết định, gồm trade-off và recommendation có bằng chứng.
+- **Persistence**: Chỉ khi user yêu cầu lưu nghiên cứu, ghi một artifact tại `.agent/artifacts/` chứa research, citations và option analysis độc nhất.
+Không ghi vào `reports/artifacts`, không tự tạo PLAN, implementation_plan, walkthrough hoặc handoff lặp lại.
+Nếu đã lưu theo yêu cầu, chat chỉ tóm tắt và dẫn tới artifact, không chép lại toàn bộ.
 
 ## 🔴 PHASE 5: Recommendation & Handoff
 
@@ -66,10 +70,14 @@ Một option ghi điểm ở câu 5 bằng cách thêm generic layer là dấu h
 
 ## 🟣 PHASE 6: Orchestrated Execution (Optional)
 
-**Trigger**: Khi user nói `orchestrate`, `triển khai luôn`, hoặc task cần nhiều specialist làm việc song song.
+**Trigger**: Chỉ khi user yêu cầu triển khai và đã chọn option; nhu cầu nhiều specialist không tự cấp quyền viết.
 
 - **Input bắt buộc**: Option đã chọn, scope boundaries, risk checkpoints (lấy từ Phase 4).
 - **Execution**: Route sang lệnh `/orchestrate` với Option đã chọn làm execution brief.
+- **Ownership**: Giữ brief trong handoff, không tạo file mới nếu không cần resume.
+Single-slice chỉ dùng compact contract/checkpoint khi cần handoff/resume; multi-slice dùng `00-OVERVIEW.md` và canonical `TASK-*.md` theo `/plan`.
+Governed manifest được derive từ TASK metadata, không viết tay.
+Packet dẫn tới contract snapshot identity và supersession; chỉ coordinator cập nhật overview lifecycle, overview không chép acceptance từ TASK.
 
 ---
 
@@ -78,7 +86,7 @@ Một option ghi điểm ở câu 5 bằng cách thêm generic layer là dấu h
 - **No Code**: Focus strictly on architecture, logic, and trade-offs. Do not write implementation code.
 - **Honest Tradeoffs**: Don't hide complexity or sugar-coat risks.
 - **No fake personas**: Use structured review lenses locally; delegate only when it creates real independent work.
-- **Write once**: Chi tiết đầy đủ chỉ nằm trong artifact file; chat chỉ hiện bản rút gọn.
+- **Write once, only when requested**: Không tự lưu analysis; artifact được yêu cầu giữ nội dung độc nhất, chat chỉ tóm tắt và dẫn nguồn.
 - **User-Centric**: Tailor solutions to the user's specific context.
 
 ---

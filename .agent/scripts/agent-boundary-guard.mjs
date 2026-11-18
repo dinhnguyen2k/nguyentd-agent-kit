@@ -5,10 +5,15 @@
  * Chặn ở tầng tool-calling, không phụ thuộc "lời dặn trong prompt".
  * Nguồn sự thật duy nhất: `.agent/contracts/agent-registry.json`.
  *
- * Ba luật được thực thi:
- *   R1 test-runner   - lệnh chạy test suite chỉ dành cho `verifier` / `test-author`.
- *   R2 test-write    - ghi vào cây test (qua Edit/Write hoặc qua shell) chỉ dành cho `test-author`.
- *   R3 self-protect  - sửa chính file cấu hình enforcement chỉ dành cho `maintainer`.
+ * Các luật được thực thi:
+ *   R1 test-runner    - lệnh chạy test suite chỉ dành cho `verifier` / `test-author`.
+ *   R2 test-write     - ghi vào cây test (qua Edit/Write hoặc qua shell) chỉ dành cho `test-author`.
+ *   R3 self-protect   - sửa chính file cấu hình enforcement chỉ dành cho `maintainer`.
+ *   R5 secret-inline  - credential viết literal trên dòng lệnh, chặn mọi role.
+ *   R6 db-destructive - drop/truncate/delete không WHERE trên DB, chặn mọi role.
+ *   R8 build-runner   - build/typecheck chỉ khi user yêu cầu; role được phép theo registry.
+ *   R7 migration-write - cấm tự viết/sửa file migration/snapshot EF Core.
+ *   R9 migration-runner - cấm tự sinh/chạy migration EF Core (add-migration, dotnet ef).
  *
  * Role được phân giải theo thứ tự: payload subagent -> env COGAIN_AGENT_ROLE ->
  * file state (TTL 8h) -> mặc định `implementer` (chặt nhất).
@@ -212,6 +217,16 @@ try {
       source = "inline";
     }
 
+    // R5/R6/R8: luật chỉ gồm pattern, khai báo ở registry. Chạy trước R1/R3 vì các luật đó in lệnh vào log,
+    // còn R5 không in lệnh để khỏi chép credential vào log.
+    for (const key of ["secret_inline", "db_destructive", "build_runner", "migration_runner"]) {
+      const r = rules[key];
+      if (!r || !(r.patterns || []).some((p) => new RegExp(p, "i").test(cmd))) continue;
+      if ((r.allowed_roles || []).includes(role)) continue;
+      const shown = r.echo_command ? `\n\nLệnh bị chặn: ${cmd.slice(0, 200)}` : "";
+      deny(`${r.id}-${key.replace("_", "-")}`, role, `${r.deny_message}${shown}`);
+    }
+
     // R1: test runner.
     const r1 = rules.test_runner || {};
     const hitsRunner = (r1.patterns || []).some((p) => new RegExp(p, "i").test(cmd));
@@ -222,7 +237,7 @@ try {
         `${r1.deny_message}\n\n` +
           `Lệnh bị chặn: ${cmd.slice(0, 200)}\n` +
           `Role hiện tại: ${role} (nguồn: ${source}).\n\n` +
-          `Agent triển khai chỉ được xác thực bằng \`dotnet build <project>\`. Build xanh là bằng chứng hợp lệ: DỪNG và bàn giao.\n` +
+          `Agent triển khai không tự build hay chạy test; CI parity qua verifier/maintainer chỉ khi user yêu cầu CI/build. DỪNG và bàn giao.\n` +
           `Chạy test là quyết định của người dùng. Nếu người dùng muốn mở cổng, người dùng chạy:\n` +
           `  ! .agent/scripts/agent-role.sh verifier\n` +
           `Không tự ý mở cổng rồi chạy tiếp.`
@@ -273,6 +288,19 @@ try {
           `Test biên dịch lỗi hay đỏ do đổi contract thì báo \`test-spec-conflict\` kèm tên test, không tự sửa test.`
       );
     }
+
+    // R7b: ghi vào file migration bằng shell.
+    const touchesMigrationPath = isMutating && (stripped.indexOf("Migrations/", firstMut) !== -1 || (registry.migration_paths || []).some((m) => stripped.indexOf(m.replace(/\/\*\*$/, "/"), firstMut) !== -1));
+    const r7shell = rules.migration_write || {};
+    if (touchesMigrationPath && isMutating && !(r7shell.allowed_roles || []).includes(role)) {
+      deny(
+        "R7-migration-write-shell",
+        role,
+        `Permission Denied: CẤM TUYỆT ĐỐI Agent tự viết tay hoặc chỉnh sửa file migration/snapshot EF Core bằng shell.\n\n` +
+          `Lệnh bị chặn: ${cmd.slice(0, 200)}\n` +
+          `Role hiện tại: ${role} (nguồn: ${source}).`
+      );
+    }
     allow();
   }
 
@@ -304,6 +332,18 @@ try {
           `Role hiện tại: ${role} (nguồn: ${source}).\n\n` +
           `Không sửa/xoá assertion, thêm Skip, hay chỉnh expected value để build xanh.\n` +
           `Test mâu thuẫn spec là \`test-spec-conflict\`: dừng, báo tên test và mâu thuẫn, để người dùng quyết.`
+      );
+    }
+
+    // R7a: cấm tự viết / sửa file migration.
+    const r7 = rules.migration_write || {};
+    if (matchesAny(target, registry.migration_paths || []) && !(r7.allowed_roles || []).includes(role)) {
+      deny(
+        "R7-migration-write",
+        role,
+        `Permission Denied: ${target} là file migration/snapshot EF Core.\n\n` +
+          `CẤM TUYỆT ĐỐI Agent tự viết tay hoặc chỉnh sửa file migration/snapshot.\n` +
+          `Sai sót phải sửa từ Entity hoặc Fluent API Configuration rồi để người dùng tự sinh migration bằng add-migration.`
       );
     }
 

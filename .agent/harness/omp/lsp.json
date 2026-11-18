@@ -1,0 +1,26 @@
+{
+  "servers": {
+    "csharp-ls": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "export DOTNET_ROOT=/usr/lib/dotnet DOTNET_ROOT_X64=\"$HOME/.dotnet10\" DOTNET_HOST_PATH=/usr/lib/dotnet/dotnet DOTNET_CLI_TELEMETRY_OPTOUT=1; export PATH=\"$DOTNET_ROOT:$PATH\"; root=\"$(git rev-parse --show-toplevel)\"; exec \"$DOTNET_ROOT_X64/tools/csharp-ls\" --solution \"$root/backend/CogainSolution.sln\""
+      ],
+      "fileTypes": [".cs"],
+      "languageId": "csharp",
+      "rootMarkers": ["backend"],
+      "warmupTimeoutMs": 180000
+    },
+    "omnisharp": { "disabled": true },
+    "typescript-language-server": {
+      "warmupTimeoutMs": 120000,
+      "initOptions": {
+        "hostInfo": "omp-coding-agent",
+        "maxTsServerMemory": 8192,
+        "disableAutomaticTypingAcquisition": true
+      }
+    },
+    "eslint": { "disabled": true }
+  },
+  "idleTimeoutMs": 300000
+}

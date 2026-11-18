@@ -61,10 +61,16 @@ per `AI_RULES.md` section 9.
 execution, run only the narrowest authorized command and report output:
 
 ```
-dotnet build tests/<Project>/<Project>.csproj --no-restore -v q
-dotnet test  tests/<Project>/<Project>.csproj --no-build --filter "FullyQualifiedName~<Area>"
+backend/fast-build.sh backend/tests/<Project>/<Project>.csproj --no-restore -v q
+dotnet test  backend/tests/<Project>/<Project>.csproj --no-build --filter "FullyQualifiedName~<Area>"
 ```
 
 Report added/changed test names, the defect each rejects, any `derived-from-impl`
 markers, and any `needs-seam` blockers. Never commit unless the user explicitly
 asks.
+
+## Rework từ Main
+
+Tin `<irc>` từ `Main` (hoặc yêu cầu sửa từ advisor) là rework packet: chỉ sửa các finding được nêu, trong write boundary ở trên.
+Trả lời bằng `yield`: mỗi finding `fixed | disputed | blocked` kèm `file:line`; phản bác phải có bằng chứng.
+Chỉ nhắn `Main` khi bị chặn về quyền hoặc cần quyết định nghiệp vụ; còn lại trả kết quả qua `yield`.

@@ -1,6 +1,6 @@
 # Cogain Agent Architecture
 
-**Updated:** 2026-08-28  
+**Updated:** 2026-10-05  
 **Scope:** coding agents for the Cogain .NET 8 microservices and React/Vite monorepo
 
 ## Goal
@@ -14,7 +14,7 @@ Entry (AGENTS/CLAUDE/GEMINI)
   -> AI_RULES.md                         global invariants and precedence
   -> .agent/rules/{backend,frontend}.md path/domain invariants
   -> .agent/contracts/*                  agent registry and task handoff contracts
-  -> .agent/agents/*-specialist.md       role, routing, evidence policy
+  -> .agent/agents/*.md                  role, routing, evidence policy
   -> .agent/skills/*/SKILL.md            task procedure loaded on demand
   -> .agent/knowledge/*                  skill lifecycle, freshness, MCP policy
   -> .agent/quarantine/skills/*          retained but inactive skill content
@@ -34,9 +34,15 @@ agent unless it is registered there and has a profile (except the control-plane
 | Agent | Kind | Write boundary |
 | ----- | ---- | -------------- |
 | `orchestrator` | control | none |
-| `backend-specialist` | worker | `backend/**` |
-| `frontend-specialist` | worker | `frontend/**` |
-| `verifier` | gate | none |
+| `backend-specialist` | worker | `backend/**` (excludes tests) |
+| `frontend-specialist` | worker | `frontend/**` (excludes tests) |
+| `test-author` | worker | `backend/tests/**`, `frontend/**/__tests__/**`, `frontend/**/*.{test,spec}.{ts,tsx}` |
+| `verifier` | gate | none (read-only tools) |
+| `reviewer` | gate | none (read-only tools; opt-in on explicit user request) |
+
+Test authorship is strictly separated from production code: workers writing production
+source never modify test files (rule R2). Test suites are restricted to `test-author` and
+`verifier` (rule R1).
 
 Security, database, performance, documentation, and release are conditional
 capabilities. They become separate agents only when a distinct permission boundary
@@ -52,18 +58,27 @@ Classify work before loading broad context or adding coordination:
 | `standard` | Selective rule/skill/context; self-validation with evidence |
 | `governed` | Task Manifest, explicit ownership, independent verifier |
 
+Fast and standard lanes are preserved for routine, low-risk work without manifest
+overhead. Validation commands run only on explicit user request.
+
 Only governed work follows the manifest contract in
 `.agent/contracts/task-manifest.schema.json`:
 
 ```text
 TRIAGED -> PLANNED -> IMPLEMENTING -> VALIDATING -> REVIEWING -> READY
-                                      \\-> FAILED -> IMPLEMENTING (bounded retry)
+                                      \-> FAILED -> IMPLEMENTING (bounded retry)
 ```
 
-The manifest must declare the owner, allowed paths, acceptance criteria, validation
-commands, and stop conditions. Parallel work is allowed only when write paths are
-disjoint. The verifier is read-only and returns `pass`, `fail`, or `blocked` with
-command evidence; it never repairs the source under review.
+Single-slice work keeps a compact contract or checkpoint. Multi-slice work tracks
+structured lifecycle in `.agent/planning/{task-slug}/00-OVERVIEW.md` and slice contracts
+in `TASK-*.md` with `task-contract` blocks (validated by `.agent/scripts/task-contract.mjs`).
+Governed task manifests are derived from canonical TASK metadata rather than edited by hand.
+
+Task checkpoints and verification:
+- CI verification runs only on explicit user request via `.agent/scripts/ci-parity.sh` (rule R8).
+- Explicit task-contract checkpoints (`gate-supersession` / `gate-completion`) are owned by `orchestrator`/`maintainer`.
+- Parallel work requires disjoint write paths. The verifier is read-only and returns `pass`,
+  `fail`, or `blocked` with command evidence; it never repairs the source under review.
 
 ## Context Budget
 
@@ -74,15 +89,21 @@ The report measures static bytes and estimates tokens conservatively. Runtime to
 usage, tool calls, validation outcome, and rework must be recorded when the harness
 exposes them; byte estimates are a fallback, not a billing metric.
 
-## Runtime Routing
+## Runtime Routing & Mode-Specific Loading
 
-| Evidence                                               | Specialist                                   | Baseline router                                            |
-| ------------------------------------------------------ | -------------------------------------------- | ---------------------------------------------------------- |
-| `backend/**`, C#, EF Core, API, DB, gRPC, broker       | `backend-specialist`                         | `backend-development`                                      |
-| `frontend/**`, React, route, query, form, Tailwind, UI | `frontend-specialist`                        | `frontend-development`                                    |
-| Cross-service or cross-app decision                    | primary affected specialist; expand analysis | add architecture skill only if the decision is high-impact |
+Routing maps evidence to specialists without unconditional skill preloading:
 
-Specialists do not preload their whole catalog. A local task normally loads one router plus one or two decision-changing skills.
+| Evidence / Scope                                       | Agent                  | Mode-specific procedure loading                            |
+| ------------------------------------------------------ | ---------------------- | ---------------------------------------------------------- |
+| `backend/**`, C#, EF Core, API, DB, gRPC, broker       | `backend-specialist`   | `backend-development`; decision skills on demand           |
+| `frontend/**`, React, route, query, form, Tailwind, UI | `frontend-specialist`  | `frontend-development`; decision skills on demand          |
+| Test authoring, test repair, regression coverage       | `test-author`          | `testing-patterns`, `tdd-workflow`                         |
+| Governed verification, invariant checks                | `verifier`             | `lint-and-validate`, `testing-patterns`, `requesting-code-review` |
+| Opt-in diff review, risk and checklist audit (user request) | `reviewer`         | `code-reviewer`, `clean-code`; diff review on demand       |
+| Cross-service or cross-app decision                    | Primary domain specialist; Main coordinates cross-domain contracts |
+Specialists load minimal context: one baseline router plus one or two decision-changing
+skills. Diff-review workflows (`code-review`) are loaded on demand for fixed-point diffs,
+not unconditionally for design, decision, or health modes.
 
 ## Project-Native Owners
 
@@ -113,13 +134,15 @@ Quarantined skills live under `.agent/quarantine/skills`. They are kept for revi
 
 ## Multi-Harness Layout
 
-`.agent/` is canonical. Harness directories use links rather than copied skill trees:
+`.agent/` is canonical. Harness directories use links and generated wiring rather than copied trees:
 
 - `.agents/skills -> ../.agent/skills`
 - `.codex/skills -> ../.agent/skills`
 - `.claude/skills -> ../.agent/skills`
+- `.claude/agents/{verifier,test-author}.md` (subagents with runtime tool restrictions)
+- `.omp/agents/*.md` (generated from `.agent/harness/omp/agents/` headers and `.agent/agents/` bodies via `.agent/scripts/install-harness-wiring.sh`)
 
-Commands/workflows remain thin harness adapters. Do not fork the skill content per harness.
+New harness profiles take effect only in a new session; live profiles in an active session are not dynamically modified.
 
 ## Quality Gates
 
@@ -129,10 +152,9 @@ Run:
 node .agent/scripts/validate-agent-system.mjs
 ```
 
-The validator checks skill frontmatter/names, local reference links, cross-skill references, specialist skill dependencies, eval coverage, prompt-size warnings, and harness links. Use `node .agent/scripts/validate-agent-system.mjs --write-catalog` after adding/removing a skill to regenerate `.agent/SKILLS.md`.
+The validator checks skill frontmatter/names, local reference links, cross-skill references, specialist skill dependencies, eval coverage, prompt-size warnings, and harness links. Use `node .agent/scripts/validate-agent-system.mjs --write-catalog` after adding/removing a skill to regenerate `.agent/SKILLS.md` and validate. No catalog count claim is made before authorized generation proves actual metadata.
 
-Behavior cases live in `.agent/evals/cases/`. Static validation proves the package is connected; behavior evals prove the instructions improve decisions. Run behavior evals nightly where a harness supports them, and always when changing a skill, model, crawler, or MCP configuration.
-
+Behavior cases live in `.agent/evals/cases/`. Static validation proves the package is connected; behavior evals prove instructions improve decisions. Model and routing evaluations run in isolated agent sessions using canonical cases before publishing changes to skills, models, or MCP configuration.
 ## Design Decisions
 
 - Concision is not minimal knowledge: keep non-obvious project procedures, but disclose detailed references only when needed.

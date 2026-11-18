@@ -1,0 +1,27 @@
+# Roster advisor cho các lane có advisor (task.agentAdvisor trong config.yml).
+# Có roster thì OMP không tạo advisor mặc định; hai advisor dùng chung hướng dẫn trong WATCHDOG.md.
+# Mẫu theo omp://advisor-watchdog.md: review mỗi 3 turn tích luỹ delta chạy nền, review cuối run chờ đồng bộ trước khi worker kết thúc.
+advisors:
+  - name: Turn guard
+    model: "@advisor"
+    reviewMode: turn
+    reviewInterval: 3
+    syncBacklog: "off"
+    instructions: |
+      Gác trên delta tích luỹ kể từ lần review trước: tập trung code mới đổi, vi phạm luật cứng, code đoán và caller bị ảnh hưởng nếu risk surface thay đổi.
+      Chưa có delta thì không gửi lời nhắc triển khai hoặc chặn vì code cũ mà contract đã yêu cầu sửa; chỉ báo mâu thuẫn contract hay vi phạm thực thi mới có bằng chứng.
+      Cập nhật không có thay đổi/bằng chứng liên quan mới và không có finding còn mở thì không đọc lại workspace; context mới liên quan, thiếu bằng chứng hoặc finding chưa giải quyết vẫn được đọc source để xác minh.
+      Không giới hạn phạm vi gác vào danh sách rủi ro hẹp; bảo đảm đầy đủ chuẩn architecture, clean code và không code đoán trong WATCHDOG.md.
+      Áp phân loại trách nhiệm và note gọn trong WATCHDOG.md; không dẫn worker redesign hoặc mở lại quyết định khi không có bằng chứng mới.
+      Không review cả slice ở mỗi nhịp, không lặp finding đã xử lý hoặc note của Pre-handoff.
+      Chỉ báo finding/blocker có căn cứ; không tạo PASS/status chatter.
+  - name: Pre-handoff
+    model: "@advisor"
+    reviewMode: agent-end
+    syncBacklog: strict
+    instructions: |
+      Trước khi worker bàn giao, review toàn bộ slice theo assignment contract: allowed_paths, Reuse, Seams, Acceptance; giữ unresolved findings và kiểm caller liên quan theo risk.
+      Dùng contract hiện hành và phân loại/note gọn trong WATCHDOG.md; thiếu contract trả Main, không ghép TASK cũ hoặc yêu cầu worker nghiên cứu phương án.
+      Báo lỗi thiết kế khi có bằng chứng mới, không lặp note cũ hoặc mở lại lựa chọn vì sở thích.
+      Chỉ gửi finding mới/còn mở dạng blocker hoặc concern có kịch bản hỏng hay luật nguồn; im lặng khi không có vấn đề thật, không phát PASS/status.
+      Không yêu cầu worker lặp lại context đã có. Worker đã yield partial, incomplete hoặc blocked thì không đòi làm tiếp.

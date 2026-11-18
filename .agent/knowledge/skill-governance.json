@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-08",
+  "updatedAt": "2026-10-05",
   "scope": "Shared local agent system for Claude, Codex, and Antigravity in cogain-core",
   "activeSkillRoot": ".agent/skills",
   "quarantineSkillRoot": ".agent/quarantine/skills",
@@ -113,7 +113,10 @@
     "react": "frontend-development",
     "typescript": "typescript-pro",
     "database": "postgresql",
-    "planning": "concise-planning"
+    "planning": "concise-planning",
+    "tdd": "tdd-workflow",
+    "tdd-master-workflow": "tdd-workflow",
+    "code-review-checklist": "code-reviewer"
   },
   "quarantinedSkills": [
     {

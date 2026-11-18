@@ -1,6 +1,9 @@
 ---
 trigger: glob
 glob: "**/*.{test,spec}.{js,ts,jsx,tsx,py,rs,go,java}"
+description: "Testing standard for test/spec files: pyramid, structure, and assertions."
+condition: ["**/*.test.js", "**/*.test.ts", "**/*.test.jsx", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.ts", "**/*.spec.jsx", "**/*.spec.tsx", "**/*.test.py", "**/*.spec.py", "**/*.test.rs", "**/*.spec.rs", "**/*.test.go", "**/*.spec.go", "**/*.test.java", "**/*.spec.java"]
+interruptMode: never
 ---
 
 # TESTING-STANDARD.MD - Quality Assurance Protocol

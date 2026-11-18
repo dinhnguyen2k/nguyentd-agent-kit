@@ -34,7 +34,14 @@ interruptMode: never
 
 1. **Chuẩn trả về**: Dùng `Result<T>`, `Result`, `PagedResult<T>`.
 2. **Lỗi Nghiệp vụ**: Bắt buộc dùng `400 BadRequest` (gọi `Result.Failure(msg)`). Cấm dùng `401`, `403`, `409` tùy tiện để tránh làm lỗi cơ chế interceptor ở Frontend.
-3. **Lỗi gRPC/hạ tầng trong service**: Bắt `RpcException` thì log status và trả `Result.Failure(msg)` mặc định như lỗi nghiệp vụ, đồng nhất trong cùng service. Không tự chọn `5xx` riêng lẻ cho từng method.
+3. **Tái sử dụng core khi gọi gRPC**:
+   - Bắt buộc kiểm tra và dùng helper core hiện có trước khi viết xử lý riêng tại service.
+   - Với lời gọi unary có response `Success`/`Message`, dùng `GrpcLookupFetchHelpers.FetchResultAsync` tại `backend/src/BuildingBlocks/Infrastructure/Services/Import/GrpcLookupFetchHelpers.cs`.
+   - Response phải implement `IGrpcStatusResponse`; bổ sung partial class tại `backend/src/BuildingBlocks/Contracts/Protos/GrpcStatusResponse.cs`, không sửa file protobuf sinh tự động.
+   - Core sở hữu kiểm tra `Success`, logging, chuyển lỗi gRPC thành `Result` và truyền cancellation; cấm lặp chuỗi catch hoặc kiểm tra null/Success quanh helper tại từng service.
+   - Caller giữ trách nhiệm tạo request, deadline/token, kiểm tra `Result`, mapping và validation nghiệp vụ; lỗi trả `Result.Failure(msg)` theo contract hiện hữu, không tự chọn `5xx` riêng lẻ.
+   - Nếu core chưa cover tình huống cần thiết của yêu cầu hiện tại, mở rộng helper core tại đúng owner và giữ tương thích các caller; không nhân bản xử lý ở service, thêm wrapper riêng hoặc mở rộng dự phòng khi chưa có nhu cầu.
+   - Không dùng helper nuốt lỗi rồi trả default/dữ liệu rỗng cho lookup bắt buộc trong CRUD/import; cancellation phải được truyền tiếp theo chính sách core, không đổi thành dữ liệu mặc định.
 4. **Không bọc luồng ghi bằng `catch (Exception)`**: Cấm `catch (Exception)` quanh `base.Create`/`base.Update`/`SaveChangesAsync`/`CreateWithWorkItemAsync`. `GlobalExceptionHandlerMiddleware` đã log và trả thông điệp chuẩn kèm mã tham chiếu (kể cả `DbUpdateException` qua `PostgresErrorFormatter`); catch chung sẽ nuốt các thông điệp đó.
 
 ---
@@ -72,7 +79,8 @@ interruptMode: never
    - Lưu khóa ngoại ID và dùng quan hệ/navigation, projection/join hoặc lookup theo ID để lấy code/name từ entity nguồn.
    - Quy tắc áp dụng cho entity, DTO ghi dữ liệu, mapping và các luồng CRUD/import; DTO đọc được phép trả code/name được resolve từ entity nguồn, không lưu snapshot.
    - Không tự ý xóa field snapshot đang tồn tại hoặc tạo migration khi áp dụng rule này; việc chuyển đổi dữ liệu cũ cần yêu cầu triển khai riêng.
-6. **EF Core Migration**: CẤM tự tạo tay file migration; chỉ sinh qua `./dev.sh add-migration`. CẤM sửa file migration/snapshot đã sinh để pass logic; sai phải sửa từ entity/Fluent API rồi sinh lại.
+6. **EF Core Migration**: CẤM TUYỆT ĐỐI tự viết tay file migration; chỉ được tạo/gỡ migration qua `./dev.sh add-migration <Service> <MigrationName>` và `./dev.sh remove-migration <Service>` (chỉ migration chưa apply). CẤM TUYỆT ĐỐI sửa file migration/snapshot đã sinh để pass logic; nếu sai sót bắt buộc phải sửa từ Entity/Fluent API Configuration, `remove-migration` rồi sinh lại.
+7. **Default cột non-null mới**: Giá trị khởi tạo C# không thành default DB (EF sinh `defaultValue: 0`). Cột enum/bool/số có default nghiệp vụ khác `default(T)` phải khai báo `HasDefaultValue(...)` trong Configuration trước `add-migration`.
 
 ---
 
@@ -105,16 +113,17 @@ interruptMode: never
 
 ---
 
-## 7. Quy Tắc Enum & Description Metadata (BẮT BUỘC)
+## 7. Quy Tắc Enum, Nhãn Động & Description Metadata (BẮT BUỘC)
 
-1. **Bắt buộc dùng `[Description("...")]` cho mọi enum member**:
-   - Khi định nghĩa enum (trong `Shared/Enums`, `Contracts`, DTO, hoặc service nội bộ), **BẮT BUỘC** khai báo attribute `[Description("...")]` (từ `System.ComponentModel`) cho **tất cả** các member của enum.
-   - Nội dung description phải là chuỗi nhãn hiển thị chuẩn (tiếng Việt có dấu, rõ nghĩa nghiệp vụ).
-2. **Thống nhất logic qua `EnumExtensions`**:
-   - **Label / Hiển thị**: Lấy nhãn hiển thị bằng `enumValue.GetDescription()` (từ `Shared.Extensions.EnumExtensions`). Cấm viết các hàm helper `GetLabel(status)` tự chế hoặc `switch`/`if-else` rải rác ở nhiều service/file.
-   - **Excel Import / Export**: Mọi luồng parse chuỗi text (từ file Excel mẫu, dữ liệu cột) sang enum bắt buộc dùng `EnumExtensions.ParseFromDescription<TEnum>(text)` hoặc `EnumExtensions.TryParseFromDescription<TEnum>(text, out var result)`. Cấm so sánh chuỗi thủ công hoặc dựa vào enum member name tiếng Anh khi người dùng nhập tiếng Việt.
-   - **Workflow & Dynamic Conditions**: Đảm bảo tương thích với `ConditionSchemaBuilder` (tự động ánh xạ qua `e.GetDescription()`) để sinh `ConditionEnumOption` đồng nhất.
-   - **API Options / Dropdown**: Danh sách options `{ value, label }` trả về cho Frontend phải lấy `label` từ `GetDescription()`.
+1. **Định nghĩa Enum trong `Shared.Enums`**:
+   - Underlying type bắt buộc là `int`; tên kiểu (`Type.Name`, dùng làm `EnumKey`) không được trùng giữa các namespace vì `EnumLabelCatalog` dùng làm khóa duy nhất.
+   - Bắt buộc gắn `[Description("...")]` (`System.ComponentModel`) tiếng Việt có dấu, rõ nghĩa cho **tất cả** member (làm nhãn mặc định cho `vi`).
+   - Nếu cần nhãn tiếng Anh mặc định hoặc alias Excel cũ: khai báo đồng bộ trong `backend/src/BuildingBlocks/Infrastructure/Localization/EnumLabels/en.json` và `aliases.json` (đúng `EnumKey` và tên member).
+2. **Lấy nhãn, options và parse runtime qua `IEnumLabelProvider` / `EnumLabelSnapshot`**:
+   - Trong service/import/export, inject `IEnumLabelProvider` (`await _enumLabelProvider.GetAsync(ct)` hoặc `GetDefaultAsync(ct)`) để lấy `EnumLabelSnapshot` theo thứ tự ưu tiên: `override(c) -> static(c) -> override(vi) -> [Description] -> member name`.
+   - Lấy nhãn: `labels.Label(enumValue)`; lấy danh sách options: `labels.Options<TEnum>()` / `labels.Labels<TEnum>()`; parse chuỗi nhập vào: `labels.TryParse<TEnum>(text, out var value)`.
+   - Với `EStatus` trong Excel import/template: dùng `StatusImportParser.TryParse(...)` và `StatusImportParser.Options(...)`.
+   - Chỉ dùng `enumValue.GetDescription()` (`Shared.Extensions.EnumExtensions`) ở chỗ thuần tĩnh không có DI hoặc không cần override theo ngôn ngữ/runtime.
 3. **Cấm**:
-   - Cấm định nghĩa enum member mà không có `[Description("...")]`.
-   - Cấm viết mapper hoặc switch-case thủ công để ánh xạ enum ra text hiển thị khi đã có `[Description]`.
+   - Cấm định nghĩa enum member thiếu `[Description("...")]`, khác underlying `int`, hoặc trùng tên `Type.Name`.
+   - Cấm tự viết `switch/case`, `if/else` hoặc map chuỗi thủ công để dịch/parse enum khi đã có `IEnumLabelProvider` và `EnumExtensions`.

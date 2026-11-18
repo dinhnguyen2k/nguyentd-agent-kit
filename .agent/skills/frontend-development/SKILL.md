@@ -18,6 +18,7 @@ Use this as a router, not a React textbook. `AI_RULES.md`, `.agent/rules/fronten
 | TanStack Query keys/mutations/invalidation               | [skill:cogain-query-cache]                                               |
 | React Hook Form, Zod, reset/hydration, nullable IDs      | [skill:cogain-form-rhf-zod]                                              |
 | Recurring API, EF-to-UI, Radix, effect, or table failure | [skill:cogain-agent-gotchas]                                             |
+| Triển khai, sửa hoặc chẩn đoán search/filter danh sách | [Search và filter](references/search-and-filter.md), chỉ đọc khi task chạm luồng này |
 | Component composition/effects                            | [skill:react-patterns]                                                   |
 | Reusable TypeScript generics                             | [skill:typescript-pro]                                                   |
 | Tailwind tokens/shared primitives                        | [skill:tailwind-patterns] and, only when shared, [skill:core-components] |
@@ -29,6 +30,8 @@ Every matching registry trigger requires its owning skill before the related dec
 Matching a trigger does not authorize a worker to reopen design or expand scope.
 
 Load the smallest set that satisfies those mandatory triggers. Context reuse never replaces inspection of affected source, nearest patterns/tests, or shared consumers according to risk. Do not load visual-design, browser, accessibility, and performance guidance for every routine code change.
+
+Không nạp reference search/filter khi task chỉ sửa layout, màu sắc, form, mutation hoặc bảng không thay đổi hành vi tìm kiếm/lọc.
 
 ## UI reference (on demand)
 

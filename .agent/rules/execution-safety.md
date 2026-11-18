@@ -1,6 +1,8 @@
 ---
 trigger: glob
 glob: "**/*"
+description: "Execution safety: dependency and malware guard, no hanging or infinite-loop commands."
+alwaysApply: true
 ---
 
 # EXECUTION-SAFETY.MD - Quy Tắc An Toàn Thực Thi & Chống Mã Độc

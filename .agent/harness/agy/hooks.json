@@ -1,0 +1,16 @@
+{
+  "cogain-boundary-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "for p in ./boundary-guard.mjs ../.agent/harness/agy/boundary-guard.mjs ./.agent/harness/agy/boundary-guard.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{\"decision\":\"allow\"}\\n'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,6 +1,9 @@
 ---
 trigger: glob
 glob: 'backend/src/Services/**/*.Import*.cs,backend/src/Services/**/*.Export*.cs'
+description: "Backend Excel import/export rules (hook-only architecture, ClosedXML mapping) for backend/src/Services Import/Export code."
+condition: ["backend/src/Services/**/*.Import*.cs", "backend/src/Services/**/*.Export*.cs"]
+interruptMode: never
 ---
 
 # Backend Excel Import/Export Rules
@@ -59,15 +62,30 @@ Export pipeline:
 2. Không gom parse, lookup, validate, persist và workbook generation vào một method.
 3. Main flow phải tuyến tính: validate → parse → collect/resolve lookup → validate references → persist → result.
 
-## 2. Header And Sheet Constants
+## 2. Header And Sheet Schema
 
 1. Không hardcode tên header hoặc sheet rải rác trong code.
-2. Tạo static class `{Entity}Headers`; header arrays phải build từ constants đó.
-
-3. Tên sheet chính và sheet reference phải gom vào static class riêng hoặc cùng nhóm constants:
-   - sheet chính: `OrderSheetName`, `DetailSheetName`, `ProjectSheetName`
-   - sheet reference: dùng prefix `Data_...`
-4. Legacy header name chỉ thêm alias tại resolver, không lặp mapping ở nhiều nơi.
+2. Với luồng chuyển sang DTO + attributes, dùng Excel row DTO riêng cho từng sheet làm nguồn metadata duy nhất.
+   Khai báo vị trí, tiêu đề, alias và ràng buộc ô trên property; không gắn metadata Excel lên entity hoặc DTO API.
+   Helper biên dịch metadata sang `ExcelSheetSchema`, sinh `Titles`, alias có ràng buộc vị trí và layout import cũ một lần theo type, không dựng lại theo từng dòng dữ liệu.
+   Không suy thứ tự cột từ reflection hoặc suy bắt buộc nhập từ nullable và dấu `(*)`.
+   Chỉ map property được khai báo cho Excel; cấu hình type không hỗ trợ hoặc vị trí cột sai phải báo lỗi rõ ràng.
+   Reader/writer dùng getter/setter đã chuẩn bị, không reflection từng ô; giữ số dòng, thứ tự và lỗi parse để service tiếp tục xử lý nghiệp vụ.
+   Metadata dùng chung không chứa trạng thái workbook; dropdown và hướng dẫn phụ thuộc ngữ cảnh phải cấu hình riêng cho từng workbook.
+   Template, export, import, nhãn lỗi parser và tên cột trong sheet hướng dẫn phải đọc cùng schema.
+   Không duy trì đồng thời DTO attributes, bộ constants hoặc danh sách descriptor chứa cùng metadata.
+   Luồng chưa chuyển đổi được giữ `{Entity}Headers`, descriptor, `ExcelSheetSchema` hoặc header arrays hiện tại, không bắt buộc migrate ngoài phạm vi task.
+3. Tên sheet chính khai báo tại attribute của Excel row DTO hoặc schema/constants của luồng chưa chuyển đổi, không khai báo trùng ở cả hai nơi.
+   Tên sheet reference gom vào nhóm constants và dùng prefix `Data_...`.
+4. Alias tiêu đề khai báo cạnh cột, alias tên sheet khai báo trong schema; helper chung xử lý tương thích, không lặp chuỗi `if/else` hoặc sửa nội dung ô header trước khi validate.
+   Alias mặc định so khớp chính xác sau chuẩn hóa; so khớp chuỗi con phải được khai báo riêng và giới hạn đúng cột.
+5. Chỉ khai báo legacy bằng prefix khi layout cũ đúng là N cột đầu của layout hiện tại, giữ nguyên tên chuẩn và thứ tự.
+   Layout có chèn, bỏ ở giữa hoặc đổi thứ tự cột phải khai báo đầy đủ, không tự suy đoán hay dịch chuyển cột.
+   Prefix chỉ phục vụ import, không được làm thay đổi template/export hiện tại.
+6. Cấu hình sai như tiêu đề hoặc alias rỗng sau chuẩn hóa, key layout trùng/dành riêng, prefix vượt phạm vi phải báo lỗi rõ ràng.
+   Không bỏ qua cấu hình sai, không để alias rỗng khớp mọi tiêu đề và không chọn tùy ý khi nhiều layout cùng khớp.
+7. Cột hệ thống tự tính vẫn xuất hiện trong template/export khi contract yêu cầu, nhưng reader bỏ qua giá trị nhập của cột được khai báo bỏ qua import.
+   Không đưa công thức nghiệp vụ, lookup hoặc mặc định nghiệp vụ vào helper chuyển kiểu để che dữ liệu thiếu hoặc sai.
 
 ## 3. Parsing Rules
 
@@ -75,7 +93,11 @@ Export pipeline:
 2. Parsed row records phải giữ field dạng raw code/string trước khi resolve ID.
 3. Không parse cùng một sheet bằng nhiều convention khác nhau trong nhiều method.
 4. Column index phụ thuộc header động phải resolve qua helper như `ResolveColumnIndex`, không dùng magic number nếu header có khả năng thay đổi.
-5. Khi field bắt buộc thiếu, thêm lỗi có sheet + dòng + field rõ ràng.
+5. Bước parse chỉ báo lỗi của chính ô giá trị (sai kiểu, sai định dạng ngày/số, ô giá trị bắt buộc bị trống qua `CellRequired`, vượt độ dài), kèm sheet + dòng + field rõ ràng.
+   Mã danh mục/khóa tham chiếu không báo lỗi và không bị bỏ dòng (`continue`) ở bước parse; parsed row giữ raw code, kể cả null/rỗng, để `ValidateImportDtosAsync` báo một lần cho toàn bộ các dòng.
+   Chỉ bỏ dòng trống hoàn toàn; lỗi cấu trúc sheet/header vẫn báo ngay tại parse.
+   Ngoại lệ: dòng con không gắn được vào DTO cha lồng nhau (mã cha không có trong sheet cha) được báo lỗi tại parse kèm sheet + dòng.
+   Áp dụng cho code mới hoặc code đang sửa.
 6. Date import phải normalize về format gRPC/backend thống nhất, ví dụ `yyyy-MM-dd`, sau khi parse thành công.
 
 ## 4. Lookup Collection Rules
@@ -102,14 +124,19 @@ Export pipeline:
 
 ## 6. Export Template Rules
 
+**Đồng nhất template Import/Export (BẮT BUỘC):** Template Excel dùng cho Import và template Excel dùng cho Export phải có cùng cấu trúc dữ liệu: cùng sheet dữ liệu, tên và thứ tự header, số lượng và thứ tự cột, kiểu và ý nghĩa của từng cột.
+Mapping header/parser của Import và mapping của Export phải ánh xạ đối xứng; cấm thêm, bỏ, đổi tên hoặc đổi thứ tự cột riêng một phía.
+Nếu Export tạo workbook dữ liệu thay vì template trống, cấu trúc cột phải tuân thủ contract này và dữ liệu phải nhập lại được qua luồng Import mà không đổi ý nghĩa.
+Không tự tạo ngoại lệ vì yêu cầu riêng của service; nếu yêu cầu sản phẩm mâu thuẫn với quy tắc này, phải báo người dùng để chốt thay đổi quy tắc trước khi triển khai.
+
 1. Template sheet order phải ổn định và rõ ràng.
 2. Data validation phải reference sheet `Data_...`, không dùng tên mơ hồ như `DS ...`.
 3. Khi đổi header order, phải cập nhật đồng bộ:
-   - header arrays
+   - thứ tự cột trong schema hoặc header arrays của luồng chưa chuyển đổi
    - parsing cell indexes
    - data validation columns
    - export write columns
-4. Reference sheet headers cũng dùng constants, ví dụ `Headers.Code`, `Headers.Name`.
+4. Reference sheet headers cũng khai báo tập trung bằng schema hoặc constants, không lặp tên cột ở nhiều nơi.
 5. Protected/reference sheets không được chứa secret hoặc hardcoded credential mới. Nếu phải protect workbook, dùng pattern hiện có và không tăng phạm vi secret.
 
 ## 7. Transaction And Cross-Service Reliability
@@ -156,6 +183,7 @@ Reject these patterns in new or modified import/export code:
 6. Persisting before lookup validation completes.
 7. Rollback that ignores remote side effects.
 8. Exceptions without file/sheet/row context.
+9. Data-driven exceptions (null/duplicate key) inside `ValidateImportDtosAsync`.
 
 ## 11. Upsert Safety (BẮT BUỘC)
 
@@ -165,8 +193,15 @@ Reject these patterns in new or modified import/export code:
    - Tiền lệ đã chốt: `ProductionOrderService.ImportFromExcel` **cố ý không** kiểm tra `ApprovedDate` — đã import thì chấp nhận ghi đè (quyết định 2026-08-22).
 2. **Giữ nguyên correlation Id khi map**: Id tạm do bước parse sinh ra để liên kết cha–con trong cùng file (ví dụ `localSemiId`) phải được giữ nguyên khi map DTO → entity. Cấm `Id = Guid.NewGuid()` trong mapper/mapping method vì sẽ làm con trỏ tới bản ghi không tồn tại. Dùng `Id = dto.Id ?? Guid.NewGuid()`.
 3. **Tra cứu theo Code phải an toàn soft-delete**: Trước khi `ToDictionary(x => x.Code)` trên kết quả DB, xác nhận entity có `HasQueryFilter` loại bỏ `DeletedDate`; nếu không có, phải lọc tường minh `.Where(x => x.DeletedDate == null)`. Luôn dùng `GroupBy(...).ToDictionary(g => g.Key, g => g.First())` để tránh `ArgumentException` khi trùng key.
+   Với khóa lấy từ Excel, `ValidateImportDtosAsync` không được ném exception vì dữ liệu, vì catch của `BaseService.ImportFromExcel` sẽ làm mất mọi lỗi đã gom.
+   Khóa có thể null (row DTO qua `ExcelSheetReader` để null khi ô trống) phải được chặn trước indexer/`TryGetValue`/`ContainsKey`/`GetValueOrDefault`/`ToDictionary`, hoặc chỉ dùng sau checkpoint `if (errors.Count > 0) return errors;` đã báo lỗi mã đó.
+   `ToDictionary` trên mã lấy từ Excel chỉ chạy sau bước báo trùng mã của chính tập đó.
+   Ở Prepare, tham chiếu tùy chọn dùng `TryGetValue` kèm kiểm null; tham chiếu bắt buộc đã validate dùng indexer như invariant, không thêm lỗi người dùng.
 4. **Đồng bộ comparer C# ↔ SQL**: `HashSet<string>(StringComparer.OrdinalIgnoreCase)` KHÔNG có hiệu lực khi set đó được dịch thành `IN (...)` trên PostgreSQL (so sánh case-sensitive). Khi lọc code trên DB phải chuẩn hoá cả hai vế (`x.Code.ToUpper()` + set đã upper) hoặc dùng `EF.Functions.ILike`, và ghi rõ đánh đổi index.
 5. **Chống trùng khoá trong cùng file**: Bắt buộc kiểm tra trùng mã ở sheet header trước khi persist (dùng `ExcelImportHelpers.CheckDuplicateCode`), báo lỗi theo dòng thay vì để DB ném unique violation.
 6. **Không suy diễn loại chứng từ từ cột nhãn tự do**: Nếu loại chứng từ tham chiếu có thể suy ra từ chính mã chứng từ (tra trong tập Dự án / Đơn hàng / …), không thêm cột "Loại chứng từ" và không viết hàm alias kiểu `IsProjectRef` / `IsSalesOrderRef` so khớp chuỗi tiếng Việt. Suy ra từ mã; nếu mã trùng ở nhiều loại thì báo lỗi mơ hồ theo dòng.
-7. **Validation không được chết**: Nếu lookup toàn cục đã fail-fast cho một loại mã, thì thông báo lỗi theo dòng cho cùng loại mã đó là code chết. Chọn MỘT tầng báo lỗi — ưu tiên tầng theo dòng vì có `sheet + dòng + mã lệnh`.
+7. **Validation không được chết**: Mỗi điều kiện lỗi (trống, không tồn tại, ngưng hoạt động) của một loại mã chỉ báo ở MỘT tầng có `sheet + dòng + mã`.
+   Báo từng dòng hoặc gom theo mã liệt kê đủ các dòng đều hợp lệ; code mới ưu tiên `ValidateImportCategoryCode`, trong cùng sheet giữ một dạng.
+   Điều kiện chéo giữa các field (ví dụ có Mã ITP hoặc Mã NVL) được báo theo dòng.
+   Kiểm tra lặp lại ở Prepare/Sync cho điều kiện validate đã bảo đảm là code chết.
 8. **Cột đã validate phải được dùng**: Mọi cột đã collect/validate trong import phải được gán vào entity. Cột chỉ để validate rồi vứt (hoặc bị ghi đè ngay sau đó bởi giá trị default) là lỗi Data Symmetry — xoá cột hoặc dùng giá trị.

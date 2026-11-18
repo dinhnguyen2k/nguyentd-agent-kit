@@ -1,6 +1,9 @@
 ---
 trigger: glob
 glob: '**/*.{cs,ts,js,py,go,tf,yaml,yml,json}'
+description: "Security and compliance: forbidden actions, secrets, auth, and data privacy for code and config files."
+condition: ["**/*.cs", "**/*.ts", "**/*.js", "**/*.py", "**/*.go", "**/*.tf", "**/*.yaml", "**/*.yml", "**/*.json"]
+interruptMode: never
 ---
 
 # SECURITY-COMPLIANCE.MD - Quy Tắc Bảo Mật Và Tuân Thủ

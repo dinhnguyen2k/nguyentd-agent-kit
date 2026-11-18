@@ -4,7 +4,13 @@ Mục tiêu: giúp khám phá workflow khi công cụ không có menu `/` native
 
 ## Execution Roles
 
-Tên role trong workflow là phase responsibility, không phải yêu cầu một agent profile riêng. Current agent thực hiện phase đó và chỉ delegate khi profile/tool thực sự tồn tại, việc song song có lợi, và task cho phép. Runtime agents được đăng ký tại `.agent/contracts/agent-registry.json`: `orchestrator`, `backend-specialist`, `frontend-specialist`, `test-author`, và `verifier`. `verifier` và `test-author` là subagent thật, xem `.agent/harness/README.md`. `AI_RULES.md` quyết định routing và luôn có ưu tiên cao hơn workflow.
+Tên role trong workflow là phase responsibility, không tự cấp quyền code cho current agent.
+Mặc định Main discovery, chốt giải pháp, giao specialist triển khai và nghiệm thu source theo `AI_RULES.md` §6, kể cả task nhỏ hoặc một slice.
+Main chỉ code khi user giao rõ làm trực tiếp tại Main cho task hiện tại; không dispatch được specialist thì báo blocker, không tự làm thay.
+Runtime agents được đăng ký tại `.agent/contracts/agent-registry.json`: `orchestrator`, `backend-specialist`, `frontend-specialist`, `test-author`, `verifier` và `reviewer`.
+`verifier` và `test-author` là subagent thật, xem `.agent/harness/README.md`.
+Code review chỉ chạy khi user yêu cầu rõ ràng qua skill `code-reviewer` / `code-review` hoặc role `reviewer`.
+`AI_RULES.md` quyết định routing và luôn có ưu tiên cao hơn workflow.
 
 ## Cách gọi không cần Slash Menu
 
@@ -36,7 +42,9 @@ Tương đương slash command:
 | `enhance`         | Muốn sửa màu, thêm nút, sửa logic nhỏ? Vào đây.                                                       |
 | `explain`         | In-depth code explanation, teaching, and knowledge transfer.                                          |
 | `frontend-design` | Thiết kế frontend theo workflow orchestration: context -> UI spec -> build -> audit.                  |
+| `health`          | Đánh giá chỉ đọc về độ ổn định lâu dài: điểm nóng, nợ kỹ thuật, lỗi lặp, lộ trình trả nợ.           |
 | `log-error`       | Ghi lại lỗi vào Error Log để học tập và cải thiện                                                     |
+| `merge-gate`      | Kiểm tra trước merge theo yêu cầu rõ ràng (on-demand): review theo rubric D1-D10 và chạy CI parity khi được cấp quyền. |
 | `mobile`          | native mobile application development and optimization.                                               |
 | `monitor`         | Server và Pipeline có ổn không? Cài đặt giám sát ngay.                                                |
 | `onboard`         | Người mới vào team? Hướng dẫn họ tự động.                                                             |

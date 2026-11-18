@@ -30,10 +30,10 @@
     ".planning/codebase/STACK.md"
   ],
   "limits": {
-    "entrypoint_max_bytes": 6500,
-    "profile_max_bytes": 3000,
-    "fast_max_estimated_tokens": 2400,
-    "standard_max_estimated_tokens": 5000,
-    "governed_core_max_estimated_tokens": 11000
+    "entrypoint_max_bytes": 14000,
+    "profile_max_bytes": 4000,
+    "fast_max_estimated_tokens": 4500,
+    "standard_max_estimated_tokens": 7500,
+    "governed_core_max_estimated_tokens": 14500
   }
 }

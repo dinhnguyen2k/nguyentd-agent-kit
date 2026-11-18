@@ -1,12 +1,21 @@
 ---
 trigger: glob
 glob: "backend/**/*,frontend/**/*"
+description: "Test obligations and role boundaries: who writes and runs tests, invariants that require tests, test-spec-conflict."
+condition: ["backend/**/*", "frontend/**/*"]
+interruptMode: never
 ---
 
 # TEST-ENFORCEMENT.MD - Bắt Buộc Có Test
 
+> [!IMPORTANT]
+> **TẠM KHÓA LUỒNG VIẾT UNIT TEST (Chỉ thị user 2026-10-07)**:
+> - Tạm thời dừng toàn bộ việc bắt buộc viết unit test, không tự động sinh slice viết test, không tự spawn `test-author`.
+> - Agent tập trung kiểm tra code thông qua **LSP diagnostics** (syntax, types, compiler) và build check.
+> - Nghiệp vụ logic do người dùng trực tiếp **manual test** để tiết kiệm chi phí token và tăng tốc độ xử lý task.
+
 > Tách từ `AI_RULES.md` mục 9. `AI_RULES.md` vẫn là nguồn sự thật cao nhất.
-> File này nói về nghĩa vụ chạy/viết test khi đổi code production.
+> File này nói về nghĩa vụ chạy/viết test khi đổi code production (tạm thời bị khóa theo chỉ thị trên).
 > Chuẩn viết test xem `.agent/rules/testing-standard.md`.
 
 ## 1. Khi nào phải chạy test và ranh giới Agent
@@ -14,8 +23,9 @@ glob: "backend/**/*,frontend/**/*"
 - **Phân định vai trò:** Việc chạy test suite (`dotnet test`) và kiểm chứng tự động thuộc về Agent nghiệm thu (`verifier`).
 - **Trong task phân tích hoặc task triển khai cục bộ/đơn giản:**
   - Agent triển khai (`backend-specialist` / implementer) **TUYỆT ĐỐI CẤM** tự ý chạy `dotnet test`.
-  - **DO NOT RUN `dotnet build` automatically. ON-DEMAND ONLY:** chỉ chạy khi user
-    yêu cầu rõ build project/scope tương ứng.
+  - **DO NOT RUN `dotnet build` automatically. ON-DEMAND ONLY:** agent triển khai không tự build;
+    guard R8 chặn build trực tiếp. Build/CI chỉ chạy khi user yêu cầu rõ ràng, qua `.agent/scripts/ci-parity.sh`
+    hoặc lệnh build trong phạm vi được cấp dưới role `verifier`/`maintainer` (`AI_RULES.md` §2).
   - Cấm tự tiện chạy test làm phiên làm việc kéo dài bất hợp lý (treo máy, tốn token, phát sinh lỗi từ test không liên quan).
 - **ON-DEMAND ONLY:** activate test execution only when the user explicitly requests
   `verifier` or a test command/scope. `/orchestrate`, risk level, task manifest, or

@@ -32,6 +32,7 @@ Treat the form model and API model as different boundary types when nullability 
 - Do not pass `""` as a controlled Radix Select value unless an explicit empty option exists; prefer `undefined` for no selection.
 - Ignore identical value emissions before forwarding `onChange`.
 - Do not nest buttons or wrap Radix Checkbox/Switch in a parent click-toggle. Use `Label htmlFor` and the control's own handler.
+- Tiêu đề form (SheetTitle/DialogTitle) dùng `FormTitle` shared, không viết tay ternary `mode === 'create'`.
 
 ## Procedure
 

@@ -1,6 +1,8 @@
 ---
 trigger: glob
 glob: "**/*"
+description: "Solution selection and complexity budget: understand deeply, reuse aggressively, change minimally."
+alwaysApply: true
 ---
 
 # SOLUTION-COMPLEXITY.MD - Chọn Giải Pháp & Ngân Sách Độ Phức Tạp
@@ -26,6 +28,7 @@ Trước khi viết code, đọc flow bị chạm, nearest test và pattern hi�
   nhiều implementation/consumer, concern thay đổi độc lập, hoặc nhu cầu
   testability/vận hành đã xác minh. Tôn trọng architecture layer hiện hữu;
   không bypass chúng chỉ để diff nhỏ hơn.
+- Ở Frontend: KHÔNG tách file quá nhỏ (micro-files, micro-components, micro-hooks) khi chỉ phục vụ nội bộ một màn hình hay một form; tránh làm loãng source và phân mảnh logic gây khó khăn khi bảo trì. Ưu tiên co-location (giữ chung file) trừ khi có nhu cầu tái sử dụng thực tế.
 - Với bug: xác lập và sửa root cause dựa trên evidence; đánh giá caller/consumer
   liên quan khi nguyên nhân có thể dùng chung. Deletion hoặc simplification là
   giải pháp hợp lệ nếu vẫn giữ contract và invariant.
