@@ -3,7 +3,9 @@
   "cases": [
     {
       "id": "baseservice-select-hook",
-      "skills": ["cogain-baseservice-hooks"],
+      "skills": [
+        "cogain-baseservice-hooks"
+      ],
       "query": "Add a custom statusCode filter that must work in GetPaged, GetAll and GetDropdown for a Cogain service.",
       "expected_behavior": [
         "Inspects BaseService and a nearby override before choosing a seam",
@@ -17,18 +19,24 @@
     },
     {
       "id": "baseservice-update-order",
-      "skills": ["cogain-baseservice-hooks"],
+      "skills": [
+        "cogain-baseservice-hooks"
+      ],
       "query": "Resolve snapshots for newly synchronized child rows during Update.",
       "expected_behavior": [
         "Recognizes AfterMappingAsync runs before child synchronization",
         "Uses AfterReconcileCollectionsAsync when synchronized children must already exist",
         "Assesses remote-write consistency"
       ],
-      "forbidden_behavior": ["Assumes AfterMappingAsync can see incoming synchronized children"]
+      "forbidden_behavior": [
+        "Assumes AfterMappingAsync can see incoming synchronized children"
+      ]
     },
     {
       "id": "child-sync-natural-key",
-      "skills": ["cogain-child-sync"],
+      "skills": [
+        "cogain-child-sync"
+      ],
       "query": "Add OperationDetails collection synchronization to ProductionEstimate; payload rows may omit Id.",
       "expected_behavior": [
         "Entity implements ISyncsChildren<ProductionEstimate>",
@@ -44,7 +52,9 @@
     },
     {
       "id": "excel-hook-only",
-      "skills": ["cogain-excel-import-export"],
+      "skills": [
+        "cogain-excel-import-export"
+      ],
       "query": "Customize Product Excel import with batch gRPC lookup and add two template columns.",
       "expected_behavior": [
         "Keeps ImportFromExcel orchestration in BaseService",
@@ -52,22 +62,32 @@
         "Batch-loads gRPC lookup data",
         "Keeps parser, template, validation, and export columns consistent"
       ],
-      "forbidden_behavior": ["Overrides ImportFromExcel", "Calls gRPC once per row or cell"]
+      "forbidden_behavior": [
+        "Overrides ImportFromExcel",
+        "Calls gRPC once per row or cell"
+      ]
     },
     {
       "id": "query-invalidation-family",
-      "skills": ["cogain-query-cache"],
+      "skills": [
+        "cogain-query-cache"
+      ],
       "query": "After updating a Job, the detail refreshes but paged, all, and dropdown views remain stale.",
       "expected_behavior": [
         "Finds the existing Job query-key family and its consumers",
         "Invalidates the affected stable prefixes including parameter variants",
         "Avoids a global cache clear"
       ],
-      "forbidden_behavior": ["Invents unrelated query keys", "Reloads the page to hide stale cache"]
+      "forbidden_behavior": [
+        "Invents unrelated query keys",
+        "Reloads the page to hide stale cache"
+      ]
     },
     {
       "id": "form-nullable-hydration",
-      "skills": ["cogain-form-rhf-zod"],
+      "skills": [
+        "cogain-form-rhf-zod"
+      ],
       "query": "Edit hydration fails because API fromWarehouseId is null while the form schema expects a string.",
       "expected_behavior": [
         "Maps API data to form-safe values during reset",
@@ -81,24 +101,68 @@
     },
     {
       "id": "form-effect-loop",
-      "skills": ["cogain-form-rhf-zod", "cogain-agent-gotchas"],
+      "skills": [
+        "cogain-form-rhf-zod",
+        "cogain-agent-gotchas"
+      ],
       "query": "A watched React Hook Form field is set inside useEffect and causes Maximum update depth exceeded.",
       "expected_behavior": [
         "Makes the effect idempotent by comparing getValues before setValue",
         "Hoists watched values instead of calling watch in dependency expressions",
         "Adds regression coverage when practical"
       ],
-      "forbidden_behavior": ["Uses a changing key prop to force remounts as the primary fix"]
+      "forbidden_behavior": [
+        "Uses a changing key prop to force remounts as the primary fix"
+      ]
     },
     {
       "id": "gotcha-endpoint-verification",
-      "skills": ["cogain-agent-gotchas"],
+      "skills": [
+        "cogain-agent-gotchas"
+      ],
       "query": "Create a new frontend query for item-templates/production-order-source.",
       "expected_behavior": [
         "Verifies the route exists in backend controllers or existing clients before implementation",
         "Uses an existing endpoint/local derivation if the proposed route does not exist"
       ],
-      "forbidden_behavior": ["Implements a client call to an unverified endpoint"]
+      "forbidden_behavior": [
+        "Implements a client call to an unverified endpoint"
+      ]
+    },
+    {
+      "id": "screen-archetype-payroll-report",
+      "skills": [
+        "cogain-screen-archetypes"
+      ],
+      "query": "Build a new ServiceDesk payroll period report with summary tabs, paginated detail table, and Excel export.",
+      "expected_behavior": [
+        "Backend uses PayrollReportQueryHelper.TryResolvePayrollPeriod and GetClosedWorkItemIdsAsync (EWorkItemStatus.Closed) cutting on HrConfirmedDate",
+        "Backend orchestrates endpoints with ReportExecution.RunPageAsync/RunReadAsync/RunExportAsync and ExcelReportWriter/ReportCol/ExcelReportLabels",
+        "Frontend composes ReportLayout, ReportPanel, ReportSummaryTable, ReportDetailTable, ReportFilterChips, PayrollPeriodInput, and useReportQueries hooks",
+        "Formats money and dates via @shared/lib helpers without cross-importing another route's _components or -components"
+      ],
+      "forbidden_behavior": [
+        "Counts unclosed documents or cuts payroll period by CreatedDate without business confirmation",
+        "Cross-imports formatVndSafe or local helpers from another route's _components/-components folder",
+        "Imports from the @shared/components barrel instead of direct component file paths"
+      ]
+    },
+    {
+      "id": "screen-archetype-crud-list-and-hr-confirm",
+      "skills": [
+        "cogain-screen-archetypes"
+      ],
+      "query": "Create a CRUD document list page with delete action, URL search filters, and an HR confirmation transition.",
+      "expected_behavior": [
+        "List uses MasterDetailLayout, TableToolbar, CustomTable with rowActions (RowActionsConfig), ColumnCode, DoubleLineCell, and useAuditColumns",
+        "Route SearchSchema uses .optional() instead of .catch('') to keep URL params clean",
+        "HR confirm backend registers ISnapshotPolicy<HrConfirmSnapshotCommand, TEntity> and writes HrConfirmedDate/HrConfirmedById when EWorkItemStatus.Closed",
+        "HRM hr-confirm list fixes currentStepCode to HR_CONFIRM and reuses hr-confirm-utils.ts"
+      ],
+      "forbidden_behavior": [
+        "Builds a manual id: 'actions' column or standalone DeleteConfirm state instead of CustomTable rowActions",
+        "Uses .catch('') in route SearchSchema or z.string().uuid() for .NET Guid fields"
+      ]
     }
   ]
 }

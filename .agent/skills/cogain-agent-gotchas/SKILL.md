@@ -15,16 +15,25 @@ Read the relevant category before editing code near a previously failed boundary
 - Verify a backend endpoint exists before adding a frontend query. Search controller routes and existing service clients.
 - Parameters not declared on an AutoFilter request model can be silently ignored. Put supported dynamic predicates in the `Filters` expression unless the endpoint explicitly binds a property.
 
-## API-to-Form Hydration
+## API-to-Form Hydration & Zod 4
 
 - Nullable backend IDs and arrays must be mapped into schema-safe form values.
 - `value ?? []` does not normalize a non-null string into an array. Use an explicit type guard/normalizer.
+- Zod 4: dùng `z.guid()` cho ID `.NET` thay vì `z.string().uuid()` vì GUID không chuẩn RFC sẽ bị reject im lặng trên phần tử mảng.
+- Form dùng `CreatorSelector`/`useRefDocSelector` bắt buộc giữ `createdById` và `createdOrganizationId` xuyên suốt schema -> defaults -> submit payload -> `CreateWorkItemRequest`.
+- Route `SearchSchema` dùng `.optional()` và đặt default khi đọc; cấm `.catch('')` hoặc default cứng làm bẩn URL.
 
-## EF Core Reflection and Children
+## EF Core Reflection, Excel Import & Children
 
 - Reflection-based navigation discovery must exclude `[NotMapped]` properties.
 - Removing a child from a tracked required-FK navigation can sever the association and try to set the FK to null. Use aggregate-owned soft-delete sync via [skill:cogain-child-sync].
 - Non-null DB snapshot columns require complete resolver/mapping coverage and a business-valid fallback; `?? string.Empty` only prevents null and does not prove semantic validity.
+- Batch Excel import không kích hoạt tra cứu snapshot gRPC khi cột mã tham chiếu để trống: giữ `Guid.Empty` ở provisional graph và bảo lưu nguyên trạng ID/snapshot cũ khi update.
+
+## Screen Archetypes & Shared UI
+
+- Dùng [skill:cogain-screen-archetypes] làm chuẩn duy nhất cho báo cáo kỳ lương (`PayrollReportQueryHelper`, `ReportExecution`, `ReportLayout`) và thao tác dòng `CustomTable` `rowActions` (`RowActionsConfig`).
+- Cấm import chéo `_components`/`-components` giữa các route; helper tiền/ngày lấy từ `@shared/lib`.
 
 ## React Feedback Loops
 

@@ -33,6 +33,12 @@ $ARGUMENTS
    Mapping phải dựa trên DTO/type, FK và flow đã đọc: phân biệt ID của thực thể nguồn với ID của dòng đích, quan hệ 1:1/1:N và khóa giữ các dòng trùng công đoạn.
    Không dùng field dự phòng, ID thay thế hoặc default khi chưa có contract quy định; thiếu bằng chứng thì chưa dispatch.
    Với flow cần thiết, chốt transaction, compensation, tracking/replay và cancellation ownership.
+   Trước khi giao viết tính năng, màn hình, luồng duyệt hoặc báo cáo mới: bắt buộc đối chiếu `[skill:cogain-screen-archetypes]` và chốt đủ 5 bất biến nghiệp vụ (nếu mã nguồn chưa tường minh thì phải hỏi gọn người dùng trước khi giao code):
+   (1) Trạng thái vòng đời hợp lệ được tính số liệu (`EWorkItemStatus.Closed` so với trạng thái bảng nội bộ);
+   (2) Mốc thời gian hiệu lực nghiệp vụ (`HrConfirmedDate` so với `CreatedDate` hoặc `ExecutionDate`);
+   (3) Quy tắc cắt kỳ thời gian và helper chuẩn (`AttendanceReportPeriod` / `PayrollReportQueryHelper` so với `PeriodId`);
+   (4) Khuôn mẫu giao diện/dịch vụ chuẩn theo `[skill:cogain-screen-archetypes]` (cấm chép helper nội bộ từ `_components`/`-components` của route khác);
+   (5) Cách xử lý dữ liệu cũ chưa có trường mới.
 5. Hoàn tất prerequisite trước khi giao slice phụ thuộc; phản biện phương án theo phase **Solution Critic** bên dưới trước implement/dispatch.
 
 Main sở hữu tính khả thi và quyết định thiết kế cùng ranh giới rủi ro cao một lần; không dựng thêm planner chỉ để diễn giải lại quyết định của Main.
@@ -184,6 +190,7 @@ Sau khi sửa, worker đối chiếu delta với acceptance và bàn giao kết 
 Worker tự quyết chi tiết cục bộ tương đương như tên biến, guard clause và cấu trúc biểu thức.
 Không mời worker đánh giá lại giải pháp, tìm phương án tốt hơn hoặc tự chọn business default, API, transaction/retry/compensation boundary hay abstraction mới.
 Thiếu symbol, source trái contract, reuse không đáp ứng invariant hoặc cần vượt scope: dừng phần liên quan, trả Main `path:line`, expected/actual và điểm cần chốt; phần độc lập vẫn làm tiếp.
+Khi phát hiện trong cùng phân hệ đã có helper hoặc component chuẩn thuộc `[skill:cogain-screen-archetypes]` mà contract bỏ sót hoặc bắt import chéo nội bộ route khác (`_components`/`-components`), worker phải dừng và báo ngay cho Main kèm `path:line` trước khi tự chế hoặc sao chép code.
 Đây là stop condition mặc định, không cần diễn giải lại ở nhiều section.
 
 ## Điều kiện dispatch

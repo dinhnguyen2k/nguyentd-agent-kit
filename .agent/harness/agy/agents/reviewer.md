@@ -3,7 +3,7 @@ name: reviewer
 description: "Cogain code reviewer. Reviews a diff or file set against AI_RULES.md, domain rules, and review skills; reports findings with evidence and never edits."
 model: inherit
 subagent: true
-tools: [read_file, view_file, grep_search, find_by_name, list_dir, run_command, call_mcp_tool, list_resources, read_resource]
+tools: [read_file, view_file, grep_search, find_by_name, list_dir, run_command, call_mcp_tool]
 ---
 
 <!-- File sinh bởi .agent/scripts/install-harness-wiring.sh. Sửa header ở .agent/harness/agy/agents/. -->

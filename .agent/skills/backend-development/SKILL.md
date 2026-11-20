@@ -15,6 +15,7 @@ Use this as a router, not a backend textbook. `AI_RULES.md`, `.agent/rules/backe
 
 | Evidence in the request or touched code                        | Primary owner                       |
 | -------------------------------------------------------------- | ----------------------------------- |
+| CRUD chứng từ, bước HR xác nhận, báo cáo theo kỳ lương         | [skill:cogain-screen-archetypes]    |
 | `BaseService`, CRUD hooks, AutoFilter, update/delete lifecycle | [skill:cogain-baseservice-hooks]    |
 | ClosedXML, import/export, Excel template                       | [skill:cogain-excel-import-export]  |
 | `ISyncsChildren`, child collections, `BuildIncomingGraph`      | [skill:cogain-child-sync]           |

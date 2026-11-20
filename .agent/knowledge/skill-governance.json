@@ -165,6 +165,11 @@
       "ownerAfterCleanup": "AI_RULES.md"
     },
     {
+      "name": "blog",
+      "reason": "Blog publishing workflow is outside the Cogain ERP product scope.",
+      "ownerAfterCleanup": "none"
+    },
+    {
       "name": "brainstorming",
       "reason": "Duplicates the /brainstorm workflow and brainstorm skill.",
       "ownerAfterCleanup": "brainstorm"
@@ -173,6 +178,16 @@
       "name": "code-review-excellence",
       "reason": "Process/mentoring prose; code-review and code-reviewer carry the procedure.",
       "ownerAfterCleanup": "code-review"
+    },
+    {
+      "name": "compliance",
+      "reason": "Generic GDPR/HIPAA/SOC2 policy template outside Cogain ERP code guidance.",
+      "ownerAfterCleanup": "security"
+    },
+    {
+      "name": "create",
+      "reason": "Generic end-to-end app scaffold conflicts with Cogain monorepo and /plan workflow.",
+      "ownerAfterCleanup": "plan"
     },
     {
       "name": "cro-expert-kit",
@@ -200,8 +215,28 @@
       "ownerAfterCleanup": "database-migrations-sql-migrations"
     },
     {
+      "name": "deploy",
+      "reason": "Generic Vercel/server deployment flow outside Cogain self-hosted setup.",
+      "ownerAfterCleanup": "none"
+    },
+    {
       "name": "docker-expert",
       "reason": "Container authoring is not current agent scope.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "document",
+      "reason": "Generic document-writing wrapper overlapping docs-architect and update-docs.",
+      "ownerAfterCleanup": "docs-architect"
+    },
+    {
+      "name": "enhance",
+      "reason": "Generic UI/tweak wrapper conflicting with Cogain shared archetypes and /plan.",
+      "ownerAfterCleanup": "cogain-screen-archetypes"
+    },
+    {
+      "name": "explain",
+      "reason": "Generic teaching/explanation prompt already handled natively without a dedicated skill.",
       "ownerAfterCleanup": "none"
     },
     {
@@ -245,9 +280,24 @@
       "ownerAfterCleanup": "none"
     },
     {
+      "name": "mobile",
+      "reason": "Native mobile development is outside the Cogain React/Vite web ERP stack.",
+      "ownerAfterCleanup": "none"
+    },
+    {
       "name": "modern-javascript-patterns",
       "reason": "ES6+ tutorial content already implied by the TS stack.",
       "ownerAfterCleanup": "typescript-pro"
+    },
+    {
+      "name": "monitor",
+      "reason": "Generic server/pipeline monitoring setup outside Cogain feature engineering.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "onboard",
+      "reason": "Generic onboarding wrapper outside active Cogain engineering routing.",
+      "ownerAfterCleanup": "none"
     },
     {
       "name": "parallel-agents",
@@ -265,6 +315,11 @@
       "ownerAfterCleanup": "concise-planning"
     },
     {
+      "name": "portfolio",
+      "reason": "Personal portfolio landing page setup is outside Cogain ERP scope.",
+      "ownerAfterCleanup": "none"
+    },
+    {
       "name": "posix-shell-pro",
       "reason": "Generic shell guidance outside the Cogain stack.",
       "ownerAfterCleanup": "none"
@@ -273,6 +328,11 @@
       "name": "postgres-best-practices",
       "reason": "Supabase and Prisma guidance does not match Cogain PostgreSQL/EF Core ownership.",
       "ownerAfterCleanup": "postgresql"
+    },
+    {
+      "name": "preview",
+      "reason": "Generic preview wrapper superseded by playwright-skill and explicit user runtime checks.",
+      "ownerAfterCleanup": "playwright-skill"
     },
     {
       "name": "react-best-practices",
@@ -293,6 +353,16 @@
       "name": "senior-architect",
       "reason": "Too broad, multi-stack persona overlaps architecture and project-native routing.",
       "ownerAfterCleanup": "architecture"
+    },
+    {
+      "name": "seo",
+      "reason": "SEO/GEO marketing optimization is outside internal Cogain ERP apps.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "status",
+      "reason": "Generic status dashboard prompt outside Cogain engineering workflows.",
+      "ownerAfterCleanup": "none"
     },
     {
       "name": "subagent-driven-development",
@@ -323,6 +393,21 @@
       "name": "typescript-expert",
       "reason": "Overlaps typescript-pro, which frontend-development already routes to.",
       "ownerAfterCleanup": "typescript-pro"
+    },
+    {
+      "name": "ui-ux-pro-max",
+      "reason": "Generic marketing/landing UI aesthetic noise conflicts with Cogain shared components and design tokens.",
+      "ownerAfterCleanup": "cogain-screen-archetypes"
+    },
+    {
+      "name": "update",
+      "reason": "IDE version update helper is unrelated to Cogain app development.",
+      "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "visually",
+      "reason": "Generic diagramming wrapper outside core Cogain engineering workflows.",
+      "ownerAfterCleanup": "none"
     },
     {
       "name": "writing-plans",

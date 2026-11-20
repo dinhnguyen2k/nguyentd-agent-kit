@@ -102,3 +102,13 @@ Mỗi lỗi lặp lại 2 lần trở lên PHẢI được biến thành:
 - **Rule mới**: Để ngăn chặn tự động
 - **Test case**: Để phát hiện sớm
 - **Checklist item**: Trong pre-flight check
+
+---
+
+## 🔁 7. Phản hồi Refactor từ Người dùng & Phân luồng 4 Lớp Kiểm soát
+
+Khi người dùng phải yêu cầu cấu trúc lại hoặc làm lại UI/nghiệp vụ từ >= 2 vòng trên cùng một màn hình hoặc luồng nghiệp vụ, bắt buộc ghi nhận bản ghi vào `.planning/errors/ERRORS.md` và phân luồng khắc phục vào đúng tầng thay vì nhồi chữ vào prompt chung:
+
+- **Lớp 1 (Shared helper/API/component)**: Đóng gói pattern tái dùng thành building block chuẩn (`BuildingBlocks`, `frontend/shared/`) và dọn dẹp mẫu xấu lân cận để không lây lan khi agent tham khảo code cũ.
+- **Lớp 2 (Luật tĩnh & Guard)**: Bổ sung luật kiểm tra tự động (ESLint, LSP, boundary/validation script) để chặn lỗi cú pháp/import chéo ngay lúc viết code.
+- **Lớp 4 (Archetype & Discovery Gate)**: Cập nhật `[skill:cogain-screen-archetypes]` hoặc `[skill:cogain-agent-gotchas]` (kèm cổng 5 bất biến nghiệp vụ tại `.agent/workflows/plan.md`) để agent khóa đúng khuôn mẫu và nghiệp vụ trước khi code.

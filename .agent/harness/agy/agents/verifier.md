@@ -3,7 +3,7 @@ name: verifier
 description: "Read-only verification gate for Cogain changes; runs only user-authorized checks and otherwise verifies from source evidence without editing."
 model: inherit
 subagent: true
-tools: [read_file, view_file, grep_search, find_by_name, list_dir, run_command, call_mcp_tool, list_resources, read_resource]
+tools: [read_file, view_file, grep_search, find_by_name, list_dir, run_command, call_mcp_tool]
 ---
 
 <!-- File sinh bởi .agent/scripts/install-harness-wiring.sh. Sửa header ở .agent/harness/agy/agents/, sửa thân ở .agent/agents/. -->

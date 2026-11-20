@@ -15,6 +15,7 @@ Use this as a router, not a React textbook. `AI_RULES.md`, `.agent/rules/fronten
 
 | Evidence in request or code                              | Primary owner                                                            |
 | -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Màn danh sách CRUD, form chứng từ, HR xác nhận, báo cáo kỳ lương | [skill:cogain-screen-archetypes]                                         |
 | TanStack Query keys/mutations/invalidation               | [skill:cogain-query-cache]                                               |
 | React Hook Form, Zod, reset/hydration, nullable IDs      | [skill:cogain-form-rhf-zod]                                              |
 | Recurring API, EF-to-UI, Radix, effect, or table failure | [skill:cogain-agent-gotchas]                                             |
@@ -35,21 +36,9 @@ Không nạp reference search/filter khi task chỉ sửa layout, màu sắc, fo
 
 ## UI reference (on demand)
 
-Rule text excerpted from evondevKit `ui-ux` lives in `references/ui-ux-evondev/` (source and license: its `README.md`).
-Read only the file matching the UI surface you are changing; never load the folder.
-
-| Changing | Read |
-| --- | --- |
-| New screen or section, scope, state mapping | `references/ui-ux-evondev/rules-core.md` |
-| Card/grid/table nesting, dividers | `references/ui-ux-evondev/rules-layout.md` |
-| Text, numbers, truncation, codes, dates, copy | `references/ui-ux-evondev/rules-text.md` |
-| Hover, row actions, loading/empty/error, modal dismiss, labels, password, focus after delete | `references/ui-ux-evondev/rules-interaction.md` |
-| Narrow screens, wide tables, raw `<button>`, `ring-*`, transitions, `@theme`/`:root` vars | `references/ui-ux-evondev/responsive-tailwind.md` |
-| Page header, breadcrumb placement, 404/403/500 | `references/ui-ux-evondev/layout-page.md` |
-| Multi-field or multi-step form, field errors, hints, char limits | `references/ui-ux-evondev/layout-form.md` |
-| Confirm dialog, modal, sheet, dropdown, filter popover | `references/ui-ux-evondev/layout-overlay.md` |
-| That component | `references/ui-ux-evondev/components/<button\|breadcrumb\|description-list\|inline-edit\|empty-state\|file-upload\|quantity-input\|charts>.md` |
-| Self-check before handoff of UI work | `references/ui-ux-evondev/review-taxonomy.md` |
+Shared components in `frontend/shared/` and [skill:cogain-screen-archetypes] are priority #1.
+Only open a matching file in `references/ui-ux-evondev/` (never load the whole folder) when needing detailed micro-interaction rules not defined by shared components:
+`rules-core.md` (states), `rules-layout.md` (nesting), `rules-text.md` (text/numbers/dates), `rules-interaction.md` (hover/loading/empty/focus), `responsive-tailwind.md`, `layout-page.md`, `layout-form.md`, `layout-overlay.md`, `components/<button|breadcrumb|description-list|inline-edit|empty-state|file-upload|quantity-input|charts>.md`, `review-taxonomy.md`.
 
 Cogain overrides win over every file above:
 
