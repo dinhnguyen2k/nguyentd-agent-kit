@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
-type GuardCheck = { tool_name: "Bash" | "Write"; tool_input: { command?: string; file_path?: string } };
+type GuardCheck = { tool_name: "Bash" | "Write"; tool_input: { command?: string; file_path?: string; new_content?: string } };
 
 const GUARD_REL = join(".agent", "scripts", "agent-boundary-guard.mjs");
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
@@ -59,8 +59,10 @@ function parseJson(text: unknown): Record<string, unknown> {
 	}
 }
 
-function writes(paths: string[]): GuardCheck[] {
-	return paths.filter(p => !URL_SCHEME.test(p)).map(p => ({ tool_name: "Write", tool_input: { file_path: p } }));
+function writes(paths: string[], newContent?: string | null): GuardCheck[] {
+	return paths
+		.filter(p => !URL_SCHEME.test(p))
+		.map(p => ({ tool_name: "Write", tool_input: { file_path: p, ...(newContent ? { new_content: newContent } : {}) } }));
 }
 
 function toChecks(toolName: string, input: Record<string, unknown>): GuardCheck[] {
@@ -71,17 +73,23 @@ function toChecks(toolName: string, input: Record<string, unknown>): GuardCheck[
 	if (toolName === "edit" || toolName === "apply_patch") {
 		const text = Object.values(input).filter((v): v is string => typeof v === "string").join("\n");
 		const found = EDIT_PATH_PATTERNS.flatMap(p => [...text.matchAll(p)].map(m => m[1].trim()));
-		return writes([...found, ...argPaths(input)]);
+		const newContent = str(input.newText) ?? str(input.new_string) ?? str(input.content);
+		return writes([...found, ...argPaths(input)], newContent);
 	}
 	if (toolName === "write") {
 		const path = str(input.path);
 		if (!path) return [];
 		const device = path.match(/^xd:\/\/([\w-]+)/)?.[1];
-		if (!device) return writes([path]);
-		if (device === "ast_edit" || MCP_FS_WRITE.test(device)) return writes(argPaths(parseJson(input.content)));
+		if (!device) return writes([path], str(input.content));
+		if (device === "ast_edit" || MCP_FS_WRITE.test(device)) {
+			const mcpArgs = parseJson(input.content);
+			return writes(argPaths(mcpArgs), str(mcpArgs.content) ?? str(mcpArgs.newText) ?? str(mcpArgs.new_string));
+		}
 		return [];
 	}
-	if (toolName === "ast_edit" || MCP_FS_WRITE.test(toolName)) return writes(argPaths(input));
+	if (toolName === "ast_edit" || MCP_FS_WRITE.test(toolName)) {
+		return writes(argPaths(input), str(input.content) ?? str(input.newText) ?? str(input.new_string));
+	}
 	if (toolName === "eval") {
 		const code = str(input.code);
 		if (!code) return [];
@@ -114,7 +122,7 @@ export default function boundaryGuard(pi: ExtensionAPI): void {
 			const input = (event.input ?? {}) as Record<string, unknown>;
 			const checks = toChecks(event.toolName, input).map(c =>
 				c.tool_input.file_path && !isAbsolute(c.tool_input.file_path)
-					? { ...c, tool_input: { file_path: resolve(ctx.cwd, c.tool_input.file_path) } }
+					? { ...c, tool_input: { ...c.tool_input, file_path: resolve(ctx.cwd, c.tool_input.file_path) } }
 					: c,
 			);
 			// Subagent: tên agent là danh tính thật để guard áp write boundary (R4). Main: guard tự lấy env/state/default.

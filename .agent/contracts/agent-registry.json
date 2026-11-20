@@ -188,6 +188,31 @@
         "applies_to": ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"],
         "allowed_roles": ["maintainer"],
         "deny_message": "Permission Denied: CẤM TUYỆT ĐỐI Agent tự viết tay hoặc chỉnh sửa file migration/snapshot EF Core. Phải sửa Entity/Fluent API Configuration rồi sinh migration qua ./dev.sh add-migration <Service> <MigrationName> khi user yêu cầu rõ ràng (backend.md §4.6)."
+      },
+      "code_conventions": {
+        "id": "R10",
+        "applies_to": ["Edit", "Write", "MultiEdit"],
+        "allowed_roles": ["maintainer"],
+        "checks": [
+          {
+            "id": "no-shared-barrel",
+            "path_globs": ["frontend/**/*.ts", "frontend/**/*.tsx"],
+            "pattern": "from\\s+['\"]@shared/(?:components|hooks|services)(?:/index|/master-data(?:/index)?)?['\"]",
+            "message": "Cấm import qua barrel '@shared/components|hooks|services'. Hãy import trực tiếp từ file định nghĩa (ví dụ '@shared/components/custom-table', '@shared/hooks/use-audit-columns')."
+          },
+          {
+            "id": "no-zod-uuid",
+            "path_globs": ["frontend/**/*.ts", "frontend/**/*.tsx"],
+            "pattern": "\\.\\s*uuid\\s*\\(",
+            "message": "Cấm dùng '.uuid()' của Zod 4 cho ID .NET vì từ chối ngầm GUID không chuẩn RFC. Hãy dùng 'z.guid()'."
+          },
+          {
+            "id": "no-route-catch-empty",
+            "path_globs": ["frontend/*/src/routes/**/*.ts", "frontend/*/src/routes/**/*.tsx"],
+            "pattern": "\\.catch\\(\\s*['\"]{2}\\s*\\)",
+            "message": "Cấm dùng \".catch('')\" trong SearchSchema của route vì làm tràn query param rỗng lên URL. Hãy dùng '.optional()' và đặt default khi đọc."
+          }
+        ]
       }
     }
   },

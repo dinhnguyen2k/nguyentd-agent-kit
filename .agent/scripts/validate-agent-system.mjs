@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { deriveTaskManifest, readLegacyEvidence, readTaskContract, readTaskLifecycle, validateContractSchema } from './task-contract.mjs';
@@ -24,7 +25,10 @@ function walk(directory, predicate = () => true) {
   if (!existsSync(directory)) return [];
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) return walk(path, predicate);
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules') return [];
+      return walk(path, predicate);
+    }
     return predicate(path) ? [path] : [];
   });
 }
@@ -278,7 +282,23 @@ function validateTaskManifestSchema() {
         }
       }
     } catch (error) {
-      errors.push(`${label}: ${error.message}`);
+      if (error.code === 'INACTIVE_CONTRACT') {
+        const lifecyclePath = join(dirname(manifest.contract_ref), '00-OVERVIEW.md').replace(/\\/g, '/');
+        const lifecycle = readTaskLifecycle(repoRoot, lifecyclePath);
+        const canonicalLifecycle = JSON.stringify(lifecycle, (_, entry) =>
+          entry && typeof entry === 'object' && !Array.isArray(entry)
+            ? Object.fromEntries(Object.keys(entry).sort().map((k) => [k, entry[k]]))
+            : entry
+        );
+        const expectedLifecycleHash = createHash('sha256').update(canonicalLifecycle).digest('hex');
+        if (manifest.lifecycle_hash !== expectedLifecycleHash) {
+          errors.push(`${label}: derived field 'lifecycle_hash' differs from canonical lifecycle; regenerate when authorized`);
+        } else {
+          warnings.push(`${label}: ${error.message}`);
+        }
+      } else {
+        errors.push(`${label}: ${error.message}`);
+      }
     }
   }
   for (const path of walk(join(repoRoot, '.agent', 'task-manifests'), (file) => file.endsWith('.json'))) {
@@ -298,7 +318,23 @@ function validateTaskManifestSchema() {
         }
       }
     } catch (error) {
-      errors.push(`${label}: ${error.message}`);
+      if (error.code === 'INACTIVE_CONTRACT') {
+        const lifecyclePath = join(dirname(manifest.contract_ref), '00-OVERVIEW.md').replace(/\\/g, '/');
+        const lifecycle = readTaskLifecycle(repoRoot, lifecyclePath);
+        const canonicalLifecycle = JSON.stringify(lifecycle, (_, entry) =>
+          entry && typeof entry === 'object' && !Array.isArray(entry)
+            ? Object.fromEntries(Object.keys(entry).sort().map((k) => [k, entry[k]]))
+            : entry
+        );
+        const expectedLifecycleHash = createHash('sha256').update(canonicalLifecycle).digest('hex');
+        if (manifest.lifecycle_hash !== expectedLifecycleHash) {
+          errors.push(`${label}: derived field 'lifecycle_hash' differs from canonical lifecycle; regenerate when authorized`);
+        } else {
+          warnings.push(`${label}: ${error.message}`);
+        }
+      } else {
+        errors.push(`${label}: ${error.message}`);
+      }
     }
   }
 }

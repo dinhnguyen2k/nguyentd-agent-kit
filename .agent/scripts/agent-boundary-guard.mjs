@@ -14,6 +14,7 @@
  *   R8 build-runner   - build/typecheck chỉ khi user yêu cầu; role được phép theo registry.
  *   R7 migration-write - cấm tự viết/sửa file migration/snapshot EF Core.
  *   R9 migration-runner - cấm tự sinh/chạy migration EF Core (add-migration, dotnet ef).
+ *   R10 code-conventions - chặn mẫu code frontend bị cấm (@shared barrel, .uuid(), .catch('')).
  *
  * Role được phân giải theo thứ tự: payload subagent -> env COGAIN_AGENT_ROLE ->
  * file state (TTL 8h) -> mặc định `implementer` (chặt nhất).
@@ -161,11 +162,13 @@ if (argv.length > 0) {
   if (roleArg) process.env.COGAIN_AGENT_ROLE = roleArg;
   const command = flag("--check-command");
   const writePath = flag("--check-write");
+  const contentArg = flag("--content");
   if (command) payload = { tool_name: "Bash", tool_input: { command } };
-  else if (writePath) payload = { tool_name: "Write", tool_input: { file_path: writePath } };
-  else {
+  else if (writePath) {
+    payload = { tool_name: "Write", tool_input: { file_path: writePath, ...(contentArg ? { new_content: contentArg } : {}) } };
+  } else {
     process.stderr.write(
-      "usage: agent-boundary-guard.mjs --check-command <cmd> | --check-write <path> [--role <role>]\n"
+      "usage: agent-boundary-guard.mjs --check-command <cmd> | --check-write <path> [--content <text>] [--role <role>]\n"
     );
     process.exit(1);
   }
@@ -376,6 +379,22 @@ try {
           `Permission Denied: '${role}' là cổng kiểm định read-only, không được sửa file.\n` +
             `Gate đỏ thì trả về cho implementer, không tự vá.`
         );
+      }
+    }
+
+    // R10: convention code (chỉ kiểm tra nội dung mới đưa vào lệnh sửa/ghi).
+    const r10 = rules.code_conventions || {};
+    const writtenText =
+      input.new_content ??
+      input.new_string ??
+      (Array.isArray(input.edits) ? input.edits.map((e) => e?.new_string || "").join("\n") : null) ??
+      input.content ??
+      "";
+    if (writtenText && !(r10.allowed_roles || []).includes(role)) {
+      for (const chk of r10.checks || []) {
+        if (matchesAny(target, chk.path_globs) && new RegExp(chk.pattern).test(writtenText)) {
+          deny(`R10-${chk.id}`, role, `Permission Denied: ${chk.message}\n\nFile: ${target}`);
+        }
       }
     }
     allow();

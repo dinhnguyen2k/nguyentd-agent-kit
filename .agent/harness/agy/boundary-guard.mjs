@@ -90,8 +90,26 @@ function argPaths(args) {
   return [...single, ...many].filter((p) => p !== null);
 }
 
-function toWriteChecks(paths) {
-  return [...new Set(paths)].filter((p) => !URL_SCHEME.test(p)).map((p) => ({ tool_name: "Write", tool_input: { file_path: p } }));
+function extractNewContent(args) {
+  return (
+    str(args.Content) ??
+    str(args.Replacement) ??
+    str(args.ReplacementContent) ??
+    str(args.new_string) ??
+    str(args.content) ??
+    (Array.isArray(args.ReplacementChunks)
+      ? args.ReplacementChunks.map((c) => str(c?.ReplacementContent) ?? "").join("\n") || null
+      : null)
+  );
+}
+
+function toWriteChecks(paths, newContent = null) {
+  return [...new Set(paths)]
+    .filter((p) => !URL_SCHEME.test(p))
+    .map((p) => ({
+      tool_name: "Write",
+      tool_input: { file_path: p, ...(newContent ? { new_content: newContent } : {}) },
+    }));
 }
 
 function readWorkflowScript(args, baseCwd) {
@@ -113,18 +131,19 @@ function toChecks(toolName, args, baseCwd) {
     return command ? [{ tool_name: "Bash", tool_input: { command } }] : [];
   }
   if (WRITE_TOOLS.has(toolName)) {
-    return toWriteChecks(argPaths(args));
+    return toWriteChecks(argPaths(args), extractNewContent(args));
   }
   if (toolName === "call_mcp_tool") {
     const server = str(args.ServerName) ?? str(args.serverName) ?? str(args.server_name);
     const mcpTool = str(args.ToolName) ?? str(args.toolName) ?? str(args.tool_name);
     if (server === "filesystem" && mcpTool && MCP_FS_WRITE_TOOLS.has(mcpTool)) {
-      return toWriteChecks(argPaths(parseJsonObject(args.Arguments ?? args.arguments)));
+      const mcpArgs = parseJsonObject(args.Arguments ?? args.arguments);
+      return toWriteChecks(argPaths(mcpArgs), extractNewContent(mcpArgs));
     }
     return [];
   }
   if (MCP_FS_TOOL_RE.test(toolName)) {
-    return toWriteChecks(argPaths(args));
+    return toWriteChecks(argPaths(args), extractNewContent(args));
   }
   if (toolName === "run_workflow" || toolName === "eval") {
     const code = readWorkflowScript(args, baseCwd);
@@ -175,7 +194,7 @@ try {
       ? resolve(check.tool_input.file_path)
       : resolve(baseCwd, check.tool_input.file_path);
     if (skipArtifactDir && isInsideDir(resolved, skipArtifactDir)) return [];
-    return [{ ...check, tool_input: { file_path: resolved } }];
+    return [{ ...check, tool_input: { ...check.tool_input, file_path: resolved } }];
   });
 
   if (checks.length === 0) allow();
