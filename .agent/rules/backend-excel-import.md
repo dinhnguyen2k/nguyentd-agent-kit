@@ -1,8 +1,8 @@
 ---
 trigger: glob
-glob: 'backend/src/Services/**/*.Import*.cs,backend/src/Services/**/*.Export*.cs'
-description: "Backend Excel import/export rules (hook-only architecture, ClosedXML mapping) for backend/src/Services Import/Export code."
-condition: ["backend/src/Services/**/*.Import*.cs", "backend/src/Services/**/*.Export*.cs"]
+glob: 'backend/src/Services/**/*.Import*.cs,backend/src/Services/**/*.Export*.cs,backend/src/Services/**/*ReportService*.cs'
+description: "Backend Excel import/export rules (hook-only architecture, Infrastructure.Services.Excel base, ClosedXML mapping) for backend/src/Services Import/Export/Report code."
+condition: ["backend/src/Services/**/*.Import*.cs", "backend/src/Services/**/*.Export*.cs", "backend/src/Services/**/*ReportService*.cs"]
 interruptMode: never
 ---
 
@@ -139,6 +139,31 @@ Không tự tạo ngoại lệ vì yêu cầu riêng của service; nếu yêu c
 4. Reference sheet headers cũng khai báo tập trung bằng schema hoặc constants, không lặp tên cột ở nhiều nơi.
 5. Protected/reference sheets không được chứa secret hoặc hardcoded credential mới. Nếu phải protect workbook, dùng pattern hiện có và không tăng phạm vi secret.
 
+## 6A. Excel Export Base (`Infrastructure.Services.Excel` — BẮT BUỘC cho code Export mới hoặc đang sửa)
+
+Mọi luồng xuất Excel dữ liệu hoặc báo cáo viết mới / nâng cấp phải dùng bộ base tại `backend/src/BuildingBlocks/Infrastructure/Services/Excel/` thay vì tự dựng `XLWorkbook` hay gọi `AdjustToContents()` thủ công. Các luồng cũ ngoài phạm vi task giữ nguyên ổn định, chỉ dọn cuốn chiếu khi chạm tới.
+
+Chọn đúng 1 trong 2 nhánh theo bản chất dữ liệu xuất:
+
+1. **Xuất dữ liệu theo mẫu nhập (`ExcelDataExporter` trong `GenerateExportDataBytesAsync`):**
+   - Luồng đã có `ExcelSheetDefinition<T>`: dùng `ExcelDataExporter.WriteBytes(ExcelDataSheet.From(rows, definition, overrides...))` (dùng `ExcelDataColumnOverride` nếu cần chỉnh `Width` / `WrapText`).
+   - Luồng bảng phẳng chưa có attribute DTO: dùng `ExcelDataExporter.WriteBytes(ExcelDataSheet.FromColumns(sheetName, rows, columns))` với `ExcelDataColumn<T>`.
+   - **Cấm** tự thêm cột STT, dòng tổng cộng, tiêu đề gộp hay đổi thứ tự cột làm gãy khả năng nhập lại qua `ImportFromExcel`.
+
+2. **Xuất báo cáo để đọc / đối soát (`ExcelReportWriter`):**
+   - Dùng `ExcelReportWriter.Write(new ExcelReport(Sheets: ..., Period: ..., ExportedBy: ..., Filters: ...))`.
+   - Khai báo sheet qua `ReportSheet` (hoặc `ReportSheet.Single(...)` cho sheet 1 bảng, hỗ trợ `FreezeColumns`, `Kpis` qua `ReportKpi`, `CompactHeader` tự động rút gọn đầu sheet chi tiết đi sau sheet tổng quan).
+   - Khai báo bảng qua `ReportTable.Of(rows, columns, title, totalLabel)` giữ nguyên luồng `IEnumerable<TRow>` (không `.ToList()` thừa trước khi ghi).
+   - Khai báo cột qua `ReportCol` (`Index`, `Code`, `Text`, `Bool`, `Int`, `Number`, `Money`, `Percent`, `Duration`, `Date`, `DateTime`). Mặc định `Total = null`; chỉ bật `ReportTotal.Sum()` (tự sinh `SUBTOTAL(9,...)` khi có lọc hoặc `SUM(...)`) hoặc `ReportTotal.Fixed(value, note)` khi nghiệp vụ yêu cầu.
+
+3. **Bất biến bắt buộc của Export mới:**
+   - **Cấm** tự tạo `new XLWorkbook()`, `MemoryStream`, vòng `for` tô style từng ô hoặc gọi `ws.Columns().AdjustToContents()` trong service.
+   - **Cấm** tạo DTO/row class trung gian chỉ để map sang `ExcelSheetWriter`.
+   - Ngày/giờ phải dùng kiểu thật qua `ReportCol.Date` / `ReportCol.DateTime`, **không** format sang `string` (`dd/MM/yyyy`).
+   - Bộ lọc hiển thị ở đầu báo cáo (`ExcelReport.Filters`) phải giải mã sang mã/tên đọc được, **cấm** in GUID thô.
+   - Ẩn/bỏ cột theo quyền ngay khi tạo danh sách `ReportColumn<TRow>` ở tầng service trước khi đưa vào `ReportTable.Of`.
+   - Báo cáo có thể lớn phải đặt trần dòng hợp lý ở service (ví dụ `20_000` dòng) trước khi materialize/xuất.
+
 ## 7. Transaction And Cross-Service Reliability
 
 1. Import flow có local DB + remote gRPC write phải có transaction boundary rõ.
@@ -184,6 +209,7 @@ Reject these patterns in new or modified import/export code:
 7. Rollback that ignores remote side effects.
 8. Exceptions without file/sheet/row context.
 9. Data-driven exceptions (null/duplicate key) inside `ValidateImportDtosAsync`.
+10. Manual `new XLWorkbook()`, `MemoryStream`, per-cell style loops, `AdjustToContents()`, raw GUID filter values, string-formatted dates, or intermediate export-only DTOs in new or modified Export code instead of `ExcelDataExporter` / `ExcelReportWriter`.
 
 ## 11. Upsert Safety (BẮT BUỘC)
 

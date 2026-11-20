@@ -31,7 +31,10 @@ Use the narrow hook that owns parsing, reference preload, validation, entity pre
 3. Parse cells into DTOs with row-aware errors; do not persist partially validated rows accidentally.
 4. Preserve base transaction and result behavior.
 5. If a remote write occurs before local commit, define compensation/reconciliation before implementation.
-6. Generate templates/data through byte-generation and filename hooks rather than replacing upload/storage orchestration.
+6. Generate templates through byte-generation and filename hooks rather than replacing upload/storage orchestration.
+7. For new or modified Excel exports, use `Infrastructure.Services.Excel` instead of manual `XLWorkbook` / `AdjustToContents()` boilerplate:
+   - Use `ExcelDataExporter.WriteBytes` (`ExcelDataSheet.From` / `ExcelDataSheet.FromColumns`) in `GenerateExportDataBytesAsync` for re-importable data exports.
+   - Use `ExcelReportWriter.Write` (`ExcelReport` / `ReportSheet` / `ReportTable.Of` / `ReportCol.*` / `ReportTotal.*`) for analytical/read-only reports, passing human-readable filter labels (never raw GUIDs) and typed dates.
 
 ## Boundaries
 
