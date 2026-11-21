@@ -21,17 +21,19 @@
  * Mọi lần deny đều ghi `.agent/reports/boundary-guard.log`.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = resolve(HERE, "..", "..");
-const ROLE_TTL_MS = 8 * 60 * 60 * 1000;
+const ROLE_TTL_MS = 14 * 60 * 60 * 1000;
 const DEFAULT_ROLE = "implementer";
+const PRIVILEGED_INLINE_ROLES = new Set(["verifier", "test-author", "maintainer"]);
 const registryCache = new Map();
 
 function appendLog(logFile, line) {
+  if (!logFile) return;
   try {
     mkdirSync(dirname(logFile), { recursive: true });
     appendFileSync(logFile, `${new Date().toISOString()} ${line}\n`);
@@ -93,45 +95,73 @@ function knownRoles(registry) {
   return new Set([...(registry.agents || []).map((a) => a.name), DEFAULT_ROLE, "maintainer"]);
 }
 
-function resolveRole(payload, registry, { roleFile, logFile, agentName, envRole }) {
-  const known = knownRoles(registry);
-
-  const fromPayload =
-    agentName || payload.agent_type || payload.agentType || payload.subagent_type || payload.agent_name;
-  if (fromPayload && known.has(fromPayload)) return { role: fromPayload, source: "subagent" };
-
-  const fromEnv = envRole ?? process.env.COGAIN_AGENT_ROLE;
-  if (fromEnv && known.has(fromEnv)) return { role: fromEnv, source: "env" };
-
+function readStateFileRole(roleFile, logFile, known, sandbox) {
+  if (sandbox) return null;
   try {
     if (existsSync(roleFile)) {
       const age = Date.now() - statSync(roleFile).mtimeMs;
       const value = readFileSync(roleFile, "utf8").trim();
-      if (age <= ROLE_TTL_MS && known.has(value)) return { role: value, source: "state-file" };
-      if (age > ROLE_TTL_MS) appendLog(logFile, `ROLE-EXPIRED value=${value} age_h=${(age / 3.6e6).toFixed(1)}`);
+      if (age <= ROLE_TTL_MS && known.has(value)) return value;
+      if (age > ROLE_TTL_MS) {
+        appendLog(logFile, `ROLE-EXPIRED value=${value} age_h=${(age / 3.6e6).toFixed(1)}`);
+        try {
+          unlinkSync(roleFile);
+        } catch {
+          /* ignore */
+        }
+      }
     }
   } catch {
     /* ignore */
   }
+  return null;
+}
 
-  return { role: DEFAULT_ROLE, source: "default" };
+function resolveRole(payload, registry, { roleFile, logFile, agentName, envRole, sandbox }) {
+  const known = knownRoles(registry);
+  const stateFileRole = readStateFileRole(roleFile, logFile, known, sandbox);
+
+  const fromPayload =
+    agentName || payload.agent_type || payload.agentType || payload.subagent_type || payload.agent_name;
+  if (fromPayload && known.has(fromPayload)) return { role: fromPayload, source: "subagent", stateFileRole };
+
+  const fromEnv = sandbox ? envRole : envRole ?? process.env.COGAIN_AGENT_ROLE;
+  if (fromEnv && known.has(fromEnv)) return { role: fromEnv, source: "env", stateFileRole };
+
+  if (stateFileRole) return { role: stateFileRole, source: "state-file", stateFileRole };
+
+  return { role: DEFAULT_ROLE, source: "default", stateFileRole };
+}
+
+function isAllowlisted(allowlist, ruleId, target, now) {
+  return (allowlist || []).some((entry) => {
+    if (!entry || entry.rule_id !== ruleId) return false;
+    if (!matchesAny(target, entry.path_globs)) return false;
+    const expiresMs = Date.parse(entry.expires_at);
+    return Number.isFinite(expiresMs) && expiresMs >= now;
+  });
 }
 
 /**
  * Đánh giá một payload chuẩn hoá (`Bash` / `Edit` / `Write` / `MultiEdit` / `NotebookEdit`) ngay trong bộ nhớ.
  */
 export function evaluateBoundaryPayload(payload, options = {}) {
+  const sandbox = options.sandbox === true;
+  const cliMode = options.cliMode === true;
+  const checkFs = !sandbox || options.checkFs === true;
+  const now = options.now ?? Date.now();
   const root = options.root ? resolve(options.root) : DEFAULT_ROOT;
   const registryPath = join(root, ".agent", "contracts", "agent-registry.json");
   const runtimeDir = join(root, ".agent", "scratch", ".runtime");
   const roleFile = join(runtimeDir, "agent-role");
   const traceFile = join(runtimeDir, "last-hook-payload.json");
-  const logFile = join(root, ".agent", "reports", "boundary-guard.log");
+  const logFile = sandbox ? null : join(root, ".agent", "reports", "boundary-guard.log");
+  const frictionFile = sandbox || cliMode ? null : join(root, ".agent", "reports", "agent-friction.jsonl");
 
   const registry = loadRegistry(registryPath, logFile);
   if (!registry) return { decision: "allow" };
 
-  if (process.env.COGAIN_GUARD_TRACE === "1") {
+  if (!sandbox && process.env.COGAIN_GUARD_TRACE === "1") {
     try {
       mkdirSync(runtimeDir, { recursive: true });
       writeFileSync(
@@ -144,16 +174,29 @@ export function evaluateBoundaryPayload(payload, options = {}) {
   }
 
   const denyResult = (rule, role, reason) => {
-    appendLog(logFile, `DENY rule=${rule} role=${role} :: ${reason.replace(/\s+/g, " ").slice(0, 400)}`);
+    const compact = reason.replace(/\s+/g, " ").slice(0, 400);
+    appendLog(logFile, `DENY rule=${rule} role=${role} :: ${compact}`);
+    if (frictionFile) {
+      try {
+        mkdirSync(dirname(frictionFile), { recursive: true });
+        appendFileSync(
+          frictionFile,
+          `${JSON.stringify({ at: new Date().toISOString(), type: "guard-deny", rule_id: rule, role, message: compact.slice(0, 240) })}\n`
+        );
+      } catch {
+        /* fail-open */
+      }
+    }
     return { decision: "deny", rule, role, reason };
   };
 
   try {
-    let { role, source } = resolveRole(payload || {}, registry, {
+    let { role, source, stateFileRole } = resolveRole(payload || {}, registry, {
       roleFile,
       logFile,
       agentName: options.agentName,
       envRole: options.envRole,
+      sandbox,
     });
     const tool = payload?.tool_name || "";
     const input = payload?.tool_input || {};
@@ -166,9 +209,19 @@ export function evaluateBoundaryPayload(payload, options = {}) {
 
       const inline = cmd.match(/^COGAIN_(?:AGENT_)?ROLE=([a-z-]+)\s+/);
       if (inline && knownRoles(registry).has(inline[1])) {
-        appendLog(logFile, `ROLE-INLINE role=${inline[1]} cmd=${cmd.slice(0, 120)}`);
-        role = inline[1];
-        source = "inline";
+        const requestedRole = inline[1];
+        const canElevate =
+          !PRIVILEGED_INLINE_ROLES.has(requestedRole) ||
+          requestedRole === role ||
+          cliMode ||
+          stateFileRole === "maintainer";
+        if (canElevate) {
+          appendLog(logFile, `ROLE-INLINE role=${requestedRole} cmd=${cmd.slice(0, 120)}`);
+          role = requestedRole;
+          source = "inline";
+        } else {
+          appendLog(logFile, `ROLE-INLINE-BLOCKED requested=${requestedRole} current=${role} source=${source} cmd=${cmd.slice(0, 120)}`);
+        }
       }
 
       for (const key of ["secret_inline", "db_destructive", "build_runner", "migration_runner"]) {
@@ -196,7 +249,10 @@ export function evaluateBoundaryPayload(payload, options = {}) {
       }
 
       const r2 = rules.test_write || {};
-      const stripped = cmd.replace(/\d?>\s*&\s*\d/g, " ").replace(/\d?>>?\s*\/dev\/null/g, " ");
+      const stripped = cmd
+        .replace(/\d?>\s*&\s*\d/g, " ")
+        .replace(/\d?>>?\s*\/dev\/null/g, " ")
+        .replace(/[=-]>/g, "  ");
       const mutIndexes = (r2.shell_mutating_tokens || [])
         .map((t) => stripped.indexOf(t))
         .filter((i) => i >= 0);
@@ -317,16 +373,62 @@ export function evaluateBoundaryPayload(payload, options = {}) {
       }
 
       const r10 = rules.code_conventions || {};
+      const allowlist =
+        sandbox && Array.isArray(options.allowlist) ? options.allowlist : (registry.enforcement?.allowlist || []);
       const writtenText =
         input.new_content ??
         input.new_string ??
         (Array.isArray(input.edits) ? input.edits.map((e) => e?.new_string || "").join("\n") : null) ??
         input.content ??
         "";
-      if (writtenText && !(r10.allowed_roles || []).includes(role)) {
+      if (!(r10.allowed_roles || []).includes(role)) {
         for (const chk of r10.checks || []) {
-          if (matchesAny(target, chk.path_globs) && new RegExp(chk.pattern).test(writtenText)) {
+          if (
+            matchesAny(target, chk.path_globs) &&
+            !isAllowlisted(allowlist, chk.id, target, now) &&
+            new RegExp(chk.pattern).test(writtenText)
+          ) {
             return denyResult(`R10-${chk.id}`, role, `Permission Denied: ${chk.message}\n\nFile: ${target}`);
+          }
+        }
+
+        const csServiceMatch = target.match(/^backend\/src\/Services\/([^/]+)\/.*\.cs$/);
+        if (csServiceMatch && writtenText && !isAllowlisted(allowlist, "no-cross-service-data-using", target, now)) {
+          const currentService = csServiceMatch[1];
+          const usingRe = /\busing\s+(?:Cogain\.)?(?:Services\.)?([A-Za-z0-9_]+)\.(?:Data|Repositories|Persistence)\b/g;
+          for (const m of writtenText.matchAll(usingRe)) {
+            if (m[1] !== currentService) {
+              return denyResult(
+                "R10-no-cross-service-data-using",
+                role,
+                `Permission Denied: Service '${currentService}' không được 'using' trực tiếp tầng ${m[0].split(".").at(-1)} của service khác ('${m[1]}'). Hãy giao tiếp qua Contracts/API/gRPC.\n\nFile: ${target}`
+              );
+            }
+          }
+        }
+
+        const feSrcMatch = target.match(/^frontend\/([^/]+)\/src\/.*\.(?:ts|tsx)$/);
+        if (checkFs && feSrcMatch && writtenText && !isAllowlisted(allowlist, "missing-static-asset", target, now)) {
+          const appName = feSrcMatch[1];
+          const assetRe = /\bimport\s+(?:[^'";]+\s+from\s+)?['"]([^'"]+\.(?:css|svg|png|jpg|jpeg|webp))['"]/g;
+          for (const m of writtenText.matchAll(assetRe)) {
+            const spec = m[1];
+            let resolvedAsset = null;
+            if (spec.startsWith("./") || spec.startsWith("../")) {
+              resolvedAsset = resolve(dirname(join(root, target)), spec);
+            } else if (spec.startsWith("@/")) {
+              resolvedAsset = resolve(root, "frontend", appName, "src", spec.slice(2));
+            } else if (spec.startsWith("@shared/")) {
+              resolvedAsset = resolve(root, "frontend", "shared", spec.slice("@shared/".length));
+            }
+            if (resolvedAsset && !existsSync(resolvedAsset)) {
+              const relResolved = toRepoRelative(resolvedAsset, root) || resolvedAsset;
+              return denyResult(
+                "R10-missing-static-asset",
+                role,
+                `Permission Denied: Tệp asset/CSS được import không tồn tại trên đĩa ('${spec}' -> '${relResolved}'). Kiểm tra lại đường dẫn trước khi bàn giao.\n\nFile: ${target}`
+              );
+            }
           }
         }
       }
@@ -354,6 +456,7 @@ export function evaluateBoundaryChecks(checks, options = {}) {
 function runMain() {
   const argv = process.argv.slice(2);
   let cliMode = false;
+  const sandbox = argv.includes("--sandbox");
   let payload = {};
   let envRole;
 
@@ -377,7 +480,7 @@ function runMain() {
       };
     } else {
       process.stderr.write(
-        "usage: agent-boundary-guard.mjs --check-command <cmd> | --check-write <path> [--content <text>] [--role <role>]\n"
+        "usage: agent-boundary-guard.mjs [--sandbox] --check-command <cmd> | --check-write <path> [--content <text>] [--role <role>]\n"
       );
       process.exit(1);
     }
@@ -389,7 +492,7 @@ function runMain() {
     }
   }
 
-  const res = evaluateBoundaryPayload(payload, { envRole });
+  const res = evaluateBoundaryPayload(payload, { envRole, cliMode, sandbox });
   if (res.decision === "deny") {
     if (cliMode) {
       process.stderr.write(`[${res.rule}] ${res.reason}\n`);

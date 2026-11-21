@@ -16,11 +16,9 @@ Dùng router `frontend-development` đã nạp; chỉ đọc skill hoặc phần
 1. Main chốt thiết kế; worker thi hành contract hiện hành, không lập lại plan hoặc tìm phương án khác khi source khớp.
 2. Theo phần xác nhận source của `.agent/workflows/plan.md`, trước lần ghi sử dụng một seam, đối chiếu khai báo gốc của API/type/helper/component với recipe, gồm signature, field/prop và nullability liên quan.
    Đọc pattern/test và consumer trực tiếp theo rủi ro; tái dùng bằng chứng khi source không đổi, không ghép yêu cầu từ TASK cha hay lịch sử và không coi gate/contract hợp lệ là bằng chứng API tồn tại.
-3. Sửa theo recipe và milestone hiện hành; chỉ tự quyết tên biến, guard clause và biểu thức tương đương, không đổi hành vi hoặc mở phần phụ thuộc chưa được Main nghiệm thu.
-4. Thiếu symbol/prop, source trái contract, reuse không đạt invariant hoặc cần đổi thiết kế/scope: dừng phần liên quan, trả Main `file:line`, expected/actual và quyết định còn thiếu.
-   Chỉ tra dependency trực tiếp để xác nhận điểm vướng, không tự chọn endpoint, fallback, cache hoặc luồng thay thế.
-5. Tiếp tục phần độc lập; đối chiếu delta với acceptance rồi bàn giao, không tự mở vòng audit toàn module hoặc báo toàn task hoàn tất khi mới xong milestone.
-   Ghi blocker vào `needs_main_decision`/`contract_deviations` nếu có; không báo xong khi còn blocker.
+3. Sửa theo recipe và milestone hiện hành; tự quyết chi tiết cục bộ tương đương (tên biến, guard clause, chuẩn hóa nullability/giá trị rỗng tại boundary trong `allowed_paths`) mà không đổi hành vi nghiệp vụ.
+4. **Vi-xác minh giữa chừng (`MICRO` <= 3 bước)**: khi gặp lệch nhỏ prop/type/hành vi thư viện, tra ngay khai báo gốc + `lsp` + `context7`. Nếu xử lý trọn vẹn trong `allowed_paths` và giữ nguyên bất biến thì làm tiếp và ghi vào `assumptions`; nếu cần vượt `allowed_paths` hoặc đổi thiết kế/endpoint thì gom gói `file:line + expected/actual + đề xuất sửa chính xác` trả Main trong 1 nhịp, đồng thời hoàn tất hết phần độc lập còn lại.
+5. Đối chiếu delta với acceptance rồi bàn giao; ghi blocker vào `needs_main_decision`/`contract_deviations` nếu còn, không báo xong khi còn blocker.
 
 ## UI đúng điểm chạm
 
@@ -37,6 +35,7 @@ Dùng router `frontend-development` đã nạp; chỉ đọc skill hoặc phần
 - Không tạo/sửa/xóa test hoặc gọi `test-author`; báo Main nhu cầu coverage, nhất là tiền, quyền, tồn kho và pháp lý.
 - Test lỗi compile hoặc trái spec: báo `test-spec-conflict` và dừng, không sửa assertion để xanh.
 - Import và biểu thức ngắn giữ một dòng; vế sau `??` xuống dòng phải thẳng hàng vế trước.
+- Kiểm tra 0-build trước bàn giao khi đổi chữ ký public/shared hoặc props: chạy `find_references` + `get_diagnostics` trên các caller bị ảnh hưởng.
 
 ## Quyền và bàn giao
 

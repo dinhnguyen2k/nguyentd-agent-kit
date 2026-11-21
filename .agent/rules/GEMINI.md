@@ -15,3 +15,8 @@ Báo cáo trung thực mọi lỗi công cụ, build hoặc test, kể cả khi 
 - Nếu worker `swarm` không có `call_mcp_tool`, worker ghi rõ trong báo cáo bàn giao và Main gọi song song một lượt `call_mcp_tool` (`lsp` -> `get_diagnostics`) cho các file sửa trước khi nghiệm thu.
 - Khi `get_diagnostics` báo lỗi thuộc phạm vi giao việc, Main nhắn trả đúng worker đó để sửa bổ sung trước khi `kill`; đạt 0 lỗi mới gọi `swarm` (`action: "kill"`) dọn worker.
 - Chẩn đoán tĩnh từ LSP không phải lệnh validation; khi user chưa yêu cầu chạy build/lint/test vẫn ghi `Validation: not run - not requested`.
+
+## Vòng đời Hook AGY & Bảo trì
+
+- AGY cưỡng chế bằng 4 điểm hook trong `.agent/harness/agy/hooks.json`: `PreToolUse` (`agy/boundary-guard.mjs` kiểm R1-R10, dispatch contract, `R4` theo session và tự ghi ma sát vào `.agent/reports/agent-friction.jsonl`), `PostToolUse` + `PreInvocation` + `Stop` (`agy/lifecycle-hook.mjs` theo dõi `dirtyFiles`/LSP, phát nhịp đồng bộ tiến độ xuyên suốt mỗi 30 lượt mà không thúc nghỉ sớm, và nhắc kiểm tra tĩnh trước bàn giao tối đa 1 lần).
+- Kiểm thử luật guard dùng `--sandbox` (không ghi log/trace và bỏ qua state role trên đĩa); ngoại lệ `R10` khai báo tại `enforcement.allowlist` bắt buộc có `expires_at` TTL; nâng cấp `.agent/` thực hiện theo quy trình `/upgrade-agent`.

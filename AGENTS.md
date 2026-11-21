@@ -14,9 +14,9 @@ Rule miền trong `.agent/rules/` nạp theo trigger; không đọc lại nội 
 - Main chỉ code khi user giao rõ làm trực tiếp tại Main cho task hiện tại theo `AI_RULES.md` §6; không có ngoại lệ tự động cho task nhỏ/cơ học/gấp.
 - Không dispatch được specialist thì báo blocker, không tự chuyển sang Main code.
 - Cross-domain hoặc rủi ro cao -> `/orchestrate`
-- Dữ kiện đơn giản Main tự tra (`LOOKUP`). Nghiên cứu cần thiết mặc định giao một `researcher` (`FOCUSED`); xem `.agent/skills/research/SKILL.md` về phạm vi và ngân sách. Chỉ khi người dùng yêu cầu hoặc quy trình cho phép rõ `DEEP`, Main mới giao câu hỏi độc lập cho nhiều Researcher, với ngân sách tổng và từng nhánh chốt trước. Researcher chỉ đọc, được tự chia câu hỏi trong phạm vi đã giao nhưng không tạo agent con hay giao lại cho người khác. Main giữ quyền quyết định; chỉ mở lại câu hỏi bị ảnh hưởng, ở cấp độ đã được phép và trong ngân sách còn lại, khi có bằng chứng mới cần xử lý. `scout` chỉ lập bản đồ repo. Nếu không có Researcher phù hợp hoặc không thể đọc nguồn an toàn, nêu rõ giới hạn; không giả định đã nghiên cứu.
+- Dữ kiện đơn giản Main tự tra (`LOOKUP`). Nghiên cứu chuyên môn mặc định giao `researcher` (`FOCUSED`) theo chu trình **Nghiên cứu liên hồi 3 nhịp** (Định hình -> Vi-nghiên cứu khi lệch giả định -> Hội tụ bằng chứng ngoại sinh) tại `.agent/skills/research/SKILL.md` (ưu tiên `lsp` + `archetype-exemplars.json` -> `context7` -> `search_web`). Chỉ khi user yêu cầu hoặc quy trình cho phép rõ `DEEP`, Main mới chia nhiều nhánh `researcher` độc lập với ngân sách hữu hạn chốt trước. Researcher chỉ đọc, không tạo agent con; Main giữ quyền quyết định và chỉ mở lại câu hỏi khi có bằng chứng ngoại sinh mới.
 - Review code theo yêu cầu rõ ràng -> skill `code-reviewer` / `code-review` (hoặc `/merge-gate`, `/health` khi user gọi đích danh)
-- Trước khi giao specialist tạo mới hoặc mở rộng màn hình danh sách/form, luồng duyệt hoặc báo cáo (kể cả khi user không gọi /plan): Main bắt buộc đối chiếu .agent/skills/cogain-screen-archetypes/SKILL.md và chốt đủ 5 bất biến nghiệp vụ theo .agent/workflows/plan.md (trạng thái hợp lệ, mốc thời gian hiệu lực, helper tính kỳ, thành phần chuẩn, dữ liệu lịch sử).
+- Trước khi giao specialist tạo mới hoặc mở rộng màn hình danh sách/form, luồng duyệt hoặc báo cáo: Main đối chiếu `.agent/skills/cogain-screen-archetypes/SKILL.md` và tự xác minh 5 bất biến nghiệp vụ theo `.agent/workflows/plan.md` từ source + `archetype-exemplars.json` + tiền lệ cùng phân hệ; chỉ điểm thực sự thuộc Vùng Đỏ chưa có tiền lệ mới đưa vào `Hộp thư Quyết định` (treo riêng nhánh đó, tiếp tục các nhánh độc lập khác).
 
 Ranh giới ghi: `.agent/contracts/agent-registry.json`, hook `.agent/scripts/agent-boundary-guard.mjs`.
 Chỉ đọc `.agent/harness/README.md` khi sửa wiring; catalog `.agent/SKILLS.md` và `.agent/workflows/README.md` khi cần tra cứu.
@@ -32,7 +32,7 @@ Chỉ đọc `.agent/harness/README.md` khi sửa wiring; catalog `.agent/SKILLS
 | Hành vi rủi ro hoặc liên module | `CONCERNS.md` |
 | Triển khai một miền | 1 router + tối đa 2 skill đổi được quyết định |
 
-Cấm mở service/module khác chỉ để xem "bên đó làm thế nào" khi ranh giới đó không lỗi; cần convention thì đọc rule.
+Không quét tràn service/module khác khi ranh giới đó không lỗi: ưu tiên đọc rule và các tệp mẫu đã duyệt trong `.agent/contracts/archetype-exemplars.json`; khi bài toán nằm ngoài các archetype đã đăng ký và rule chưa quy định, được mở tối đa 2 tệp chuẩn cùng phân hệ/service để xác minh tiền lệ thực tế thay vì đoán mò hoặc dừng hỏi user.
 Task Manifest và verifier độc lập chỉ dành cho governed work dưới `/orchestrate`.
 
 ## Workflow
@@ -42,8 +42,9 @@ Không có file thì báo rõ và tra `.agent/workflows/README.md`.
 
 ## Session Policy
 
-Architecture mặc định QUICK ASK; mở rộng khi user yêu cầu hoặc quyết định có tác động lớn.
+Vận hành xuyên suốt (`Human-on-the-Loop`) theo phân tầng Vùng Xanh - Vàng - Đỏ tại `AI_RULES.md` §3: tự nghiên cứu và tự hội tụ mọi quyết định kỹ thuật/khả nghịch, chỉ treo nhánh dính Vùng Đỏ vào `Hộp thư Quyết định` mà không dừng các nhánh độc lập.
 Mentor mode chỉ bật bằng `@mentor`; quyền validation, commit và test theo `AI_RULES.md`.
+Phiên làm tính năng (Luồng 1) không tự sửa `.agent/**`; ma sát rule/skill/harness được hook tự ghi hoặc ghi ngắn vào `.agent/reports/agent-friction.jsonl` để kết tinh tập trung trong phiên `/upgrade-agent`.
 
 ## Commit Messages
 

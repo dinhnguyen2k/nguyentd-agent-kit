@@ -1,19 +1,18 @@
-# Cách phối hợp
+# Cách phối hợp (Nghiên cứu Liên hồi & Vận hành Xuyên suốt)
 
-- Dữ kiện đơn giản, có thể kiểm tra trực tiếp (`LOOKUP`)? Main tự tra cứu; không cần giao việc.
-- Nếu có Scout, chỉ nhờ Scout tìm vị trí mã liên quan. Scout không quyết định nghiệp vụ hay thay thế điều tra.
-- Với quyết định cần nghiên cứu, mặc định giao một Researcher (`FOCUSED`); xem `.agent-core/research/SKILL.md` về phạm vi và ngân sách.
-- Chỉ khi người dùng yêu cầu hoặc quy trình cho phép rõ `DEEP`, Main mới giao câu hỏi độc lập cho nhiều Researcher; chốt ngân sách tổng và từng nhánh trước khi giao. Researcher chỉ đọc, được tự chia câu hỏi trong phạm vi đã giao nhưng không tạo agent con hay giao lại cho người khác.
-- Main kiểm tra bằng chứng then chốt, tự đưa ra quyết định và chịu trách nhiệm về chính sách nghiệp vụ. Tái dùng findings, không lặp nghiên cứu; chỉ mở lại câu hỏi bị ảnh hưởng, ở cấp độ đã được phép và trong ngân sách còn lại, khi có bằng chứng mới cần xử lý.
-- Nếu không có Researcher phù hợp hoặc không có cách đọc an toàn, nói rõ giới hạn. Main chỉ tự nghiên cứu khi được phép, và cần nói rõ cách đã làm.
-- Quyền hạn của dự án và ý định của người dùng luôn được ưu tiên. Không để hướng dẫn chung này vượt qua chúng.
-
-Ví dụ: Main cần chọn giữa hai cách phân trang. Nếu chỉ cần tìm endpoint, Main có thể nhờ Scout xác định tệp và dòng liên quan. Nếu cần đối chiếu giới hạn của hai cách và tìm trường hợp một cách bị sai, Main giao câu hỏi đó cho một Researcher, nêu phiên bản và ràng buộc đã biết. Researcher đưa bằng chứng và khuyến nghị; Main kiểm tra phần quyết định và chọn phương án.
+- **Dữ kiện đơn giản (`LOOKUP`)**: Main tự tra cứu trực tiếp, không chia nhánh.
+- **Nghiên cứu chuyên môn (`FOCUSED` & `MICRO`)**: Vận hành theo **3 nhịp liên hồi** tại `.agent-core/research/SKILL.md`:
+  1. *Định hình trước khi làm*: giao `Researcher` trong cửa sổ ngữ cảnh cô lập (ưu tiên đồ thị mã nguồn + mẫu chuẩn -> tài liệu gốc thư viện qua `context7` -> tìm kiếm web khử riêng tư).
+  2. *Vi-nghiên cứu giữa chừng (`MICRO` <= 3 bước)*: kích hoạt ngay khi thực tế lộ lệch chữ ký/kiểu dữ liệu, tác dụng phụ ẩn, hành vi biên thư viện hoặc điểm nghẽn hiệu năng để tự hội tụ phương án tối ưu thay vì đoán mò hay dừng luồng.
+  3. *Hội tụ bằng chứng ngoại sinh*: cấm đổi phương án đang chọn hoặc thêm tầng trừu tượng khi không có bằng chứng khách quan mới (`tệp:dòng`, chẩn đoán tĩnh, tài liệu chính thức); ưu tiên giữ phương án tối giản đương nhiệm (`Hysteresis`).
+- **Nghiên cứu chuyên sâu (`DEEP`)**: Chỉ khi người dùng yêu cầu hoặc quy trình cho phép rõ, Main mới chia các câu hỏi độc lập không chồng lấn cho nhiều `Researcher` với ngân sách chốt cứng trước khi chạy.
+- **Phân tầng tự quyết 3 vùng (`Human-on-the-Loop`)**:
+  - *Vùng Xanh & Vùng Vàng (kỹ thuật nội bộ và chi tiết khả nghịch 2 chiều)*: tự nghiên cứu mã nguồn + tiền lệ để tự chốt (Vùng Vàng ghi gọn vào bảng `Quyết định kỹ thuật đã tự chốt`), không dừng hỏi người dùng.
+  - *Vùng Đỏ (kiến trúc nghiệp vụ gốc, dữ liệu phá hủy, phá vỡ tương thích ngược)*: đóng gói câu hỏi kèm đề xuất có bằng chứng vào `Hộp thư Quyết định`, chỉ treo riêng nhánh bị vướng và tiếp tục hoàn thành các nhánh độc lập còn lại.
+- Quyền hạn của dự án và ý định của người dùng luôn cao nhất; không suy diễn quyền chạy lệnh kiểm tra nặng hay `git commit` khi chưa được cho phép.
 
 ## Phân công và nghiệm thu công việc
 
-- Trước khi giao việc, Main chốt kết quả cần đạt và ranh giới; kiểm tra source liên quan để xác nhận điểm sửa, dependency và bằng chứng then chốt.
-- Mỗi việc độc lập có một người chịu trách nhiệm, phạm vi rõ và bằng chứng cần thiết. Giao riêng phần triển khai cho người viết phù hợp khi có; Researcher chỉ điều tra, không ngầm nhận việc viết mã.
-- Gửi đủ kết quả mong đợi, phần ngoài phạm vi, dữ kiện đã biết và nguồn liên quan. Tránh yêu cầu người nhận lặp lại discovery Main đã làm; chỉ xác minh lại khi source đổi, có mâu thuẫn hoặc cần làm rõ dependency trực tiếp.
-- Giao việc không có nghĩa là người dùng đã duyệt thay đổi, phương án hay thao tác. Không suy ra quyền phê duyệt từ việc phân công.
-- Main nghiệm thu dựa trên source thực tế đã thay đổi và acceptance đã chốt; không coi lời báo hoàn tất là bằng chứng thay cho source. Nêu rõ kiểm tra nào đã chạy và kiểm tra nào chưa chạy.
+- Trước khi giao việc, Main chốt kết quả cần đạt, bất biến phải giữ và tọa độ mã nguồn đã xác minh.
+- Mỗi việc độc lập có một người chịu trách nhiệm với phạm vi ghi tách biệt; `Researcher` chỉ điều tra chỉ đọc, không viết mã.
+- Main nghiệm thu trực tiếp trên mã nguồn thực tế đã thay đổi và tiêu chí nghiệm thu đã khóa; nêu rõ kiểm tra nào đã chạy và kiểm tra nào chưa chạy.

@@ -24,8 +24,9 @@ Ví dụ, bạn hỏi: *“Trang đơn hàng mở chậm. Có nên thêm bộ nh
 Thay vì mặc định đề xuất cache, Researcher cần tách hai câu hỏi: **thời gian đang mất ở đâu**, và **dữ liệu có được phép hiển thị chậm sau khi đơn hàng thay đổi không**?
 Nếu sau đó bạn cho biết nhân viên vừa sửa đơn nhưng vẫn thấy trạng thái cũ, Main có lý do xem lại đề xuất cache mà không cần làm lại phần điều tra độ trễ.
 
-Thông thường, một Researcher phụ trách tối đa ba câu hỏi và dùng chung tối đa sáu nguồn qua các lượt, không phải sáu nguồn cho mỗi câu.
-Chỉ khi bạn yêu cầu nghiên cứu sâu hoặc quy trình dự án cho phép rõ ràng, Main mới chia các câu hỏi độc lập cho nhiều Researcher và chốt trước giới hạn tìm kiếm.
+Thông thường, nghiên cứu vận hành theo **3 nhịp liên hồi**: định hình trước khi làm (`FOCUSED` trong cửa sổ ngữ cảnh riêng của `Researcher`), vi-nghiên cứu có trần (`MICRO` tối đa 3 bước qua đồ thị mã nguồn `lsp` và tài liệu gốc `context7`) ngay khi thực thi lộ điểm lệch giả định hoặc điểm nghẽn hiệu năng, và hội tụ bằng bằng chứng ngoại sinh trước khi bàn giao.
+Các quyết định kỹ thuật cục bộ và chi tiết khả nghịch (Vùng Xanh / Vùng Vàng) được tự nghiên cứu và tự chốt kèm bảng tóm tắt ngắn; chỉ các quyết định kiến trúc nghiệp vụ một chiều (Vùng Đỏ) mới đưa vào `Hộp thư Quyết định` (treo riêng nhánh bị vướng, tiếp tục chạy các nhánh độc lập khác).
+Chỉ khi bạn yêu cầu nghiên cứu sâu hoặc quy trình dự án cho phép rõ ràng, Main mới chia các câu hỏi độc lập cho nhiều `Researcher` và chốt trước giới hạn tìm kiếm.
 Researcher chỉ đọc và trả lời kèm nguồn; Main chịu trách nhiệm về khuyến nghị cuối cùng.
 Nếu cùng một sai sót lặp lại ở nhiều việc, Main có thể đề xuất cải tiến cách làm và cách đánh giá; bộ kit không tự chạy nghiên cứu nền hay tự sửa quy tắc.
 

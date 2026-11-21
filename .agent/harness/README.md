@@ -53,7 +53,7 @@ Các harness còn lại dùng chung bộ luật qua CLI.
 | --- | --- | --- |
 | Claude Code | `.claude/settings.json -> ../.agent/harness/claude/settings.json`, `.claude/skills -> ../.agent/skills`, `.claude/rules -> ../.agent/rules`, `.claude/commands -> ../.agent/workflows`, `.claude/agents/{backend-specialist,frontend-specialist,test-author,verifier,researcher,reviewer}.md -> ../../.agent/agents/*.md` | **Cứng** (R1-R10): hook `PreToolUse` chặn trước khi tool chạy |
 | OMP | `.omp/RULES.md -> ../AI_RULES.md`, `.omp/{WATCHDOG.md,WATCHDOG.yml,config.yml,lsp.json,rules,hooks}` symlink về `.agent/harness/omp/`, `.omp/agents/*.md` là file sinh | **Cứng** (R1-R10): hook `tool_call` gọi trực tiếp `evaluateBoundaryChecks` trong bộ nhớ (0 lần tạo tiến trình phụ, bắt cả nội dung `+` của `apply_patch`) |
-| Antigravity (AGY) | `.agents/hooks.json -> ../.agent/harness/agy/hooks.json`, `.agents/{skills,workflows}` symlink về `.agent/{skills,workflows}`, `.agents/agents/*.md` là file sinh | **Cứng** (R1-R3, R5-R10): hook `PreToolUse` lọc regex chỉ kích hoạt trên công cụ ghi/chạy lệnh và gọi trực tiếp `evaluateBoundaryChecks` trong cùng tiến trình Node; R4 theo worker dựa vào danh tính agent hoặc `COGAIN_AGENT_ROLE` |
+| Antigravity (AGY) | `.agents/hooks.json -> ../.agent/harness/agy/hooks.json`, `.agents/{skills,workflows}` symlink về `.agent/{skills,workflows}`, `.agents/agents/*.md` là file sinh | **Cứng** (R1-R10 + vòng đời): `PreToolUse` lọc matcher và gọi trực tiếp `evaluateBoundaryChecks` (kèm kiểm dispatch contract và `R4` theo session); `PostToolUse`/`PreInvocation`/`Stop` chạy `agy/lifecycle-hook.mjs` |
 | Codex | `.codex/{agents,skills,workflows}` symlink về `.agent/{agents,skills,workflows}` | Mềm: prose + CLI check khi được gọi |
 | CI, git hook, script | không cần wiring | CLI mode, exit code 2 |
 
@@ -65,13 +65,16 @@ Cùng registry, cùng luật, không phụ thuộc harness:
 node .agent/scripts/agent-boundary-guard.mjs --check-command "dotnet test --filter X"
 node .agent/scripts/agent-boundary-guard.mjs --check-write backend/tests/Foo.cs
 node .agent/scripts/agent-boundary-guard.mjs --check-command "dotnet test" --role verifier
+node .agent/scripts/agent-boundary-guard.mjs --sandbox --check-write frontend/erp/src/a.tsx --content "z.string().uuid()"
 ```
 
 exit 0 là cho phép, exit 2 là bị chặn kèm lý do ở stderr.
-Luật thực thi gồm: R1 chạy test, R2 ghi cây test, R3 sửa file enforcement, R4 ranh giới ghi theo role, R5 credential literal trên dòng lệnh, R6 lệnh DB phá huỷ, R7 ghi file migration EF Core, R8 build/typecheck nặng chỉ chạy khi user yêu cầu (verifier, test-author, maintainer), R9 chạy lệnh migration EF Core, R10 chặn mẫu code frontend bị cấm (`@shared` barrel, `.uuid()`, `.catch('')`).
+Chế độ `--sandbox` bỏ qua `roleFile` trên đĩa và không ghi `boundary-guard.log` hay `last-hook-payload.json`, dùng để kiểm thử mẫu đúng/sai trong `.agent/evals/guard-fixtures.json`.
+Luật thực thi gồm: R1 chạy test, R2 ghi cây test, R3 sửa file enforcement, R4 ranh giới ghi theo role, R5 credential literal trên dòng lệnh, R6 lệnh DB phá huỷ, R7 ghi file migration EF Core, R8 build/typecheck nặng chỉ chạy khi user yêu cầu (verifier, test-author, maintainer), R9 chạy lệnh migration EF Core, R10 chặn mẫu code vi phạm quy ước (và hỗ trợ miễn trừ có thời hạn `expires_at` tại `enforcement.allowlist` trong `agent-registry.json`).
 R5/R6/R8/R9 khai báo bằng pattern và chạy trước các luật khác; R5 không in lệnh vào log.
 R5 cho phép đọc password từ file cấu hình vào env ngay trong lệnh, ví dụ `PGPASSWORD="$(jq -r '.ConnectionStrings.DefaultConnection' <appsettings.json> | sed -E 's/.*Password=([^;]*).*/\1/')" psql ...`, hoặc dùng `~/.pgpass`; không echo/in giá trị.
 Harness nào có cơ chế chạy lệnh trước mỗi tool call thì nối vào đây, không viết lại luật lần thứ hai.
+Nâng cấp luật/skill/harness thực hiện theo chu trình 6 bước `/upgrade-agent` (`.agent/workflows/upgrade-agent.md`) từ hộp thư `.agent/reports/agent-friction.jsonl` và `node .agent/scripts/summarize-friction.mjs`.
 
 ## Subagent thật và nạp theo chế độ (Mode-Specific Loading)
 
@@ -210,9 +213,10 @@ Rollout bảo thủ dùng agent/phiên OMP mới sau generation; không hứa ho
 
 | File nguồn | Vai trò trên AGY |
 | --- | --- |
-| `agy/hooks.json` | Đăng ký `PreToolUse` với `matcher: "*"` chạy `boundary-guard.mjs`. Chỉ nối symlink tại `.agents/hooks.json`, không đặt trùng ở `.agent/hooks.json` để tránh chạy hook hai lần |
-| `agy/boundary-guard.mjs` | Dịch `run_command`, `write_file`/`edit_file`, `call_mcp_tool` (`filesystem`), `mcp_filesystem_*` và `run_workflow` (kèm trích `new_content`) sang payload `Bash`/`Write` rồi gọi `agent-boundary-guard.mjs`; trả `{"decision": "deny"}` khi vi phạm R1-R3, R5-R10 (và R4 khi có danh tính agent/`COGAIN_AGENT_ROLE`), trả `{"decision": "allow"}` khi hợp lệ hoặc fail-open |
-| `agy/agents/*.md` | Header mỏng AGY (`model: inherit`, `subagent: true`, bỏ alias cũ `view_file` để tránh xung đột `read_file`, giới hạn `tools` không sửa file cho `verifier`, `reviewer`, `researcher`) và phần "AGY runtime" cho cả 6 agent, được `install-harness-wiring.sh` ghép với thân chung `.agent/agents/<name>.md` thành `.agents/agents/<name>.md` |
+| `agy/hooks.json` | Đăng ký 4 điểm hook: `PreToolUse` (Grouped matcher cho tool ghi/chạy lệnh + `invoke_subagent`/`swarm`), `PostToolUse` (Grouped), `PreInvocation` (Flat) và `Stop` (Flat). Chỉ nối symlink tại `.agents/hooks.json`, không đặt trùng ở `.agent/hooks.json` để tránh chạy hook hai lần |
+| `agy/boundary-guard.mjs` | Hook `PreToolUse`: dịch `run_command`, `write_file`/`edit_file`, `call_mcp_tool` (`filesystem`), `mcp_filesystem_*`, `run_workflow` sang payload `Bash`/`Write` gọi `agent-boundary-guard.mjs` (kèm tra `agy-sessions.json` cho `R4`); kiểm `invoke_subagent`/`swarm add` tới specialist viết code phải có `allowed_paths` + `acceptance` và tự mở rộng 2 dòng `contract_ref`/`contract_version` qua `dispatch-contract.mjs` |
+| `agy/lifecycle-hook.mjs` | Hook `PostToolUse`, `PreInvocation` và `Stop`: theo dõi `dirtyFiles` (`.cs`/`.ts`/`.tsx`) và trạng thái kiểm tra `lsp -> get_diagnostics` theo `conversationId` trong `.agent/scratch/.runtime/agy-sessions.json` (TTL 16h); phát nhịp đồng bộ tiến độ xuyên suốt mỗi 30 lượt (`PreInvocation`, giữ nguyên prompt cache ở các lượt khác); nhắc kiểm tra tĩnh trước bàn giao tối đa 1 lần ở `Stop` khi `!event.continuationActive` và tự ghi ma sát vào `.agent/reports/agent-friction.jsonl` |
+| `agy/agents/*.md` | Header mỏng AGY (`model: inherit`, `subagent: true`, bỏ alias cũ `view_file` để tránh xung đột `read_file`, cấp `call_mcp_tool` chỉ đọc cho `verifier`/`reviewer`/`researcher` và giới hạn `tools` không sửa file) và phần "AGY runtime" cho cả 6 agent, được `install-harness-wiring.sh` ghép với thân chung `.agent/agents/<name>.md` thành `.agents/agents/<name>.md` |
 
 Để dùng AGY ở chế độ full-accept tương tự OMP nhưng vẫn giữ guard chặn cứng, user bật Preset `Turbo` (hoặc `Auto`) qua `/permissions`, hoặc khởi chạy bằng `agy --dangerously-skip-permissions --mode auto`.
 Frontmatter `agy/agents/*.md` giữ `model: inherit` vì bộ nạp custom agent của AGY chỉ chấp nhận 4 tier (`inherit`, `pro`, `flash`, `flash_lite`) và sẽ bỏ qua agent nếu ghi tên model cụ thể.

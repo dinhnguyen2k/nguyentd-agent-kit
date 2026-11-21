@@ -20,9 +20,12 @@
 - Cấm build trực tiếp (bị chặn bởi guard R8); `.agent/scripts/ci-parity.sh` chỉ chạy khi user yêu cầu rõ ràng.
 - Cấm tự chạy app/build/test để reproduce bug trừ khi được yêu cầu đích danh.
 
-## 3. Nguồn Sự Thật
+## 3. Nguồn Sự Thật & Phân Tầng Tự Quyết (Xanh - Vàng - Đỏ)
 Tin source code/runtime hơn doc, doc hơn best practice chung.
-Doc mâu thuẫn với code: **báo cáo mâu thuẫn**, không tự ý chọn bên thắng.
+Khi gặp điểm chưa tường minh hoặc doc/comment cũ lệch code, phân loại vào 3 vùng để vận hành xuyên suốt thay vì dừng hỏi việc nhỏ:
+- **Vùng Xanh (Tự nghiên cứu & tự chốt ngay)**: chi tiết kỹ thuật cục bộ, mẫu chuẩn trong repo/`.agent/contracts/archetype-exemplars.json`, tối ưu hiệu năng/bộ nhớ theo `OPINION.md`, hoặc doc/comment cũ lệch runtime code mà luồng code thực tế đã rõ -> tin runtime code, tự quyết và làm thẳng, không hỏi user.
+- **Vùng Vàng (Cửa 2 chiều khả nghịch)**: giá trị hiển thị mặc định khi trống, thứ tự cột phụ, nhánh biên kỹ thuật dễ đảo ngược trên Git mà không đổi công thức nghiệp vụ, schema DB hay phá tương thích ngược -> tự tra tiền lệ gần nhất + `OPINION.md`, chọn phương án tương thích ngược tối ưu, làm tiếp không dừng và ghi vào bảng `Quyết định kỹ thuật đã tự chốt` (tối đa 5 mục) ở báo cáo cuối.
+- **Vùng Đỏ (Cửa 1 chiều & Kiến trúc nghiệp vụ gốc)**: công thức tiền/lương/quyền/tồn kho/mốc hiệu lực chưa có tiền lệ rõ, breaking public contract, schema DB/migration phá huỷ, mâu thuẫn nghiệp vụ thật sự -> cấm tự đoán; đóng gói câu hỏi kèm đề xuất có bằng chứng vào `Hộp thư Quyết định`, **chỉ treo riêng nhánh vướng Vùng Đỏ** (và nhánh phụ thuộc trực tiếp), tiếp tục chạy xuyên suốt các nhánh độc lập còn lại.
 
 ## 4. Cổng An Toàn (Safety Gates)
 - Cấm tự ý chạy `git commit`. Chỉ chạy khi user yêu cầu rõ ràng.
@@ -31,9 +34,10 @@ Doc mâu thuẫn với code: **báo cáo mâu thuẫn**, không tự ý chọn b
 - Thay đổi phải cục bộ nhỏ nhất và tương thích ngược.
 - Ranh giới vai trò và quyền chạy test: `.agent/rules/test-enforcement.md`, cưỡng chế bằng hook chứ không bằng lời dặn.
 
-## 5. Chọn Giải Pháp
-Xếp hạng theo correctness, simplicity, robustness, maintainability.
-Không lấy chi phí phát triển (số dòng diff, số bước, token) làm tiêu chí chọn phương án. Chi tiết: `.agent/rules/solution-complexity.md`.
+## 5. Chọn Giải Pháp & Nghiên Cứu Liên Hồi
+Xếp hạng theo correctness, simplicity, robustness, maintainability; không lấy chi phí phát triển (số dòng diff, số bước, token) làm tiêu chí chọn phương án (`.agent/rules/solution-complexity.md`).
+- Kích hoạt **vi-nghiên cứu có trần** (tối đa 3 bước tra `lsp`/`context7`/source) ngay khi chạm thực tế lộ lệch chữ ký/type, tác dụng phụ ẩn, hành vi biên thư viện hoặc điểm nghẽn hiệu năng để tự hội tụ phương án tối ưu thay vì làm đại hoặc dừng luồng.
+- **Chống dao động (`Hysteresis`)**: cấm đổi phương án đang chọn khi không có bằng chứng ngoại sinh mới (`file:line`, chẩn đoán tĩnh, tài liệu gốc); chỉ thay phương án đương nhiệm khi chứng minh được nó sai/vi phạm bất biến hoặc phương án mới đơn giản hơn rõ rệt.
 
 ## 6. Định Tuyến
 - `backend/**` → `backend-development`; `frontend/**` → `frontend-development`.

@@ -1,0 +1,694 @@
+{
+  "version": 1,
+  "description": "Regression fixtures for Cogain Boundary Guard (R1-R10, inline escalation, R8 false-positive protection, and allowlist TTL).",
+  "cases": [
+    {
+      "id": "R1-invalid-dotnet-test",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "dotnet test backend/tests/HR.Tests.csproj" } },
+      "expected_decision": "deny",
+      "expected_rule": "R1-test-runner"
+    },
+    {
+      "id": "R1-invalid-pnpm-test",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "pnpm --filter hrm test" } },
+      "expected_decision": "deny",
+      "expected_rule": "R1-test-runner"
+    },
+    {
+      "id": "R1-valid-verifier-dotnet-test",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "dotnet test backend/tests/HR.Tests.csproj" } },
+      "options": { "envRole": "verifier" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R1-valid-git-status",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "git status" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R1-valid-rg-vitest-alternation",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "rg -n \"vitest|playwright|test\" frontend/*/package.json" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R1-valid-git-log-dotnet-test",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "git log -S \"dotnet test\" --oneline" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R1-invalid-chained-npx-vitest",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "cd frontend/hrm && npx vitest run src/foo.test.ts" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R1-test-runner"
+    },
+    {
+      "id": "R7-valid-grep-arrow-migrations",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "grep -rn \"x => x.Id\" backend/src | grep -v \"/Migrations/\"" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R2-invalid-write-test",
+      "payload": {
+        "tool_name": "Write",
+        "tool_input": { "file_path": "backend/tests/HR.Tests/LeaveTests.cs", "new_content": "public class LeaveTests {}" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R2-test-write"
+    },
+    {
+      "id": "R2-invalid-shell-write-test",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "echo x > backend/tests/HR.Tests/LeaveTests.cs" } },
+      "expected_decision": "deny",
+      "expected_rule": "R2-test-write-shell"
+    },
+    {
+      "id": "R2-valid-test-author-write",
+      "payload": {
+        "tool_name": "Write",
+        "tool_input": { "file_path": "backend/tests/HR.Tests/LeaveTests.cs", "new_content": "public class LeaveTests {}" }
+      },
+      "options": { "envRole": "test-author" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R2-valid-shell-cat-test",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat backend/tests/HR.Tests/LeaveTests.cs" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R3-invalid-write-registry",
+      "payload": {
+        "tool_name": "Write",
+        "tool_input": { "file_path": ".agent/contracts/agent-registry.json", "new_content": "{}" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R3-self-protect"
+    },
+    {
+      "id": "R3-invalid-shell-sed-registry",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "sed -i 's/a/b/' .agent/contracts/agent-registry.json" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R3-self-protect-shell"
+    },
+    {
+      "id": "R3-invalid-inline-escalation-maintainer",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "COGAIN_AGENT_ROLE=maintainer sed -i 's/a/b/' .agent/contracts/agent-registry.json" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R3-self-protect-shell"
+    },
+    {
+      "id": "R3-invalid-inline-escalation-verifier",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "COGAIN_AGENT_ROLE=verifier dotnet test backend/tests/HR.Tests.csproj" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R1-test-runner"
+    },
+    {
+      "id": "R3-valid-maintainer-write-registry",
+      "payload": {
+        "tool_name": "Write",
+        "tool_input": { "file_path": ".agent/contracts/agent-registry.json", "new_content": "{}" }
+      },
+      "options": { "envRole": "maintainer" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R3-valid-cli-inline-escalation",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "COGAIN_AGENT_ROLE=verifier dotnet test backend/tests/HR.Tests.csproj" }
+      },
+      "options": { "cliMode": true },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R3-valid-cat-redirect-out",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "cat .agent/contracts/agent-registry.json > /tmp/reg.json" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R5-invalid-pgpassword-literal",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "PGPASSWORD=supersecret psql -h localhost -U postgres -d cogain" }
+      },
+      "options": { "envRole": "maintainer" },
+      "expected_decision": "deny",
+      "expected_rule": "R5-secret-inline"
+    },
+    {
+      "id": "R5-valid-pgpassword-env",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "PGPASSWORD=\"$DB_PASS\" psql -h localhost -U postgres -d cogain" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R6-invalid-drop-table",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "psql -d cogain -c \"DROP TABLE employees;\"" }
+      },
+      "options": { "envRole": "maintainer" },
+      "expected_decision": "deny",
+      "expected_rule": "R6-db-destructive"
+    },
+    {
+      "id": "R6-valid-select-query",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "psql -d cogain -c \"SELECT count(*) FROM employees;\"" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R7-invalid-write-migration",
+      "payload": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "backend/src/Services/HR/Cogain.Services.HR.Data/Migrations/20261101_Init.cs",
+          "new_content": "public partial class Init {}"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R7-migration-write"
+    },
+    {
+      "id": "R7-invalid-shell-rm-migration",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "rm backend/src/Services/HR/Migrations/20261101_Init.cs" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R7-migration-write-shell"
+    },
+    {
+      "id": "R7-valid-write-entity",
+      "payload": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "backend/src/Services/HR/Cogain.Services.HR.Data/Entities/Employee.cs",
+          "new_content": "public class Employee {}"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-invalid-fast-check",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "./frontend/fast-check.sh --quick" } },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R8-invalid-chained-fast-build",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cd backend && ./fast-build.sh" } },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R8-invalid-subshell-ci-parity",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "echo $(.agent/scripts/ci-parity.sh)" } },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R8-invalid-dotnet-build",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "dotnet build backend/CogainSolution.sln" } },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R8-valid-git-log-fast-check",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "git log -S fast-check.sh" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-rg-fast-check",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "rg fast-check.sh .agent/" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-echo-fast-check",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "echo fast-check.sh" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-bash-n-fast-check",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "bash -n frontend/fast-check.sh" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-verifier-fast-check",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "./frontend/fast-check.sh --quick" } },
+      "options": { "envRole": "verifier" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R9-invalid-ef-migrations-add",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "dotnet ef migrations add Init" } },
+      "expected_decision": "deny",
+      "expected_rule": "R9-migration-runner"
+    },
+    {
+      "id": "R9-valid-ef-migrations-list",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "dotnet ef migrations list" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-shared-barrel",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/pages/test.ts",
+          "new_string": "import { CustomTable } from '@shared/components';"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-shared-barrel"
+    },
+    {
+      "id": "R10-valid-shared-direct",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/pages/test.ts",
+          "new_string": "import { CustomTable } from '@shared/components/custom-table';"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-zod-uuid",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/schemas/emp.ts",
+          "new_string": "const id = z.string().uuid();"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-zod-uuid"
+    },
+    {
+      "id": "R10-valid-zod-guid",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/schemas/emp.ts",
+          "new_string": "const id = z.guid();"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-route-catch-empty",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/routes/employees/index.tsx",
+          "new_string": "status: z.string().catch('')"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-route-catch-empty"
+    },
+    {
+      "id": "R10-valid-route-optional",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/routes/employees/index.tsx",
+          "new_string": "status: z.string().optional()"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-generated-changelog",
+      "payload": {
+        "tool_name": "Write",
+        "tool_input": { "file_path": "CHANGELOG.md", "new_content": "# Changelog" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-generated-manual-edit"
+    },
+    {
+      "id": "R10-invalid-generated-routetree",
+      "payload": {
+        "tool_name": "Write",
+        "tool_input": { "file_path": "frontend/hrm/src/routeTree.gen.ts", "new_content": "// edited" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-generated-manual-edit"
+    },
+    {
+      "id": "R10-valid-generated-maintainer",
+      "payload": {
+        "tool_name": "Write",
+        "tool_input": { "file_path": ".agent/SKILLS.md", "new_content": "# Skills" }
+      },
+      "options": { "envRole": "maintainer" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-cross-route-private",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/routes/attendance/index.tsx",
+          "new_string": "import { LeaveModal } from '../../leave/_components/leave-modal';"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-cross-route-private-components"
+    },
+    {
+      "id": "R10-valid-same-route-private",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/routes/attendance/detail.tsx",
+          "new_string": "import { Cell } from './_components/cell';\nimport { Header } from '../_components/header';"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-html-number-input",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/erp/src/components/order-form.tsx",
+          "new_string": "return <input className='w-full' type=\"number\" value={qty} />;"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-html-number-input"
+    },
+    {
+      "id": "R10-valid-numeric-input",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/erp/src/components/order-form.tsx",
+          "new_string": "return <NumericInput value={qty} onChange={setQty} />;"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-manual-employee-header",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/services/leave.service.ts",
+          "new_string": "headers: { 'X-Employee-Id': empId }"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-manual-employee-header"
+    },
+    {
+      "id": "R10-valid-content-type-header",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/services/leave.service.ts",
+          "new_string": "headers: { 'Content-Type': 'application/json' }"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-disable-exhaustive-deps",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/hooks/use-emp.ts",
+          "new_string": "// eslint-disable-next-line react-hooks/exhaustive-deps"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-disable-exhaustive-deps"
+    },
+    {
+      "id": "R10-valid-normal-comment",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/hooks/use-emp.ts",
+          "new_string": "// derived from selectedEmployeeId"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-double-cast-unknown",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/crm/src/utils/map.ts",
+          "new_string": "const dto = raw as unknown as CustomerDto;"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-double-cast-unknown"
+    },
+    {
+      "id": "R10-valid-typed-var",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/crm/src/utils/map.ts",
+          "new_string": "const dto: CustomerDto = mapCustomer(raw);"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-empty-catch-cs",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/HR/Services/LeaveService.cs",
+          "new_string": "try { DoWork(); } catch (Exception) { }"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-empty-catch-cs"
+    },
+    {
+      "id": "R10-valid-logged-catch-cs",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/HR/Services/LeaveService.cs",
+          "new_string": "try { DoWork(); } catch (Exception ex) { _logger.LogError(ex, \"fail\"); return Result.Failure(\"err\"); }"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-not-implemented-cs",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/HR/Services/LeaveService.cs",
+          "new_string": "throw new NotImplementedException();"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-not-implemented-cs"
+    },
+    {
+      "id": "R10-valid-invalid-operation-cs",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/HR/Services/LeaveService.cs",
+          "new_string": "throw new InvalidOperationException(\"Invalid state\");"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-obsolete-reconcile-collections",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/ServiceDesk/Services/OrderService.cs",
+          "new_string": "this.ReconcileCollections(entity.Items, dto.Items);"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-obsolete-reconcile-collections"
+    },
+    {
+      "id": "R10-valid-sync-children",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/ServiceDesk/Services/OrderService.cs",
+          "new_string": "entity.SyncChildren(incomingGraph);"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-ts-ignore",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/pages/emp.tsx",
+          "new_string": "// @ts-ignore\nconst x = row.foo;"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-ts-ignore-blanket"
+    },
+    {
+      "id": "R10-valid-clean-ts",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/pages/emp.tsx",
+          "new_string": "const x: string | undefined = row.foo;"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-cross-service-data-using",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/ERP/Services/OrderService.cs",
+          "new_string": "using Cogain.Services.HR.Data.Entities;"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-cross-service-data-using"
+    },
+    {
+      "id": "R10-valid-same-service-data-using",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/ERP/Services/OrderService.cs",
+          "new_string": "using Cogain.Services.ERP.Data.Entities;\nusing Cogain.Services.HR.Contracts;"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-missing-static-asset",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/main.tsx",
+          "new_string": "import './does-not-exist-xyz.css';"
+        }
+      },
+      "options": { "checkFs": true },
+      "expected_decision": "deny",
+      "expected_rule": "R10-missing-static-asset"
+    },
+    {
+      "id": "R10-valid-existing-static-asset",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/main.tsx",
+          "new_string": "import './index.css';"
+        }
+      },
+      "options": { "checkFs": true },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-valid-package-static-asset",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/main.tsx",
+          "new_string": "import 'leaflet/dist/leaflet.css';"
+        }
+      },
+      "options": { "checkFs": true },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-valid-allowlist-active",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/legacy/old-schema.ts",
+          "new_string": "const id = z.string().uuid();"
+        }
+      },
+      "options": {
+        "allowlist": [
+          {
+            "id": "AL-TEST-1",
+            "rule_id": "no-zod-uuid",
+            "path_globs": ["frontend/hrm/src/legacy/*.ts"],
+            "owner": "test",
+            "reason": "legacy migration",
+            "expires_at": "2099-12-31",
+            "rollback_hint": "switch to z.guid()"
+          }
+        ]
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-allowlist-expired",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/hrm/src/legacy/old-schema.ts",
+          "new_string": "const id = z.string().uuid();"
+        }
+      },
+      "options": {
+        "allowlist": [
+          {
+            "id": "AL-TEST-2",
+            "rule_id": "no-zod-uuid",
+            "path_globs": ["frontend/hrm/src/legacy/*.ts"],
+            "owner": "test",
+            "reason": "expired exception",
+            "expires_at": "2020-01-01",
+            "rollback_hint": "switch to z.guid()"
+          }
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-zod-uuid"
+    }
+  ]
+}

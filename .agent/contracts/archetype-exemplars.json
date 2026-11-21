@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "updated_at": "2026-11-21",
+  "archetypes": {
+    "crud-list": {
+      "title": "Màn danh sách CRUD & chứng từ chuẩn",
+      "backend_exemplars": [
+        "backend/src/Services/ServiceDesk/ServiceDesk.API/Controllers/Production/TeamLoansController.cs",
+        "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/Production/TeamLoanService.cs"
+      ],
+      "frontend_exemplars": [
+        "frontend/bizdoc/src/routes/_app/team-loan/index.tsx",
+        "frontend/shared/components/master-detail-layout.tsx",
+        "frontend/shared/components/custom/table-toolbar.tsx",
+        "frontend/shared/components/custom/table-row-actions.tsx",
+        "frontend/shared/components/custom-table.tsx",
+        "frontend/shared/hooks/use-audit-columns.tsx"
+      ],
+      "anti_exemplars_notes": [
+        "Cấm tự dựng cột id: 'actions' hoặc state DeleteConfirm rời rạc; phải truyền rowActions (RowActionsConfig) vào CustomTable.",
+        "Cấm dùng .catch('') hoặc .catch(1) trong SearchSchema gây tràn query param rỗng lên URL; dùng .optional() và đặt default khi đọc.",
+        "Cấm import qua barrel @shared/components, @shared/hooks, @shared/services; import trực tiếp từng file định nghĩa."
+      ],
+      "invariants": [
+        "Tuân thủ phân lớp API -> Services -> Repositories -> Data và trả về Result<T> từ Service.",
+        "Tận dụng BaseService hooks (BeforeApplyAutoFilterCoreAsync, ValidateAsync, GetUpdateIncludeString) thay vì thay thế toàn bộ CRUD orchestration.",
+        "Màn danh sách dùng MasterDetailLayout + TableToolbar + CustomTable + ColumnCode/DoubleLineCell + useAuditColumns."
+      ],
+      "acceptance_template": {
+        "positive": [
+          "Lọc, phân trang, sắp xếp qua AutoFilter trả đúng danh sách chưa xóa mềm và giữ URL search sạch khi tham số mặc định/rỗng.",
+          "Thao tác dòng (Xem/Sửa/Xóa) qua RowActionsConfig hiển thị đúng theo quyền và làm mới query cache sau mutation."
+        ],
+        "negative": [
+          "Truyền tham số lọc rỗng hoặc không hợp lệ không làm vỡ truy vấn hay ghi rác vào URL.",
+          "Thiếu quyền thao tác hoặc bản ghi không tồn tại trả lỗi có cấu trúc, không xóa nhầm hoặc crash UI."
+        ]
+      }
+    },
+    "document-child-sync-form": {
+      "title": "Form chứng từ có bảng con & snapshot liên service",
+      "backend_exemplars": [
+        "backend/src/BuildingBlocks/Contracts/Domain/Entities/Interfaces/ISyncsChildren.cs",
+        "backend/src/BuildingBlocks/Contracts/Application/Interfaces/ISnapshotLifecycleService.cs",
+        "backend/src/BuildingBlocks/Contracts/Snapshots/SnapshotContracts.cs",
+        "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/CommercialTerms/CommercialTermService.cs",
+        "backend/src/Services/ServiceDesk/ServiceDesk.Data/Entities/Production/LaborOrder.cs"
+      ],
+      "frontend_exemplars": [
+        "frontend/bizdoc/src/routes/_app/labor-order/_components/labor-order-form.tsx",
+        "frontend/bizdoc/src/routes/_app/labor-order/_components/labor-order-form.schema.ts",
+        "frontend/shared/hooks/use-ref-doc-selector.ts"
+      ],
+      "anti_exemplars_notes": [
+        "Cấm dùng ReconcileCollections reflection đã deprecated; entity phải implement ISyncsChildren<TEntity> và service override BuildIncomingGraph.",
+        "Cấm gán tay *CodeSnapshot/*NameSnapshot từ client hoặc gọi gRPC rời rạc bên trong transaction DB; pha COLLECT phải chạy trước write boundary qua ISnapshotLifecycleService.",
+        "Cấm dùng z.string().uuid() trong Zod 4 vì từ chối ngầm GUID .NET không chuẩn RFC; dùng z.guid()."
+      ],
+      "invariants": [
+        "WorkItem.Id == Entity.Id (ADR-0001) cho mọi chứng từ tham gia luồng WorkItem.",
+        "Aggregate tự đồng bộ xóa mềm/thêm/sửa bảng con qua ISyncsChildren<TEntity>.SyncChildren.",
+        "Form có CreatorSelector hoặc useRefDocSelector bắt buộc giữ createdById và createdOrganizationId xuyên suốt schema -> defaults -> reset -> payload -> CreateWorkItemRequest."
+      ],
+      "acceptance_template": {
+        "positive": [
+          "Tạo/cập nhật chứng từ đồng bộ đúng tập dòng con (thêm mới, giữ ID cũ khi sửa, xóa mềm dòng bị bỏ) và ghi đủ cột snapshot từ MasterData/HR.",
+          "Dữ liệu API có field/ID nullable hoặc mảng rỗng được chuẩn hóa an toàn vào form khi mở sửa."
+        ],
+        "negative": [
+          "Bỏ một dòng con khi update chỉ soft-delete dòng đó (không cắt FK gây lỗi null constraint hay tạo bản sao trùng).",
+          "Dịch vụ snapshot trả lỗi hoặc thiếu mã tham chiếu bắt buộc sẽ chặn lưu trước khi mở write transaction DB."
+        ]
+      }
+    },
+    "payroll-period-report": {
+      "title": "Báo cáo tổng hợp & chi tiết theo kỳ lương",
+      "backend_exemplars": [
+        "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/Production/PayrollReportQueryHelper.cs",
+        "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/Production/LaborOrderPayrollReportService.cs",
+        "backend/src/BuildingBlocks/Shared/Helpers/AttendanceReportHelper.cs",
+        "backend/src/BuildingBlocks/Contracts/Application/Reports/ReportExecution.cs",
+        "backend/src/BuildingBlocks/Infrastructure/Services/Excel/ExcelReportWriter.cs",
+        "backend/src/BuildingBlocks/Infrastructure/Services/Excel/ExcelReportModels.cs"
+      ],
+      "frontend_exemplars": [
+        "frontend/bizdoc/src/routes/_app/production-management/labor-order-payroll-report/index.tsx",
+        "frontend/bizdoc/src/routes/_app/production-management/labor-order-payroll-report/-components/payroll-report-summary-section.tsx",
+        "frontend/shared/components/report-layout.tsx",
+        "frontend/shared/hooks/use-report-queries.ts",
+        "frontend/shared/components/custom/payroll-period-input.tsx"
+      ],
+      "anti_exemplars_notes": [
+        "Cấm đếm phiếu chưa đóng (không lọc EWorkItemStatus.Closed) hoặc tự tính khoảng ngày 16..15 bằng tay thay vì AttendanceReportPeriod / PayrollReportQueryHelper.",
+        "Cấm tự suy diễn mốc lọc sang CreatedDate khi nghiệp vụ tính theo HrConfirmedDate.",
+        "Cấm khai báo lặp các cặp *Label trong DTO bộ lọc; dùng Dictionary<string, string>? FilterLabels kết hợp ExcelReportLabels.ResolveFilterLabel.",
+        "Cấm import chéo _components/-components của route khác; dùng helper từ @shared/lib và @shared/components/report-layout."
+      ],
+      "invariants": [
+        "Chỉ tổng hợp phiếu có WorkItem đạt EWorkItemStatus.Closed qua PayrollReportQueryHelper.GetClosedWorkItemIdsAsync.",
+        "Cắt kỳ lương qua PayrollReportQueryHelper.TryResolvePayrollPeriod / AttendanceReportPeriod.Resolve(..., payroll: true) từ ngày 16 tháng chọn đến hết ngày 15 tháng sau giờ VN.",
+        "Thực thi phân trang, tổng hợp và xuất Excel qua ReportExecution + ExcelReportWriter + useReportSummaryQuery/useReportPageQuery/useReportExcelExport."
+      ],
+      "acceptance_template": {
+        "positive": [
+          "Tổng hợp, chi tiết phân trang và file Excel xuất ra khớp số liệu trong kỳ 16..(15 tháng sau) và hiển thị đúng chip nhãn bộ lọc.",
+          "Phiếu đã Closed có mốc hiệu lực nằm đúng ranh giới kỳ được tính vào đúng kỳ lương tương ứng."
+        ],
+        "negative": [
+          "Phiếu đang chờ duyệt, nháp hoặc bị từ chối (chưa Closed) bị loại khỏi mọi số liệu tổng hợp, chi tiết và xuất Excel.",
+          "Kỳ chọn không hợp lệ hoặc không có dữ liệu trả về báo cáo rỗng đúng phân trang, không ném ngoại lệ."
+        ]
+      }
+    },
+    "hr-confirm": {
+      "title": "Luồng nhân sự xác nhận (HR Confirm)",
+      "backend_exemplars": [
+        "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/Production/HrConfirmSnapshotPolicies.cs",
+        "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/Production/LaborOrderService.cs"
+      ],
+      "frontend_exemplars": [
+        "frontend/hrm/src/routes/_app/hr-confirm/labor-order/index.tsx",
+        "frontend/hrm/src/routes/_app/hr-confirm/labor-order/$id/detail.tsx",
+        "frontend/hrm/src/routes/_app/hr-confirm/-components/hr-confirm-utils.ts"
+      ],
+      "anti_exemplars_notes": [
+        "Cấm ghi HrConfirmedDate / HrConfirmedById trước khi WorkItem transition thực sự đạt EWorkItemStatus.Closed.",
+        "Cấm bỏ qua ISnapshotPolicy<HrConfirmSnapshotCommand, TEntity> khi gán snapshot người xác nhận.",
+        "Cấm ghép điều kiện lọc HR Confirm thủ công khi đã có hr-confirm-utils.ts và currentStepCode cố định theo enum bước HR_CONFIRM."
+      ],
+      "invariants": [
+        "Thu thập snapshot người xác nhận trước transition qua ISnapshotLifecycleService.ExecuteAsync và ISnapshotPolicy<HrConfirmSnapshotCommand, TEntity>.",
+        "Chỉ ghi HrConfirmedDate = DateTimeOffset.UtcNow và HrConfirmedById (kèm IsHrConfirm nếu có) khi response.StatusEnum == (int)EWorkItemStatus.Closed.",
+        "Màn HRM dưới frontend/hrm/src/routes/_app/hr-confirm/* khóa cứng currentStepCode theo giá trị HR_CONFIRM của domain."
+      ],
+      "acceptance_template": {
+        "positive": [
+          "Khi HR xác nhận hoàn tất và WorkItem chuyển sang Closed, bản ghi lưu đủ HrConfirmedDate, HrConfirmedById và snapshot mã/tên người xác nhận.",
+          "Màn danh sách và chi tiết hiển thị hrConfirmedDate và hrConfirmedByNameSnapshot đồng bộ sau xác nhận."
+        ],
+        "negative": [
+          "Transition chưa đạt EWorkItemStatus.Closed (hoặc bước trung gian/trả lại) tuyệt đối không ghi HrConfirmedDate.",
+          "Người không có quyền bước HR_CONFIRM hoặc phiếu không ở bước HR_CONFIRM bị từ chối thao tác."
+        ]
+      }
+    },
+    "excel-import-export": {
+      "title": "Nhập/Xuất Excel qua BaseService hooks & batch lookup",
+      "backend_exemplars": [
+        "backend/src/BuildingBlocks/Infrastructure/Services/BaseService.cs",
+        "backend/src/BuildingBlocks/Infrastructure/Services/Excel/ExcelDataExporter.cs",
+        "backend/src/Services/MasterData/MasterData.Services/Implement/Labor/WorkerSkillService.cs"
+      ],
+      "frontend_exemplars": [
+        "frontend/shared/lib/excel-template-export.ts",
+        "frontend/shared/lib/excel-report-export.ts",
+        "frontend/interactive/src/components/excel-import-export-actions.tsx"
+      ],
+      "anti_exemplars_notes": [
+        "Cấm override trực tiếp ImportFromExcel, ExportTemplateAsync, ExportDataAsync; chỉ mở rộng qua các hook được BaseService hỗ trợ.",
+        "Cấm gọi DB/gRPC theo từng dòng hoặc từng ô Excel; bắt buộc tải lô (batch preload) trước vòng lặp xử lý dòng.",
+        "Khi cột mã tham chiếu để trống lúc update qua Excel, giữ Guid.Empty ở đồ thị tạm và bảo toàn nguyên trạng ID/snapshot cũ."
+      ],
+      "invariants": [
+        "Cột biểu mẫu nhập và cột xuất dữ liệu tái nhập phải đối xứng qua một định nghĩa hợp đồng cột thống nhất.",
+        "Xuất dữ liệu tái nhập dùng ExcelDataExporter.WriteBytes; xuất báo cáo phân tích dùng ExcelReportWriter.Write kèm nhãn bộ lọc đọc được.",
+        "Trả lỗi chi tiết gắn số dòng và không lưu một phần các dòng lỗi khi giao dịch lô thất bại."
+      ],
+      "acceptance_template": {
+        "positive": [
+          "Tải file mẫu, nhập nhiều dòng hợp lệ và xuất lại dữ liệu giữ nguyên cấu trúc cột đối xứng và tra cứu đúng snapshot theo lô.",
+          "Dòng có lỗi dữ liệu trả thông báo chỉ rõ vị trí dòng/cột vi phạm."
+        ],
+        "negative": [
+          "Nhập lô lớn không sinh truy vấn N+1 tới DB hoặc gRPC theo số dòng.",
+          "Dòng sai định dạng hoặc thiếu tham chiếu bắt buộc không được ép về giá trị rỗng giả để lưu lọt."
+        ]
+      }
+    },
+    "hierarchical-tree-and-matrix": {
+      "title": "Bảng phân cấp hình cây (TreeTable) & lưới ma trận lớn",
+      "backend_exemplars": [
+        "backend/src/Services/MasterData/MasterData.Services/Implement/Labor/WorkerSkillService.cs"
+      ],
+      "frontend_exemplars": [
+        "frontend/shared/components/custom/tree-table.tsx",
+        "frontend/shared/components/custom/tree-table-virtual.tsx",
+        "frontend/hrm/src/routes/_app/employee-attendance-v2/employee-attendance-board.tsx"
+      ],
+      "anti_exemplars_notes": [
+        "Cấm render trực tiếp hàng nghìn nút cây hoặc ô ma trận không qua ảo hóa (TreeTableVirtual / virtualization) gây treo luồng giao diện.",
+        "Cấm gọi hook truy vấn lẻ (useQuery theo ID) bên trong từng dòng/ô của bảng cây hoặc lưới chấm công."
+      ],
+      "invariants": [
+        "Dữ liệu phân cấp hoặc ma trận phải chuẩn hóa cấu trúc phẳng/chỉ mục O(1) theo khóa trước khi render.",
+        "Tận dụng TreeTable / TreeTableVirtual trong @shared/components/custom thay vì tự dựng state đóng/mở đệ quy rời rạc trên từng màn hình."
+      ],
+      "acceptance_template": {
+        "positive": [
+          "Mở rộng/thu gọn nhánh cây, lọc tìm kiếm và cuộn lưới dữ liệu lớn phản hồi mượt, giữ đúng quan hệ cha - con.",
+          "Cập nhật một nút hoặc ô chỉ làm mới đúng phạm vi dữ liệu liên quan mà không mất trạng thái đang mở."
+        ],
+        "negative": [
+          "Dữ liệu lớn hoặc cây nhiều tầng không gây vòng lặp render vô hạn hay N+1 request mạng.",
+          "Tham chiếu cha không hợp lệ hoặc chu trình dữ liệu được chặn an toàn, không làm treo trình duyệt."
+        ]
+      }
+    }
+  },
+  "global_state_invariants": [
+    {
+      "id": "INV-WORKITEM-ID",
+      "rule": "WorkItem.Id == Entity.Id (ADR-0001): mọi thực thể tham gia luồng WorkItem dùng chung khóa chính với WorkItem khi gọi CreateWorkItem, CheckWorkItemPermission và GetWorkItemsByIds.",
+      "forbidden": "Tạo WorkItem với Id độc lập rồi dùng RefDocId để join thay vì khóa chính Id.",
+      "evidence": "docs/adr/0001-workitem-id-equals-entity-id.md"
+    },
+    {
+      "id": "INV-CLOSED-WORKITEM",
+      "rule": "Chỉ tính số liệu báo cáo/tổng hợp lương từ phiếu có WorkItem đạt EWorkItemStatus.Closed qua PayrollReportQueryHelper.GetClosedWorkItemIdsAsync.",
+      "forbidden": "Đếm phiếu nháp, đang xử lý, chờ duyệt hoặc chỉ lọc status bảng nội bộ mà bỏ qua EWorkItemStatus.Closed.",
+      "evidence": "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/Production/PayrollReportQueryHelper.cs"
+    },
+    {
+      "id": "INV-HR-CONFIRMED-DATE",
+      "rule": "Mốc HrConfirmedDate = DateTimeOffset.UtcNow và HrConfirmedById chỉ được ghi khi transition WorkItem đạt response.StatusEnum == (int)EWorkItemStatus.Closed; báo cáo cắt kỳ theo mốc hiệu lực đã chốt thay vì tự đổi sang CreatedDate.",
+      "forbidden": "Ghi HrConfirmedDate ở bước trung gian chưa Closed hoặc tự ý thay thế mốc hiệu lực sang CreatedDate.",
+      "evidence": "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/Production/HrConfirmSnapshotPolicies.cs"
+    },
+    {
+      "id": "INV-PAYROLL-PERIOD",
+      "rule": "Cắt kỳ lương chuẩn qua PayrollReportQueryHelper.TryResolvePayrollPeriod và AttendanceReportPeriod.Resolve(..., payroll: true) từ ngày 16 tháng chọn đến hết ngày 15 tháng sau theo giờ Việt Nam.",
+      "forbidden": "Tự cộng trừ DateTime/DateTimeOffset cục bộ hoặc lệch ranh giới múi giờ VN.",
+      "evidence": "backend/src/BuildingBlocks/Shared/Helpers/AttendanceReportHelper.cs"
+    },
+    {
+      "id": "INV-CHILD-SYNC-SNAPSHOT",
+      "rule": "Aggregate đồng bộ xóa mềm bảng con bằng ISyncsChildren<TEntity> + BuildIncomingGraph và thu thập snapshot liên service trước write boundary qua ISnapshotLifecycleService.",
+      "forbidden": "Dùng ReconcileCollections reflection (đã Obsolete), gán tay cột *Snapshot từ client, hoặc gọi gRPC snapshot bên trong DB transaction.",
+      "evidence": "backend/src/BuildingBlocks/Contracts/Domain/Entities/Interfaces/ISyncsChildren.cs"
+    }
+  ]
+}

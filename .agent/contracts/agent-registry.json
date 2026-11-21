@@ -24,6 +24,7 @@
     ".agent/scripts/agent-role.sh",
     ".agent/harness/agy/hooks.json",
     ".agent/harness/agy/boundary-guard.mjs",
+    ".agent/harness/agy/lifecycle-hook.mjs",
     ".agents/hooks.json",
     ".claude/settings.json",
     ".claude/settings.local.json",
@@ -70,7 +71,8 @@
     "role_inline": "COGAIN_AGENT_ROLE=<role> đứng đầu dòng lệnh, có hiệu lực cho đúng lệnh đó và luôn hiện trong transcript",
     "audit_log": ".agent/reports/boundary-guard.log",
     "default_role": "implementer",
-    "role_ttl_hours": 8,
+    "role_ttl_hours": 14,
+    "allowlist": [],
     "role_semantics": "State file và inline chỉ CẤP THÊM năng lực (R1/R2). Ràng buộc write_paths (R4) chỉ áp khi role đến từ danh tính subagent thật hoặc env, để không gông nhầm seat đang chạy song song.",
     "fail_mode": "open-on-crash",
     "task_contract": {
@@ -94,13 +96,10 @@
         ],
         "deny_message": "Permission Denied: Running test suites is strictly reserved for 'verifier' and 'test-author'.",
         "patterns": [
-          "\\bdotnet\\s+test\\b",
-          "\\bdotnet\\s+[^;&|]+\\s+test\\b",
-          "\\bvitest\\b",
-          "\\bjest\\b",
-          "\\bplaywright\\s+test\\b",
-          "\\b(npm|pnpm|yarn|npx)\\s+(run\\s+)?test(:|\\s|$)",
-          "\\bpnpm\\s+--filter\\s+\\S+\\s+test\\b"
+          "(?:^|[;&(`]|\\|\\|)\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*dotnet\\s+(?:[^;&|\"']+\\s+)?test(?:\\s|[;&|)'\"]|$)",
+          "(?:^|[;&(`]|\\|\\|)\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:npx|pnpx|bunx)\\s+|(?:pnpm|npm|yarn)\\s+(?:--filter\\s+\\S+\\s+)?(?:exec|dlx)\\s+)?(?:\\./node_modules/\\.bin/)?(?:vitest|jest)(?:\\s|[;&|)'\"]|$)",
+          "(?:^|[;&(`]|\\|\\|)\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:npx|pnpx|bunx)\\s+|(?:pnpm|npm|yarn)\\s+(?:--filter\\s+\\S+\\s+)?(?:exec|dlx)\\s+)?(?:\\./node_modules/\\.bin/)?playwright\\s+test(?:\\s|[;&|)'\"]|$)",
+          "(?:^|[;&(`]|\\|\\|)\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:npm|pnpm|yarn|npx)\\s+(?:--filter\\s+\\S+\\s+)?(?:run\\s+)?test(?::\\S+|\\s|[;&|)'\"]|$)"
         ]
       },
       "test_write": {
@@ -204,13 +203,12 @@
         ],
         "echo_command": true,
         "deny_message": "Permission Denied: build/typecheck ON-DEMAND ONLY, chỉ chạy khi user yêu cầu rõ ràng. CI parity qua verifier/maintainer; test-author chỉ chạy trong phạm vi test được cấp. Worker và main không tự build.",
-        "known_false_positive": "Lệnh chỉ đọc có nhắc tên script (`cat backend/fast-build.sh`) cũng bị chặn; đọc file bằng tool `read`.",
         "patterns": [
           "\\bdotnet\\s+(build|publish|msbuild)\\b",
           "\\bmsbuild\\b",
-          "fast-build\\.sh",
-          "fast-check\\.sh",
-          "ci-parity\\.sh",
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:bash|sh|zsh)\\s+(?:-[exuo]+\\s+|-c\\s+['\"]?)?|(?:source|\\.)\\s+)?(?:\\./|[\\w./-]*/)?fast-build\\.sh(?:\\s|[;&|)'\"]|$)",
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:bash|sh|zsh)\\s+(?:-[exuo]+\\s+|-c\\s+['\"]?)?|(?:source|\\.)\\s+)?(?:\\./|[\\w./-]*/)?fast-check\\.sh(?:\\s|[;&|)'\"]|$)",
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:bash|sh|zsh)\\s+(?:-[exuo]+\\s+|-c\\s+['\"]?)?|(?:source|\\.)\\s+)?(?:\\./|[\\w./-]*/)?ci-parity\\.sh(?:\\s|[;&|)'\"]|$)",
           "\\bvite\\s+build\\b",
           "\\btsc\\b[^;&|]*\\s(-b|--build|-p|--project|--noEmit)\\b",
           "\\b(pnpm|npm|yarn)\\b[^;&|]*\\s(run\\s+)?build(:|\\s|$)",
@@ -265,7 +263,8 @@
               "frontend/**/*.tsx"
             ],
             "pattern": "from\\s+['\"]@shared/(?:components|hooks|services)(?:/index|/master-data(?:/index)?)?['\"]",
-            "message": "Cấm import qua barrel '@shared/components|hooks|services'. Hãy import trực tiếp từ file định nghĩa (ví dụ '@shared/components/custom-table', '@shared/hooks/use-audit-columns')."
+            "message": "Cấm import qua barrel '@shared/components|hooks|services'. Hãy import trực tiếp từ file định nghĩa (ví dụ '@shared/components/custom-table', '@shared/hooks/use-audit-columns').",
+            "source_feedback": "frontend.md & STRUCTURE.md: import trực tiếp từng file thay vì barrel"
           },
           {
             "id": "no-zod-uuid",
@@ -274,7 +273,8 @@
               "frontend/**/*.tsx"
             ],
             "pattern": "\\.\\s*uuid\\s*\\(",
-            "message": "Cấm dùng '.uuid()' của Zod 4 cho ID .NET vì từ chối ngầm GUID không chuẩn RFC. Hãy dùng 'z.guid()'."
+            "message": "Cấm dùng '.uuid()' của Zod 4 cho ID .NET vì từ chối ngầm GUID không chuẩn RFC. Hãy dùng 'z.guid()'.",
+            "source_feedback": "ERRORS.md & cogain-form-rhf-zod: Zod 4 .uuid() từ chối GUID .NET"
           },
           {
             "id": "no-route-catch-empty",
@@ -283,7 +283,105 @@
               "frontend/*/src/routes/**/*.tsx"
             ],
             "pattern": "\\.catch\\(\\s*['\"]{2}\\s*\\)",
-            "message": "Cấm dùng \".catch('')\" trong SearchSchema của route vì làm tràn query param rỗng lên URL. Hãy dùng '.optional()' và đặt default khi đọc."
+            "message": "Cấm dùng \".catch('')\" trong SearchSchema của route vì làm tràn query param rỗng lên URL. Hãy dùng '.optional()' và đặt default khi đọc.",
+            "source_feedback": "cogain-react-state-effects: tránh tràn query param rỗng lên URL"
+          },
+          {
+            "id": "no-generated-manual-edit",
+            "path_globs": [
+              "CHANGELOG.md",
+              ".agent/SKILLS.md",
+              "frontend/**/routeTree.gen.ts"
+            ],
+            "pattern": "[\\s\\S]*",
+            "message": "Cấm sửa tay file auto-generated (CHANGELOG.md, .agent/SKILLS.md, routeTree.gen.ts). Dùng generator/script chính thức.",
+            "source_feedback": "AI_RULES.md §8: không sửa tay CHANGELOG.md hoặc file auto-generated"
+          },
+          {
+            "id": "no-cross-route-private-components",
+            "path_globs": [
+              "frontend/*/src/routes/**/*.ts",
+              "frontend/*/src/routes/**/*.tsx"
+            ],
+            "pattern": "(?:\\.\\./)+[^/'\"]+/(?:_components|-components)/",
+            "message": "Cấm import component nội bộ (_components/-components) của route khác. Hãy đưa component dùng chung lên @shared hoặc module chung.",
+            "source_feedback": "ESLint route boundary: cấm mượn component nội bộ của route khác"
+          },
+          {
+            "id": "no-html-number-input",
+            "path_globs": [
+              "frontend/**/*.tsx"
+            ],
+            "pattern": "<input[^>]{0,200}\\btype\\s*=\\s*[\"']number[\"']",
+            "message": "Cấm dùng <input type=\"number\"> thô. Hãy dùng 'NumericInput' từ '@shared/ui' để đồng bộ định dạng số.",
+            "source_feedback": ".agent/rules/guard-frontend-antipatterns.md"
+          },
+          {
+            "id": "no-manual-employee-header",
+            "path_globs": [
+              "frontend/**/*.ts",
+              "frontend/**/*.tsx"
+            ],
+            "pattern": "[\"']X-Employee-Id[\"']",
+            "message": "Cấm gán tay header 'X-Employee-Id'. Hãy để interceptor của api-client tự đính kèm.",
+            "source_feedback": ".agent/rules/guard-frontend-antipatterns.md"
+          },
+          {
+            "id": "no-disable-exhaustive-deps",
+            "path_globs": [
+              "frontend/**/*.ts",
+              "frontend/**/*.tsx"
+            ],
+            "pattern": "eslint-disable[^\\n]{0,80}react-hooks/exhaustive-deps",
+            "message": "Cấm tắt 'react-hooks/exhaustive-deps'. Hãy chuyển về render derivation/event handler hoặc sửa dependency array.",
+            "source_feedback": ".agent/rules/guard-frontend-antipatterns.md & cogain-react-state-effects"
+          },
+          {
+            "id": "no-double-cast-unknown",
+            "path_globs": [
+              "frontend/**/*.ts",
+              "frontend/**/*.tsx"
+            ],
+            "pattern": "\\bas\\s+unknown\\s+as\\b",
+            "message": "Cấm ép kiểu kép 'as unknown as'. Hãy khai báo đúng type từ @shared/types hoặc narrow kiểu an toàn.",
+            "source_feedback": "code-quality.md & typescript-pro"
+          },
+          {
+            "id": "no-empty-catch-cs",
+            "path_globs": [
+              "backend/src/**/*.cs"
+            ],
+            "pattern": "\\bcatch\\s*(?:\\([^)]{0,120}\\))?\\s*\\{\\s*\\}",
+            "message": "Cấm khối catch rỗng nuốt lỗi trong C#. Hãy log đủ context qua ILogger và trả Result.Failure hoặc ném lại ngoại lệ.",
+            "source_feedback": ".agent/rules/guard-backend-antipatterns.md & business.md §6"
+          },
+          {
+            "id": "no-not-implemented-cs",
+            "path_globs": [
+              "backend/src/**/*.cs"
+            ],
+            "pattern": "\\bnew\\s+NotImplementedException\\s*\\(",
+            "message": "Cấm để lại 'new NotImplementedException()' trong mã sản phẩm.",
+            "source_feedback": "backend-development review feedback"
+          },
+          {
+            "id": "no-obsolete-reconcile-collections",
+            "path_globs": [
+              "backend/src/**/*.cs"
+            ],
+            "pattern": "\\bReconcileCollections\\s*(?:<|\\()",
+            "message": "Cấm dùng 'ReconcileCollections' (đã Obsolete, dùng reflection dễ gãy FK). Hãy implement 'ISyncsChildren<TEntity>' trên aggregate và override 'BuildIncomingGraph' trong Service (xem [skill:cogain-child-sync]).",
+            "source_feedback": "archetype-exemplars.json & cogain-child-sync: thay ReconcileCollections bằng ISyncsChildren"
+          },
+          {
+            "id": "no-ts-ignore-blanket",
+            "path_globs": [
+              "frontend/**/*.ts",
+              "frontend/**/*.tsx"
+            ],
+            "pattern": "@ts-ignore\\b",
+            "message": "Cấm dùng '@ts-ignore' che giấu lỗi kiểu tĩnh. Hãy khai báo đúng kiểu từ DTO/@shared/types hoặc tra tài liệu gốc qua context7.",
+            "source_feedback": "code-quality.md & continuous-research: chống tắt kiểm tra kiểu tĩnh"
           }
         ]
       }
@@ -493,7 +591,9 @@
         "Grep",
         "Glob",
         "WebSearch",
-        "WebFetch"
+        "WebFetch",
+        "MCP:lsp",
+        "MCP:context7"
       ],
       "skills": [
         "research"

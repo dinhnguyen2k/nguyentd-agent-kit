@@ -626,8 +626,12 @@ export function validateTaskSupersessionSourceAuthorization(authorization, inspe
       !equal(Object.keys(authorization).sort(), SOURCE_AUTHORIZATION_FIELDS)) {
     raise('INVALID_SUPERSESSION_APPROVAL', 'strict source authorization keys required');
   }
-  if (authorization.kind !== 'user-approved-current-source-review') {
-    raise('INVALID_SUPERSESSION_APPROVAL', 'explicit user-approved-current-source-review kind required');
+  const allowedAuthKinds = new Set([
+    'user-approved-current-source-review',
+    'coordinator-rework-within-delegated-scope',
+  ]);
+  if (!allowedAuthKinds.has(authorization.kind)) {
+    raise('INVALID_SUPERSESSION_APPROVAL', 'explicit source authorization kind required');
   }
   if (typeof authorization.user_words !== 'string' || !authorization.user_words.trim()) {
     raise('INVALID_SUPERSESSION_APPROVAL', 'explicit user-authorized current source words required');

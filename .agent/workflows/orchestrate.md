@@ -46,10 +46,10 @@ Reuse `.agent/workflows/plan.md` canonical TASK/overview pattern and `.agent/con
 Follow its metadata/packet protocol; use `readTaskContract` and `deriveTaskManifest` from `.agent/scripts/task-contract.mjs`, not a second parser or editable manifest contract.
 Do not repeat scope/acceptance/checks between canonical metadata and prose; generation still needs explicit user authorization.
 
-- Parallel workers may run only with disjoint `allowed_paths`.
+- Parallel workers may run only with disjoint `allowed_paths` and without coupling to an unsettled Red-Zone business invariant.
 - Backend/frontend contract work is sequenced unless ownership is truly disjoint.
 - No worker may merge, deploy, or execute destructive production actions.
-- Require human approval for breaking, destructive, or product-decision changes.
+- Require human approval for breaking, destructive, or Red-Zone product-decision changes (`AI_RULES.md` §3): package any Red-Zone question with evidence-backed recommendation into `Hộp thư Quyết định`, suspend only that blocked branch (and direct dependents), and continue executing ready independent branches without halting the whole run.
 
 ## 3. Execute and Verify
 
@@ -102,7 +102,7 @@ Version giảm hoặc canonical hash đổi khi version giữ nguyên bị rejec
 Coordinator (`orchestrator` hoặc `maintainer`) ghi explicit checkpoint tại `.agent/reports/merge-gate/checkpoints/*.md` với đúng một fence `json gate-supersession`, không dùng pass record hoặc caller boolean để thay approval.
 Schema seam chính thức trong helper là `SUPERSESSION_APPROVAL_FIELDS`; `readTaskSupersessionApproval(repoRoot, approvalRef, inspection)` kiểm exact fields, exact inspection, nguồn/state còn hiện hành, path và symlink.
 Checkpoint gồm `approval_version: 1`, `owner: "orchestrator"` (hoặc `"maintainer"`), `model_degraded: false`, `independent_review: true`, `inspection` nguyên object review, `reason` không rỗng và `source_authorization`.
-`source_authorization` bắt buộc đúng 3 keys `['authorized_mutations', 'kind', 'user_words']`, với `kind: "user-approved-current-source-review"`, `user_words` trích nguyên yêu cầu cho phép review/pin nguồn hiện tại, và mảng `authorized_mutations` gồm các item `{ path, provenance, sha256? }` với path repo-relative đã chuẩn hoá, provenance không rỗng và sha256 64-hex tuỳ chọn.
+`source_authorization` bắt buộc đúng 3 keys `['authorized_mutations', 'kind', 'user_words']`, với `kind` là `"user-approved-current-source-review"` (hoặc `"coordinator-rework-within-delegated-scope"` khi điều phối viên tự nâng phiên bản để bổ sung caller/delta hợp lệ nằm trọn trong mục tiêu đã được người dùng ủy quyền), `user_words` trích nguyên yêu cầu gốc/lời cho phép của người dùng, và mảng `authorized_mutations` gồm các item `{ path, provenance, sha256? }` với path repo-relative đã chuẩn hoá, provenance không rỗng và sha256 64-hex tuỳ chọn.
 Khi `baseline_kind` là `dispatch-backed`, `authorized_mutations` bắt buộc bao phủ đầy đủ toàn bộ `mutation_paths` và `newly_reviewed_paths`; trường hợp `hash-only` duy trì mảng hợp lệ nhưng không bắt buộc liệt kê toàn bộ file lịch sử.
 Helper không biến inspection thành approval khi chưa có checkpoint hợp lệ.
 

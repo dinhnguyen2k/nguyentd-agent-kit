@@ -19,7 +19,7 @@
 
 ## Format code: ưu tiên gọn trên một dòng
 
-- **Biểu thức ngắn giữ nguyên một dòng**: điều kiện JSX, ternary, chuỗi `??` — đừng bẻ dòng khi đọc một dòng vẫn rõ.
+- **Biểu thức ngắn giữ nguyên một dòng**: điều kiện JSX, ternary, chuỗi `??` - đừng bẻ dòng khi đọc một dòng vẫn rõ.
 - **C#**: ưu tiên expression-bodied method (`=>`) khi thân hàm chỉ có một biểu thức; dọn hint `Use expression body for method` trong file đang sửa.
 - Khi `??` buộc phải xuống dòng, đặt vế sau **thẳng hàng** với vế trước, không thụt thêm một cấp.
 - **Comment chỉ giữ phần "tại sao" không suy ra được từ code**, tối đa ~2 dòng.
@@ -38,3 +38,10 @@
 - **Cấm tuyệt đối viết tay migration**: Tuyệt đối không được tự gõ hoặc tạo thủ công file `.cs` migration.
 - **Chỉ dùng qua add-migration**: Bắt buộc phải dùng `./dev.sh add-migration <Service> <MigrationName>` để EF Core tự sinh file migration và ModelSnapshot chuẩn xác.
 - **Cấm sửa file migration đã sinh**: Tuyệt đối không sửa tay file migration hay snapshot để "lách" lỗi; nếu sai sót bắt buộc phải sửa từ Entity hoặc Fluent API Configuration rồi sinh lại.
+
+## Kim chỉ nam tự quyết khi quy tắc im lặng (Vùng Xanh & Vùng Vàng)
+
+- **Tài liệu hoặc comment cũ lệch mã nguồn thực chạy**: Luôn tin luồng code đang chạy thật và các caller hiện hữu; không dừng luồng chỉ vì XML doc/comment cũ chưa cập nhật (chỉ sửa comment trên đúng hàm đang chạm nếu đã xác minh rõ).
+- **Dữ liệu lịch sử trống hoặc trường nullable trên UI/Báo cáo**: Giữ nguyên kiểu `null`/`undefined` trung thực ở DTO, state và payload API (tuyệt đối không gán chuỗi giả `"N/A"` hay `""` xuống dữ liệu lưu); chỉ hiển thị ký hiệu `"-"` ở tầng cell/view cuối cùng theo chuẩn `@shared/lib` và `ReportLayout`.
+- **Mở rộng hợp đồng API/DTO nội bộ**: Luôn ưu tiên phương án tương thích ngược 100% (thêm trường `optional`/nullable, giữ nguyên hành vi cho caller cũ chưa truyền trường mới); chỉ đẩy vào `Hộp thư Quyết định` khi bắt buộc phải phá tương thích ngược hoặc đổi ý nghĩa nghiệp vụ của trường cũ.
+- **Phân xử giữa hai phương án kỹ thuật cùng đúng**: Chọn phương án (1) tải theo lô (batch query / batch gRPC) thay vì gọi lẻ trong vòng lặp, (2) ít khái niệm, ít tệp và ít tầng trung gian hơn, (3) đặt logic ngay tại nơi sở hữu dữ liệu thay vì tạo helper/wrapper dùng một lần.

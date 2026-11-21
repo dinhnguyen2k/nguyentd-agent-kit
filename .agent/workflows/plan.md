@@ -20,8 +20,8 @@ $ARGUMENTS
 ## Main discovery
 
 1. Chốt yêu cầu, invariant và ngoài scope từ user/source/luật; lấy hành vi và contract hiện hữu làm baseline. Main được tư vấn phương án tốt hơn có evidence/tradeoff; tách bạch requirement của user, proposal của Main và approved scope, không tự mở scope.
-   Không coi phần user chưa mô tả là quyền tự thêm dữ liệu bắt buộc, đổi default, định dạng, thao tác hoặc public contract.
-   Chỉ hỏi nghiệp vụ hoặc đánh đổi repo không giải đáp được; nếu source mâu thuẫn luật/doc thì báo mâu thuẫn, không tự chọn baseline.
+   Không coi phần user chưa mô tả là quyền tự thêm dữ liệu bắt buộc, đổi hành vi nghiệp vụ gốc hoặc phá tương thích ngược public contract.
+   Áp dụng **Phân tầng tự quyết 3 vùng** (`AI_RULES.md` §3): Vùng Xanh và Vùng Vàng bắt buộc tự tra cứu (`lsp` + `archetype-exemplars.json` + tối đa 2 tệp chuẩn cùng phân hệ + `context7` + `OPINION.md`) để tự chốt (Vùng Vàng ghi vào bảng `Quyết định kỹ thuật đã tự chốt` tối đa 5 mục ở báo cáo bàn giao); doc/comment cũ lệch runtime code mà luồng code đã rõ thì tin runtime code. Chỉ điểm thuộc **Vùng Đỏ** chưa có tiền lệ mới đưa vào `Hộp thư Quyết định` (treo riêng nhánh đó, tiếp tục chạy các nhánh độc lập).
 2. Trace flow thật tới điểm sở hữu hành vi; trước dispatch xác định đúng owner và ranh giới caller/consumer theo mức độ rủi ro, không quét workspace hoặc load lại context đã có.
    Gom các vùng khai báo độc lập vào cùng lượt đọc; khi nội dung còn trong context, không đọc lại cùng vùng chỉ để xác nhận lần nữa.
    Chỉ mở lại vùng đó khi source đổi, nội dung không còn trong context hoặc có mâu thuẫn/failure mode mới; worker đọc chi tiết thân hàm tại điểm sửa và dependency trực tiếp, không chạy lại khảo sát toàn module.
@@ -74,6 +74,7 @@ Không ép sinh bốn phương án, không tự mở agent review độc lập.
 - **CẦN SỬA**: rủi ro thiết kế/bảo trì có tình huống cụ thể; Main sửa phương án hoặc chốt đánh đổi có bằng chứng trước triển khai, không dùng đánh đổi để bỏ qua luật cứng hay acceptance.
 - **GỢI Ý**: sở thích không có failure mode cụ thể; không chặn và không mở rộng scope.
 - Chỉ ghi finding và thay đổi quyết định trong chat/contract hiện có, không sinh báo cáo riêng hay bốn mục PASS rỗng; không có finding thì tiếp tục.
+- **Yêu cầu bằng chứng ngoại sinh & Luật trễ (`Hysteresis`)**: cấm mở vòng đổi phương án hoặc thêm abstraction khi không có bằng chứng khách quan mới (`path:line`, chẩn đoán tĩnh, đặc tả thư viện qua `context7`); chỉ thay phương án đương nhiệm khi chứng minh được nó sai/vi phạm bất biến hoặc phương án mới đơn giản hơn rõ rệt.
 - Main cập nhật recipe/contract sau phản biện; chỉ rà lại phần bị ảnh hưởng khi có thay đổi hoặc bằng chứng mới, không tranh luận lặp.
 - Cách kiểm chứng không phải quyền thực thi: không tự chạy test/build/app hoặc mở quyền validation.
 
@@ -187,9 +188,8 @@ Khi đó chỉ truy đúng dependency hoặc reference liên quan; nếu phát s
 Không đọc lại nội dung đã có trong context khi source không đổi và không có câu hỏi mới cần giải đáp.
 Sau khi sửa, worker đối chiếu delta với acceptance và bàn giao kết quả; không tự mở vòng audit toàn module hoặc cải tiến ngoài contract.
 
-Worker tự quyết chi tiết cục bộ tương đương như tên biến, guard clause và cấu trúc biểu thức.
-Không mời worker đánh giá lại giải pháp, tìm phương án tốt hơn hoặc tự chọn business default, API, transaction/retry/compensation boundary hay abstraction mới.
-Thiếu symbol, source trái contract, reuse không đáp ứng invariant hoặc cần vượt scope: dừng phần liên quan, trả Main `path:line`, expected/actual và điểm cần chốt; phần độc lập vẫn làm tiếp.
+Worker tự quyết chi tiết cục bộ tương đương (tên biến, guard clause, chuẩn hóa nullability/biểu thức tương đương bảo toàn bất biến trong `allowed_paths`).
+Khi gặp lệch nhỏ chữ ký/type/hành vi thư viện, worker chạy **vi-xác minh có trần** (`MICRO` <= 3 bước `lsp`/`context7`/source): xử lý được trong `allowed_paths` mà giữ nguyên bất biến thì làm tiếp và ghi nhận vào `assumptions`; cần vượt `allowed_paths`, đổi public contract, transaction/compensation boundary hoặc quy tắc nghiệp vụ thì dừng riêng phần liên quan, gửi kèm gói `path:line + expected/actual + đề xuất sửa chính xác` về Main trong 1 nhịp, phần độc lập vẫn hoàn tất trọn vẹn.
 Khi phát hiện trong cùng phân hệ đã có helper hoặc component chuẩn thuộc `[skill:cogain-screen-archetypes]` mà contract bỏ sót hoặc bắt import chéo nội bộ route khác (`_components`/`-components`), worker phải dừng và báo ngay cho Main kèm `path:line` trước khi tự chế hoặc sao chép code.
 Đây là stop condition mặc định, không cần diễn giải lại ở nhiều section.
 
