@@ -1,9 +1,10 @@
 {
   "name": "nguyentd-agent-kit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "NguyenTD's AI Agent Kit: rules, opinion, skills, and workflows for Claude, Gemini, Antigravity, and Codex",
   "bin": {
-    "nguyentd-agent-kit": "./bin/install.js"
+    "nguyentd-agent-kit": "./bin/install.js",
+    "agent-init": "./bin/install.js"
   },
   "keywords": [
     "ai-agent",

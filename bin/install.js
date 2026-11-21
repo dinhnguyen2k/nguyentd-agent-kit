@@ -3,24 +3,72 @@
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const sourceDir = path.resolve(__dirname, '..');
-const targetDir = process.cwd();
+let targetDir = process.cwd();
 const rawArgs = process.argv.slice(2);
-const allowedFlags = new Set(['--core', '--update', '--dry-run']);
-const hasInvalidArguments = rawArgs.some((arg) => !allowedFlags.has(arg));
-const coreMode = rawArgs.includes('--core');
-const updateMode = rawArgs.includes('--update');
-const dryRun = rawArgs.includes('--dry-run');
+
+let coreMode = false;
+let updateMode = false;
+let dryRun = false;
+let noUpdater = false;
+
+function printHelp() {
+  console.log(`NguyenTD Agent Kit - Bộ cài đặt quy tắc, kỹ năng và điều phối Agent
+
+Cách dùng:
+  nguyentd-agent-kit [thư_mục_đích] [tùy_chọn]
+  agent-init [thư_mục_đích] [tùy_chọn]
+
+Tùy chọn:
+  --target <đường_dẫn>, -t  Chỉ định thư mục cài đặt (mặc định: thư mục hiện tại)
+  --update, --force         Cập nhật các tệp đã có và tự động sao lưu bản cũ
+  --core                    Chỉ cài bản thu gọn (.agent-core, hướng dẫn phối hợp)
+  --dry-run                 Chạy thử nghiệm xem trước, không ghi đè lên đĩa
+  --no-updater              Không tự động kích hoạt tiến trình chạy ngầm agent-updater
+  --help, -h                Hiển thị hướng dẫn này
+`);
+}
+
+for (let i = 0; i < rawArgs.length; i++) {
+  const arg = rawArgs[i];
+  if (arg === '--core') {
+    coreMode = true;
+  } else if (arg === '--update' || arg === '--force') {
+    updateMode = true;
+  } else if (arg === '--dry-run') {
+    dryRun = true;
+  } else if (arg === '--no-updater' || arg === '--skip-updater') {
+    noUpdater = true;
+  } else if (arg === '--target' || arg === '-t') {
+    i++;
+    if (i < rawArgs.length) targetDir = path.resolve(rawArgs[i]);
+  } else if (arg.startsWith('--target=')) {
+    targetDir = path.resolve(arg.slice('--target='.length));
+  } else if (arg === '--help' || arg === '-h') {
+    printHelp();
+    process.exit(0);
+  } else if (!arg.startsWith('-')) {
+    targetDir = path.resolve(arg);
+  } else {
+    console.error(`✖ Tùy chọn không hợp lệ: ${arg}`);
+    printHelp();
+    process.exit(1);
+  }
+}
 
 const legacyItems = [
   'AI_RULES.md',
   'OPINION.md',
   'AGENTS.md',
-  'GEMINI.md',
-  'CLAUDE.md',
-  'ANTIGRAVITY.md',
   '.agent',
+];
+
+const rootSymlinks = [
+  { destination: 'CLAUDE.md', target: 'AGENTS.md' },
+  { destination: 'GEMINI.md', target: 'AGENTS.md' },
+  { destination: 'ANTIGRAVITY.md', target: 'AGENTS.md' },
 ];
 const privateDirectoryNames = new Set([
   '.config',
@@ -57,6 +105,9 @@ function reportError(message) {
 }
 
 function ensureTargetOutsideKit() {
+  if (!fs.existsSync(targetDir)) {
+    if (!dryRun) fs.mkdirSync(targetDir, { recursive: true });
+  }
   const realSource = fs.realpathSync(sourceDir);
   const realTarget = fs.realpathSync(targetDir);
   if (isWithin(realSource, realTarget)) {
@@ -246,11 +297,88 @@ function installItems(items, skipsPrivate) {
   if (activeBackupDir && !dryRun) {
     console.log(`↺ Đã sao lưu các tệp cũ trước khi ghi đè tại: ${path.relative(targetDir, activeBackupDir)}`);
   }
+  if (!coreMode) {
+    installRootSymlinks();
+  }
   const wiringScript = path.join(targetDir, '.agent', 'scripts', 'install-harness-wiring.sh');
-  if (updateMode && !coreMode && !dryRun && !hasErrors && fs.existsSync(wiringScript)) {
-    execFileSync('bash', [wiringScript], { cwd: targetDir, stdio: 'inherit' });
+  if (!coreMode && !dryRun && !hasErrors && fs.existsSync(wiringScript)) {
+    console.log('\n🔗 Đang thiết lập cấu hình harness wiring (.claude, .gemini, .cursor, .vscode)...');
+    try {
+      execFileSync('bash', [wiringScript], { cwd: targetDir, stdio: 'inherit' });
+    } catch (err) {
+      console.warn('⚠ Lỗi khi chạy install-harness-wiring.sh:', err.message);
+    }
   }
   return hasErrors;
+}
+
+function installRootSymlinks() {
+  if (coreMode || dryRun) return;
+  for (const { destination, target } of rootSymlinks) {
+    const destPath = path.join(targetDir, destination);
+    const existing = destinationState(destPath);
+    if (!existing) {
+      fs.symlinkSync(target, destPath);
+      console.log(`✔ Đã tạo liên kết: ${destination} -> ${target}`);
+    } else if (existing.kind === 'link') {
+      if (existing.linkTarget !== target && updateMode) {
+        fs.unlinkSync(destPath);
+        fs.symlinkSync(target, destPath);
+        console.log(`✔ Đã cập nhật liên kết: ${destination} -> ${target}`);
+      }
+    } else if (existing.kind === 'file' && updateMode) {
+      backupExistingEntry(destPath, destination, existing.kind);
+      fs.unlinkSync(destPath);
+      fs.symlinkSync(target, destPath);
+      console.log(`✔ Đã thay thế tệp cũ bằng liên kết: ${destination} -> ${target}`);
+    }
+  }
+}
+
+function triggerAgentUpdater(targetDir) {
+  if (process.env.AGENT_UPDATER_SKIP) return;
+  console.log('\n⚡ Đang cấu hình và kích hoạt tiến trình tự động nâng cấp agent-updater...');
+
+  const localBin = path.join(os.homedir(), '.local', 'bin', 'agent-updater');
+  let binCmd = null;
+  let binArgs = [];
+
+  if (fs.existsSync(localBin)) {
+    binCmd = localBin;
+  } else {
+    try {
+      const whichOut = execFileSync('which', ['agent-updater'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      if (whichOut && fs.existsSync(whichOut)) {
+        binCmd = whichOut;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!binCmd) {
+    const devSibling = path.resolve(sourceDir, '..', 'cogain', 'agent-updater', 'bin', 'agent-updater');
+    if (fs.existsSync(devSibling)) {
+      binCmd = devSibling;
+    }
+  }
+
+  if (!binCmd) {
+    binCmd = 'npx';
+    binArgs = ['-y', 'github:dinhnguyen2k/agent-updater'];
+  }
+
+  try {
+    const finalArgs = [...binArgs, 'init', '--target', targetDir];
+    execFileSync(binCmd, finalArgs, {
+      stdio: 'inherit',
+      env: { ...process.env, AGENT_UPDATER_SKIP: '1' },
+    });
+    console.log('\n✔ Hệ thống Agent và tiến trình agent-updater đã sẵn sàng hoạt động!');
+  } catch (err) {
+    console.warn(`\n⚠ Lưu ý: Chưa thể tự động kích hoạt dịch vụ chạy ngầm (${err.message}).`);
+    console.warn(`  Bạn có thể kích hoạt sau bằng lệnh: npx -y github:dinhnguyen2k/agent-updater init --target "${targetDir}"`);
+  }
 }
 
 function coreItems() {
@@ -278,24 +406,24 @@ function coreItems() {
   }
 }
 
-if (hasInvalidArguments) {
-  reportError('Cách dùng: node bin/install.js [--core] [--update] [--dry-run]');
-  process.exitCode = 1;
-} else {
-  try {
-    ensureTargetOutsideKit();
-    const items = coreMode
-      ? [
-          ...coreItems(),
-          ...researchFiles.map((file) => ({
-            source: path.join('.agent', 'skills', 'research', file),
-            destination: path.join('.agent-core', 'research', file),
-          })),
-        ]
-      : legacyItems.map((item) => ({ source: item, destination: item }));
-    if (installItems(items, !coreMode)) process.exitCode = 1;
-  } catch (error) {
-    reportError(error.message);
+try {
+  ensureTargetOutsideKit();
+  const items = coreMode
+    ? [
+        ...coreItems(),
+        ...researchFiles.map((file) => ({
+          source: path.join('.agent', 'skills', 'research', file),
+          destination: path.join('.agent-core', 'research', file),
+        })),
+      ]
+    : legacyItems.map((item) => ({ source: item, destination: item }));
+  const hasErrors = installItems(items, !coreMode);
+  if (hasErrors) {
     process.exitCode = 1;
+  } else if (!coreMode && !dryRun && !noUpdater) {
+    triggerAgentUpdater(targetDir);
   }
+} catch (error) {
+  reportError(error.message);
+  process.exitCode = 1;
 }

@@ -30,25 +30,40 @@ Chỉ khi bạn yêu cầu nghiên cứu sâu hoặc quy trình dự án cho ph�
 Researcher chỉ đọc và trả lời kèm nguồn; Main chịu trách nhiệm về khuyến nghị cuối cùng.
 Nếu cùng một sai sót lặp lại ở nhiều việc, Main có thể đề xuất cải tiến cách làm và cách đánh giá; bộ kit không tự chạy nghiên cứu nền hay tự sửa quy tắc.
 
-## Cài vào dự án
+## Khởi tạo và cài đặt tự động 1 lệnh (Khuyên dùng)
 
-Bạn cần Git và Node.js. Tải kit vào một thư mục riêng, rồi **chạy lệnh cài từ thư mục dự án muốn sử dụng**:
+Bạn có thể đứng trong bất kỳ thư mục dự án mới nào và chạy đúng **1 lệnh duy nhất** qua NPX:
+
+```bash
+npx -y github:dinhnguyen2k/nguyentd-agent-kit --update
+```
+
+Hoặc chỉ định đường dẫn từ bất kỳ đâu:
+
+```bash
+npx -y github:dinhnguyen2k/nguyentd-agent-kit --update --target /duong/dan/du-an
+```
+
+*(Nếu đã thiết lập alias trong shell, bạn chỉ cần gõ `agent-init` hoặc `agent-init /duong/dan/du-an`)*.
+
+### Quy trình hợp nhất 1 bước tự động:
+1. **Triển khai toàn diện bộ não Agent**: Cài đặt `.agent/`, các bộ quy tắc `AI_RULES.md`, `OPINION.md`, `AGENTS.md` và tạo sẵn liên kết chuyển tiếp `CLAUDE.md`, `GEMINI.md`, `ANTIGRAVITY.md`.
+2. **Tự động đồng bộ Harness Wiring**: Chạy `install-harness-wiring.sh` để kết nối symlinks cho mọi công cụ AI đang dùng (`.claude`, `.gemini`, `.cursor`, `.vscode`, `.codex`, `.omp`).
+3. **Kích hoạt tự động dịch vụ nâng cấp chạy ngầm (`agent-updater`)**: Tự động liên kết dự án vào bộ hẹn giờ `systemd --user`, bật bộ canh ngưỡng lỗi sớm nhân Linux (`agent-updater-watch.path`), gắn nhãn WezTerm status bar và dòng nhắc shell trong `~/.zshrc` mà không phải gõ thêm bất kỳ lệnh nào.
+
+---
+
+## Cài đặt thủ công qua Git Clone
+
+Nếu muốn tải mã nguồn kit về máy trước:
 
 ```bash
 git clone https://github.com/dinhnguyen2k/nguyentd-agent-kit.git ~/nguyentd-agent-kit
 cd /duong/dan/toi/du-an
-node ~/nguyentd-agent-kit/bin/install.js --core
+node ~/nguyentd-agent-kit/bin/install.js --update
 ```
 
-`--core` thêm hướng dẫn phối hợp, cách nghiên cứu và các tệp cấu hình để công cụ của bạn đọc được những hướng dẫn đó.
-Nếu dự án đã có `AGENTS.md` hoặc một tệp hướng dẫn tương tự và bộ cài báo xung đột, giữ nội dung của dự án rồi thêm dòng sau vào tệp được báo:
-
-```markdown
-Đọc `.agent-core/team.md` để biết khi nào giao việc cho Researcher.
-```
-
-Mở **phiên làm việc mới** sau khi cài.
-Bạn có thể bắt đầu bằng chính câu hỏi về trang đơn hàng ở trên; không cần lệnh riêng để gọi Researcher.
+*(Có thể thêm `--core` nếu chỉ muốn cài bản thu gọn `.agent-core` hoặc `--no-updater` nếu không muốn bật tiến trình chạy ngầm)*.
 
 ## Cài đầy đủ cho Cogain trên máy mới
 
