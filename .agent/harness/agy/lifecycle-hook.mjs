@@ -205,7 +205,23 @@ function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
     return {};
   }
 
-  if (event.error) return {};
+  if (event.error) {
+    const errText = extractLspErrorText(event);
+    appendFriction(root, {
+      type:
+        toolName === "invoke_subagent" || toolName === "swarm"
+          ? "subagent-dispatch-error"
+          : isLspToolCall(toolName, args)
+          ? "lsp-tool-error"
+          : toolName === "call_mcp_tool" || /^mcp_+/i.test(toolName)
+          ? "mcp-tool-error"
+          : "tool-execution-error",
+      harness: "agy",
+      tool: toolName,
+      summary: errText.slice(0, 200),
+    });
+    return {};
+  }
   if (!convId) return {};
 
   const state = loadSessions(sessionFile, now);
@@ -314,7 +330,7 @@ function handlePreInvocation(event, sessionFile, now) {
           state.pendingDispatches.splice(idx, 1);
         } else {
           const swarmMatch = input.match(
-            /You have just started\. Your assignment[\s\S]{0,600}\.agents?\/agents\/(backend-specialist|frontend-specialist|test-author|verifier|researcher|reviewer)\.md/i
+            /\.agents?\/agents\/(backend-specialist|frontend-specialist|test-author|verifier|researcher|reviewer)\.md/i
           );
           if (swarmMatch) matchedRole = swarmMatch[1].toLowerCase();
         }

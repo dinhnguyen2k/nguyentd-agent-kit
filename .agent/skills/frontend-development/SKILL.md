@@ -47,7 +47,7 @@ Read the Cogain-native references on demand when checking UI states, layout, con
 1. Determine analysis, proposal, or implementation mode.
 2. Main discovery/design: identify the package from `package.json`; trace affected route/search -> hook/query -> service -> API/shared primitive and nearest pattern/test according to risk.
    Settle interaction/data/cache semantics, reuse and consumer impact before dispatch under `.agent/workflows/plan.md`.
-3. Worker implementation: confirm the current contract against source at the affected boundary, not a full rediscovery or parent-TASK/history reconstruction.
+3. Worker implementation: confirm the current contract against source at the affected boundary, not a full rediscovery or parent-TASK/history reconstruction. On Antigravity (`agy`), when Main runs on a heavy planner model or dispatches parallel slices, Main may invoke `swarm` (`action: "add"`, `model: "gemini-4-hydrogen-high"`, referencing `.agents/agents/frontend-specialist.md`) for fast execution.
    Missing design, source mismatch, failed reuse or a needed scope change returns Main `file:line`, expected/actual and the decision; do not choose another endpoint/DTO/default, cache/interaction semantics or abstraction.
 4. Apply the settled recipe within scope; choose equivalent local details, never a guessed fallback.
    Read affected source/pattern/tests/consumers as risk requires; Main's conclusion cannot override conflicting source.

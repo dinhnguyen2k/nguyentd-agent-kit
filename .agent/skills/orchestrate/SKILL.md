@@ -23,7 +23,7 @@ itself.
 Fast/standard remain intentional standalone, user-owned lanes, not automatically governed.
 Main coordinates specialists directly with concise `allowed_paths`, `Reuse`, and `Acceptance` and accepts source evidence without a mandatory review gate; this alone does not require a governed manifest or independent verifier.
 
-- Mặc định giao specialist triển khai code theo `AI_RULES.md` §6, kể cả task nhỏ, một slice hoặc thay đổi thuần cơ học.
+- Mặc định giao specialist triển khai code theo `AI_RULES.md` §6, kể cả task nhỏ, một slice hoặc thay đổi thuần cơ học. Trên Antigravity (`agy`), khi chạy nhiều nhánh song song hoặc phiên chính không chạy sẵn trên Hydrogen High, skill này cho phép gọi `swarm` (`action: "add"`, `model: "gemini-4-hydrogen-high"`, đính kèm `.agents/agents/<specialist>.md` + `allowed_paths` + `acceptance`) để thực thi nhanh trên Hydrogen High và `kill` sau khi nghiệm thu.
 - Main chỉ code khi user giao rõ làm trực tiếp tại Main cho task hiện tại; `gấp`, ít dòng, giải pháp đã rõ hoặc yêu cầu sửa chung không cấp quyền, quyền task trước không tự áp cho task sau.
 - Không thể dispatch specialist thì báo blocker, không tự chuyển sang Main code.
 - Xác nhận lại source nếu đã thay đổi; gửi delta nếu file đang thuộc worker.

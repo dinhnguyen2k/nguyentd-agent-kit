@@ -268,6 +268,75 @@
       "expected_decision": "allow"
     },
     {
+      "id": "R8-valid-git-diff-ci-parity",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "git diff -- .agent/scripts/ci-parity.sh" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-sed-grep-ci-parity",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "sed -n '1,60p' .agent/scripts/ci-parity.sh | grep -nE \"usage|Usage|\\-\\-|case|\\$1|app\" | cut -c1-160" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-sed-ci-parity",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "sed -n 1,40p .agent/scripts/ci-parity.sh" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-grep-ci-parity",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "grep -n \"RUN_DIR\\|run_dir\\|\\.agent/.*runs\\|LOG\" .agent/scripts/ci-parity.sh | head -15" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-sed-wc-ci-parity",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "sed -n 1,60p .agent/scripts/ci-parity.sh; wc -l .agent/scripts/ci-parity.sh" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-readonly-chain-ci-parity",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "sed -n 1,200p .agent/scripts/ci-parity.sh; echo ----; ls .agent/planning | grep -i -E 'barrel|build|m4'; git show --stat 15062096c7 | tail" }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-invalid-direct-ci-parity",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": ".agent/scripts/ci-parity.sh" } },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R8-invalid-env-bash-ci-parity",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "env CI=1 bash .agent/scripts/ci-parity.sh" } },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R8-invalid-read-then-run-ci-parity",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "git diff -- .agent/scripts/ci-parity.sh && bash .agent/scripts/ci-parity.sh" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R8-invalid-piped-ci-parity",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "printf x | bash .agent/scripts/ci-parity.sh" } },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
       "id": "R9-invalid-ef-migrations-add",
       "payload": { "tool_name": "Bash", "tool_input": { "command": "dotnet ef migrations add Init" } },
       "expected_decision": "deny",
@@ -546,6 +615,66 @@
       },
       "expected_decision": "deny",
       "expected_rule": "R10-no-obsolete-reconcile-collections"
+    },
+    {
+      "id": "R10-invalid-obsolete-reconcile-collections-async",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/ServiceDesk/Services/OrderService.cs",
+          "new_string": "await ReconcileCollectionsAsync(existingEntity, dto);"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-obsolete-reconcile-collections"
+    },
+    {
+      "id": "R4-invalid-researcher-shell-mutate",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "sed -i 's/foo/bar/' backend/src/Services/HR/LeaveService.cs" }
+      },
+      "options": { "envRole": "researcher" },
+      "expected_decision": "deny",
+      "expected_rule": "R4-gate-readonly-shell"
+    },
+    {
+      "id": "R4-invalid-researcher-git-stash",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "git stash push" }
+      },
+      "options": { "envRole": "researcher" },
+      "expected_decision": "deny",
+      "expected_rule": "R4-gate-readonly-shell"
+    },
+    {
+      "id": "R4-valid-researcher-readonly-rg-git",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "rg -n \"SyncChildren\" backend/src && git log -n 5 --oneline" }
+      },
+      "options": { "envRole": "researcher" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R4-valid-verifier-git-stash",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "git stash push -- backend/src" }
+      },
+      "options": { "envRole": "verifier" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R4-invalid-verifier-shell-rm",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "rm backend/src/Services/HR/LeaveService.cs" }
+      },
+      "options": { "envRole": "verifier" },
+      "expected_decision": "deny",
+      "expected_rule": "R4-gate-readonly-shell"
     },
     {
       "id": "R10-valid-sync-children",

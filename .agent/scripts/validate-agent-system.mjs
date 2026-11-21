@@ -712,9 +712,80 @@ function validateLspCircuitAndSlnf() {
   }
 }
 
+function validateMultiHarnessAgentConfigs() {
+  const agyAgentDir = join(repoRoot, '.agent', 'harness', 'agy', 'agents');
+  const validAgyModels = new Set(['inherit', 'pro', 'flash', 'flash_lite']);
+  const bannedAgyTools = [
+    'call_mcp_tool',
+    'view_file',
+    'grep_search',
+    'find_by_name',
+    'list_dir',
+    'write_to_file',
+    'replace_file_content',
+    'multi_replace_file_content',
+  ];
+
+  for (const agyFile of walk(agyAgentDir, (p) => p.endsWith('.md'))) {
+    const { metadata } = parseFrontmatter(agyFile);
+    const label = relative(repoRoot, agyFile);
+    if (!metadata?.name || !metadata?.description) {
+      errors.push(`${label}: invalid AGY agent frontmatter`);
+      continue;
+    }
+    if (metadata.subagent !== 'true') {
+      errors.push(`${label}: AGY subagent profile must set 'subagent: true'`);
+    }
+    if (metadata.model && !validAgyModels.has(metadata.model)) {
+      errors.push(`${label}: invalid AGY model '${metadata.model}' (allowed: inherit, pro, flash, flash_lite)`);
+    }
+    if (metadata.tools) {
+      for (const banned of bannedAgyTools) {
+        if (new RegExp(`\\b${banned}\\b`).test(metadata.tools)) {
+          errors.push(
+            `${label}: forbidden surface-specific tool '${banned}' in AGY frontmatter tools (breaks Antigravity CLI or App executor)`
+          );
+        }
+      }
+    }
+  }
+
+  const ompConfigPath = join(repoRoot, '.agent', 'harness', 'omp', 'config.yml');
+  const ompAgentDir = join(repoRoot, '.agent', 'harness', 'omp', 'agents');
+  if (existsSync(ompConfigPath) && existsSync(ompAgentDir)) {
+    const ompConfig = readFileSync(ompConfigPath, 'utf8');
+    const modelRolesSection = ompConfig.match(/^modelRoles:\s*\n((?:  [a-zA-Z0-9_-]+:.*\n)+)/m)?.[1] ?? '';
+    const definedModelRoles = new Set(['task']);
+    for (const m of modelRolesSection.matchAll(/^  ([a-zA-Z0-9_-]+):/gm)) {
+      definedModelRoles.add(m[1]);
+    }
+    const advisorSection = ompConfig.match(/^  agentAdvisor:\s*\n((?:    [a-zA-Z0-9_-]+:.*\n)+)/m)?.[1] ?? '';
+    const advisorConfigured = new Set();
+    for (const m of advisorSection.matchAll(/^    ([a-zA-Z0-9_-]+):/gm)) {
+      advisorConfigured.add(m[1]);
+    }
+
+    for (const ompFile of walk(ompAgentDir, (p) => p.endsWith('.md'))) {
+      const { metadata } = parseFrontmatter(ompFile);
+      const label = relative(repoRoot, ompFile);
+      if (!metadata?.name) continue;
+      if (metadata.model?.startsWith('@')) {
+        const roleRef = metadata.model.slice(1);
+        if (!definedModelRoles.has(roleRef)) {
+          errors.push(`${label}: OMP model role '@${roleRef}' is not defined under modelRoles in omp/config.yml`);
+        }
+      }
+      if (!advisorConfigured.has(metadata.name)) {
+        errors.push(`${label}: agent '${metadata.name}' missing explicit entry under task.agentAdvisor in omp/config.yml`);
+      }
+    }
+  }
+}
+
 validateGuardFixturesAndAllowlist();
 validateDocHygieneAndExemplars();
 validateLspCircuitAndSlnf();
+validateMultiHarnessAgentConfigs();
 
 function writeCatalog() {
   const entries = [...skills.entries()].sort(([a], [b]) => a.localeCompare(b));

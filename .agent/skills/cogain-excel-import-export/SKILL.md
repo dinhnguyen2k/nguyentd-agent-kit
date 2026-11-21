@@ -12,7 +12,7 @@ The base methods own orchestration. Derived services customize behavior through 
 
 ## Mandatory Reading
 
-Read `.agent/rules/backend-excel-import.md` for the current invariant set, then inspect the relevant methods in `BaseService.cs` and one nearby service with the same import/export shape.
+Read `.agent/rules/backend-excel-import.md` for core invariants and [references/detailed-rules.md](references/detailed-rules.md) when designing sheet schemas, batch lookups, `ExcelDataExporter`/`ExcelReportWriter` layouts, or upsert flows; then inspect `BaseService.cs` and one nearby service with the same import/export shape.
 
 ## Orchestration Boundary
 

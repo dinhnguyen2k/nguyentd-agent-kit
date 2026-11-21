@@ -777,6 +777,24 @@ export function recordLspOutcome(root, lang = "general", outcome = {}, opts = {}
   }
 }
 
+export function recordAgentFriction(root, entry = {}, opts = {}) {
+  try {
+    if (!root || opts?.sandbox) return;
+    const frictionFile = join(root, LSP_FRICTION_REL);
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    mkdirSync(dirname(frictionFile), { recursive: true });
+    appendFileSync(
+      frictionFile,
+      `${JSON.stringify({
+        at: new Date(now).toISOString(),
+        ...entry,
+      })}\n`
+    );
+  } catch {
+    /* fail-open */
+  }
+}
+
 export function clearSessionFilesForLanguage(root, sessionId, lang = "general", opts = {}) {
   try {
     if (!root || !sessionId) return;

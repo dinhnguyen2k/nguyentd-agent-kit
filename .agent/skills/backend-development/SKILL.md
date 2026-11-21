@@ -36,7 +36,7 @@ Load the smallest set that satisfies those mandatory triggers, not a fixed one-s
 
 1. Determine analysis, proposal, or implementation mode from the user request.
 2. Main discovery/design: trace affected service/contract/entity/migration, nearest pattern/test and downstream consumers according to risk; settle invariants, reuse and the recipe under `.agent/workflows/plan.md`.
-3. Worker implementation: confirm the current contract against source at the affected boundary, not a full rediscovery or parent-TASK/history reconstruction.
+3. Worker implementation: confirm the current contract against source at the affected boundary, not a full rediscovery or parent-TASK/history reconstruction. On Antigravity (`agy`), when Main runs on a heavy planner model or dispatches parallel slices, Main may invoke `swarm` (`action: "add"`, `model: "gemini-4-hydrogen-high"`, referencing `.agents/agents/backend-specialist.md`) for fast execution.
    Missing design, source mismatch, failed reuse or a needed scope change returns Main `file:line`, expected/actual and the decision; do not choose another API/default/transaction/retry/compensation boundary or abstraction.
 4. Apply the settled recipe within scope; choose equivalent local details, never a guessed fallback.
    Read affected source/pattern/tests/callers as risk requires; Main's conclusion cannot override conflicting source.

@@ -4,7 +4,7 @@
  * Nguồn luật duy nhất nằm ở `.agent/contracts/agent-registry.json`.
  * Fail-open có chủ đích: lỗi của chính hook không được chặn tool.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluateBoundaryChecks } from "../../scripts/agent-boundary-guard.mjs";
@@ -14,7 +14,17 @@ import { prepareDispatchAssignment } from "../../scripts/dispatch-contract.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GUARD_REL = join(".agent", "scripts", "agent-boundary-guard.mjs");
 const SESSIONS_REL = join(".agent", "scratch", ".runtime", "agy-sessions.json");
+const SESSION_TTL_MS = 16 * 60 * 60 * 1000;
 const CODING_SPECIALISTS = new Set(["backend-specialist", "frontend-specialist", "test-author"]);
+const KNOWN_ROLES = new Set([
+  "backend-specialist",
+  "frontend-specialist",
+  "test-author",
+  "verifier",
+  "researcher",
+  "reviewer",
+]);
+const SWARM_ROLE_RE = /\.agents?\/agents\/(backend-specialist|frontend-specialist|test-author|verifier|researcher|reviewer)\.md/i;
 const SWARM_SPECIALIST_RE = /\.agents?\/agents\/(backend-specialist|frontend-specialist|test-author)\.md/i;
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 const WRITE_TOOLS = new Set([
@@ -173,6 +183,58 @@ function lookupSessionAgentName(root, conversationId) {
   }
 }
 
+function saveSessionRole(root, conversationId, role) {
+  if (!conversationId || !role || !KNOWN_ROLES.has(role)) return;
+  try {
+    const file = join(root, SESSIONS_REL);
+    const now = Date.now();
+    const raw = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : { version: 1, conversations: {}, pendingDispatches: [] };
+    const conversations = raw.conversations && typeof raw.conversations === "object" ? raw.conversations : {};
+    if (!conversations[conversationId]) {
+      conversations[conversationId] = { role, dirtyFiles: [], codegenTouched: false, updatedAt: now };
+    } else {
+      conversations[conversationId].role = role;
+      conversations[conversationId].updatedAt = now;
+    }
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify({ version: 1, conversations, pendingDispatches: raw.pendingDispatches || [] }, null, 2));
+  } catch {
+    /* fail-open */
+  }
+}
+
+function recordPendingDispatch(root, role, promptText) {
+  if (!root || !KNOWN_ROLES.has(role)) return;
+  const promptSnippet = String(promptText || "").trim().slice(0, 300);
+  if (promptSnippet.length < 20) return;
+  try {
+    const file = join(root, SESSIONS_REL);
+    const now = Date.now();
+    const raw = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : { version: 1, conversations: {}, pendingDispatches: [] };
+    const pending = Array.isArray(raw.pendingDispatches)
+      ? raw.pendingDispatches.filter((d) => d && now - (d.createdAt || 0) <= SESSION_TTL_MS)
+      : [];
+    if (!pending.some((d) => d.role === role && d.promptSnippet === promptSnippet)) {
+      pending.push({ role, promptSnippet, createdAt: now });
+    }
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(
+      file,
+      JSON.stringify(
+        {
+          version: 1,
+          conversations: raw.conversations && typeof raw.conversations === "object" ? raw.conversations : {},
+          pendingDispatches: pending.slice(-30),
+        },
+        null,
+        2
+      )
+    );
+  } catch {
+    /* fail-open */
+  }
+}
+
 function handleDispatchGate(toolName, args, root) {
   const isSubagent = toolName === "invoke_subagent";
   const isSwarmAdd = toolName === "swarm" && String(args.action || "").toLowerCase() === "add";
@@ -180,6 +242,7 @@ function handleDispatchGate(toolName, args, root) {
 
   let textKey;
   let text;
+  let detectedRole = "";
   if (isSubagent) {
     const typeName = (
       str(args.TypeName) ??
@@ -188,13 +251,18 @@ function handleDispatchGate(toolName, args, root) {
       str(args.agent_type) ??
       ""
     ).toLowerCase();
-    if (!CODING_SPECIALISTS.has(typeName)) return null;
     textKey = str(args.Prompt) !== null ? "Prompt" : "prompt";
     text = str(args[textKey]) ?? "";
+    detectedRole = typeName;
+    if (KNOWN_ROLES.has(detectedRole)) recordPendingDispatch(root, detectedRole, text);
+    if (!CODING_SPECIALISTS.has(typeName)) return null;
   } else {
     textKey = "brief";
     text = str(args.brief) ?? "";
     const swarmName = (str(args.name) ?? "").toLowerCase();
+    const roleMatch = text.match(SWARM_ROLE_RE);
+    detectedRole = roleMatch ? roleMatch[1].toLowerCase() : KNOWN_ROLES.has(swarmName) ? swarmName : "";
+    if (detectedRole) recordPendingDispatch(root, detectedRole, text);
     if (!SWARM_SPECIALIST_RE.test(text) && !CODING_SPECIALISTS.has(swarmName)) return null;
   }
 
@@ -215,10 +283,21 @@ function handleDispatchGate(toolName, args, root) {
   const hasScope = /\ballowed_paths\b|\bcontract_ref:/i.test(text);
   const hasAcceptance = /\bacceptance\b|tiêu\s+chí\s+nghiệm\s+thu/i.test(text);
   if (!hasScope || !hasAcceptance) {
+    const reason =
+      "Giao việc cho specialist viết code bắt buộc phải ghi rõ phạm vi đường dẫn (`allowed_paths` hoặc `contract_ref:`) VÀ tiêu chí nghiệm thu (`acceptance` hoặc `Tiêu chí nghiệm thu`).";
+    try {
+      const frictionFile = join(root, ".agent", "reports", "agent-friction.jsonl");
+      mkdirSync(dirname(frictionFile), { recursive: true });
+      appendFileSync(
+        frictionFile,
+        `${JSON.stringify({ at: new Date().toISOString(), type: "dispatch-gate-deny", role: detectedRole || "main", summary: reason.slice(0, 200) })}\n`
+      );
+    } catch {
+      /* fail-open */
+    }
     return {
       decision: "deny",
-      reason:
-        "Giao việc cho specialist viết code bắt buộc phải ghi rõ phạm vi đường dẫn (`allowed_paths` hoặc `contract_ref:`) VÀ tiêu chí nghiệm thu (`acceptance` hoặc `Tiêu chí nghiệm thu`).",
+      reason,
     };
   }
   return { decision: "allow" };
@@ -273,12 +352,17 @@ try {
   if (checks.length === 0) allow();
 
   const convId = str(event.conversationId);
-  const agentName =
+  let agentName =
     str(event.agentName) ??
     str(event.agentType) ??
     str(event.subagentType) ??
-    str(parseJsonObject(event.agent).name) ??
-    lookupSessionAgentName(root, convId);
+    str(parseJsonObject(event.agent).name);
+
+  if (agentName && convId) {
+    saveSessionRole(root, convId, agentName.toLowerCase());
+  } else if (!agentName && convId) {
+    agentName = lookupSessionAgentName(root, convId);
+  }
 
   const reason = evaluateBoundaryChecks(checks, { root, agentName });
   if (reason) deny(reason);

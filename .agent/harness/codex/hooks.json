@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|shell|exec_command|.*apply_patch.*|Edit|Write|mcp__filesystem__.*",
+        "matcher": "Bash|shell|exec_command|.*apply_patch.*|Edit|Write|MultiEdit|Task|spawn_agent|call_mcp_tool|mcp__filesystem__.*|mcp__.*lsp.*",
         "hooks": [
           {
             "type": "command",

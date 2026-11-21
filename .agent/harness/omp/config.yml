@@ -4,6 +4,7 @@ textVerbosity: low
 defaultThinkingLevel: high
 modelRoles:
   advisor: openai-codex/gpt-6-luna:high
+  gate: "@advisor"
   plan: anthropic/claude-opus-5-5:high
   slow: "@plan"
 lsp:
@@ -31,6 +32,7 @@ task:
   # Advisor chỉ gác lane viết code; lane read-only không sinh code để bắt lỗi. Map này thắng frontmatter `advisor`.
   agentModelOverrides:
     verifier: anthropic/claude-opus-5-5:medium
+    researcher: "@advisor"
     reviewer: "@advisor"
     task: "@task"
     scout: openai-codex/gpt-6-luna:high
@@ -48,6 +50,7 @@ task:
     task: "off"
     scout: "off"
     sonic: "off"
+    researcher: "off"
     reviewer: "off"
     security-reviewer: "off"
     verifier: "off"

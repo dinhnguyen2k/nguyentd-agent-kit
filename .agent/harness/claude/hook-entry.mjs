@@ -20,6 +20,7 @@ import {
   isLspToolCall,
   markSessionFilesChecked,
   normalizeToolChecks,
+  recordAgentFriction,
   recordLspOutcome,
   recordSessionDispatch,
   recordSessionEdit,
@@ -138,6 +139,15 @@ try {
   }
 
   if (eventName === "PostToolUse") {
+    const errText = str(payload.error) ?? (payload.is_error ? extractLspErrorText(payload) : null);
+    if (errText && (toolName === "Task" || toolName === "Agent" || /^mcp__/i.test(toolName) || toolName === "call_mcp_tool") && !isLspToolCall(toolName, toolInput)) {
+      recordAgentFriction(root, {
+        type: toolName === "Task" || toolName === "Agent" ? "subagent-dispatch-error" : "mcp-tool-error",
+        harness: "claude",
+        tool: toolName,
+        summary: errText.slice(0, 200),
+      });
+    }
     if (toolName === "Task" || toolName === "Agent") {
       const prompt = str(toolInput.prompt) ?? "";
       const refMatch = prompt.match(/^contract_ref:[ \t]*(\S+)/m);

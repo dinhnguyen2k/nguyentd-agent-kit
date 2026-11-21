@@ -369,9 +369,9 @@
             "path_globs": [
               "backend/src/**/*.cs"
             ],
-            "pattern": "\\bReconcileCollections\\s*(?:<|\\()",
-            "message": "Cấm dùng 'ReconcileCollections' (đã Obsolete, dùng reflection dễ gãy FK). Hãy implement 'ISyncsChildren<TEntity>' trên aggregate và override 'BuildIncomingGraph' trong Service (xem [skill:cogain-child-sync]).",
-            "source_feedback": "archetype-exemplars.json & cogain-child-sync: thay ReconcileCollections bằng ISyncsChildren"
+            "pattern": "\\bReconcileCollections(?:Async)?\\s*(?:<|\\()",
+            "message": "Cấm dùng 'ReconcileCollections' hoặc 'ReconcileCollectionsAsync' (đã Obsolete, dùng reflection dễ gãy FK). Hãy implement 'ISyncsChildren<TEntity>' trên aggregate và override 'BuildIncomingGraph' trong Service (xem [skill:cogain-child-sync]).",
+            "source_feedback": "archetype-exemplars.json & cogain-child-sync: thay ReconcileCollections/ReconcileCollectionsAsync bằng ISyncsChildren"
           },
           {
             "id": "no-ts-ignore-blanket",
@@ -599,9 +599,11 @@
         "research"
       ],
       "commands": {
-        "allow": [],
+        "allow": [
+          "rg, grep, find, git log/show/diff/blame (chỉ đọc)"
+        ],
         "deny": [
-          "mọi lệnh shell"
+          "mọi lệnh ghi/sửa tệp, build, test, cài gói (R4-gate-readonly-shell)"
         ]
       },
       "activation": "Main giao một cuộc điều tra có phạm vi cụ thể; Researcher trả lời kèm nguồn và không triển khai."

@@ -63,4 +63,4 @@ output:
 - Hook `boundary-guard` nhận diện bạn là `test-author`: chỉ được ghi vào cây test; ghi vào `backend/src/**` hay `frontend/src/**` sẽ bị chặn.
 - Rule `testing-standard` và `test-enforcement` tự chèn khi sửa file khớp; đọc trước qua `rule://test-enforcement`.
 - Sửa bằng `apply_patch` (model GPT) mà báo `Found N occurrences`: thêm dòng ngữ cảnh duy nhất gần nhất (tên `it(...)`, khai báo biến phía trên) vào hunk, hoặc gộp các chỗ trùng vào một hunk lớn, hoặc dùng `ast_edit`. Không gửi lại cùng hunk quá 2 lần.
-- Kiểm lỗi type file vừa sửa bằng `xd://lsp` `diagnostics` từng file (không dùng glob); `OK` ngay lần đầu khi server vừa khởi động thì kiểm lại một lần.
+- Kiểm lỗi compile/type cuối slice bằng Canary Probe 1 tệp `xd://lsp` `diagnostics` với `timeout: 8` (không dùng glob); chỉ hỏi tiếp các tệp còn lại khi tệp đầu phản hồi bình thường. Không gọi lại chỉ vì lần đầu trả `OK`; nếu quá hạn/lỗi thì dừng ngay không `reload` hay lặp lại, đối chiếu tĩnh khai báo gốc/caller và báo `LSP: timeout (circuit-open, skipped remaining files)`.

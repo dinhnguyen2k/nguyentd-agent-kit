@@ -37,6 +37,8 @@ Chỉ đọc hướng dẫn của cấp độ tương ứng khi cần chi tiết
 - `LOOKUP`: [references/lookup.md](references/lookup.md)
 - `FOCUSED`: [references/focused.md](references/focused.md)
 - `DEEP`: [references/deep.md](references/deep.md)
+- Bảng chữ ký tham số MCP dùng ngay (không cần đọc schema JSON lẻ): [references/mcp-cheatsheet.md](references/mcp-cheatsheet.md)
+- Trên Antigravity (`agy`), khi phiên chính đang dùng model lập kế hoạch nặng hoặc chạy `DEEP` nhiều nhánh, skill này cho phép Main gọi `swarm` (`action: "add"`, `model: "gemini-4-hydrogen-high"`, yêu cầu đọc `.agents/agents/researcher.md` và báo `@coordinator [done]`) để chạy nghiên cứu tốc độ cao trên Hydrogen High rồi `kill` sau khi thu kết quả.
 
 **4 Chốt chặn định lượng bắt buộc**:
 1. **Cấm đổi thiết kế không có bằng chứng ngoại sinh mới**: không mở vòng đổi phương án nếu không chỉ ra được `file:line` mới, lỗi chẩn đoán tĩnh hoặc đặc tả gốc chứng minh điểm yếu thật.

@@ -16,7 +16,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 STATE_DIR="$ROOT/.agent/scratch/.runtime"
 STATE_FILE="$STATE_DIR/agent-role"
 LOG_FILE="$ROOT/.agent/reports/boundary-guard.log"
-VALID="implementer backend-specialist frontend-specialist test-author verifier orchestrator maintainer"
+VALID="implementer backend-specialist frontend-specialist test-author verifier researcher reviewer orchestrator maintainer"
+TTL_SECONDS=50400
 
 mkdir -p "$STATE_DIR" "$(dirname "$LOG_FILE")"
 
@@ -25,10 +26,11 @@ show() {
     local age_s role
     role="$(cat "$STATE_FILE")"
     age_s=$(( $(date +%s) - $(stat -c %Y "$STATE_FILE") ))
-    if (( age_s > 28800 )); then
-      echo "role: implementer (state '$role' đã hết hạn sau $((age_s / 3600))h)"
+    if (( age_s > TTL_SECONDS )); then
+      rm -f "$STATE_FILE"
+      echo "role: implementer (state '$role' đã hết hạn sau $((age_s / 3600))h và đã tự dọn)"
     else
-      echo "role: $role (còn hiệu lực $(( (28800 - age_s) / 60 )) phút)"
+      echo "role: $role (còn hiệu lực $(( (TTL_SECONDS - age_s) / 60 )) phút)"
     fi
   else
     echo "role: implementer (mặc định)"
@@ -53,7 +55,7 @@ case "$arg" in
       exit 1
     fi
     printf '%s' "$arg" > "$STATE_FILE"
-    echo "$(date -Is) ROLE-SET role=$arg by=user ttl=8h" >> "$LOG_FILE"
+    echo "$(date -Is) ROLE-SET role=$arg by=user ttl=14h" >> "$LOG_FILE"
     show
     ;;
 esac

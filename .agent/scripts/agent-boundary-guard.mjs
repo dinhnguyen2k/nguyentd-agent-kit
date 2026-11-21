@@ -249,19 +249,42 @@ export function evaluateBoundaryPayload(payload, options = {}) {
       }
 
       const r2 = rules.test_write || {};
-      const stripped = cmd
+      const stripQuotes = (s) => s.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, " ");
+      const unquoted = stripQuotes(cmd);
+      const stripped = unquoted
         .replace(/\d?>\s*&\s*\d/g, " ")
         .replace(/\d?>>?\s*\/dev\/null/g, " ")
         .replace(/[=-]>/g, "  ");
-      const mutIndexes = (r2.shell_mutating_tokens || [])
-        .map((t) => stripped.indexOf(t))
-        .filter((i) => i >= 0);
-      const isMutating = mutIndexes.length > 0;
-      const firstMut = isMutating ? Math.min(...mutIndexes) : -1;
+
+      const cmdPrefix = "(?:^|[;&|(`]|\\b(?:sudo|xargs|env)\\s+)\\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|\"[^\"]*\"|\\S+)\\s+)*";
+      const mutatingCmdRe = new RegExp(cmdPrefix + "(?:rm|cp|mv|truncate|tee|ln|patch)\\b", "i");
+      const sedMutatingRe = new RegExp(cmdPrefix + "sed\\b[^;&|]*(?:^|\\s)-[a-zA-Z]*i", "i");
+      const gitMutatingCmdRe = new RegExp(cmdPrefix + "git\\s+(?:checkout|restore|apply)\\b", "i");
+      const redirectionRe = />>?[^&]/;
+
+      const isMutating =
+        mutatingCmdRe.test(stripped) ||
+        sedMutatingRe.test(stripped) ||
+        gitMutatingCmdRe.test(stripped) ||
+        redirectionRe.test(stripped);
+
+      let firstMut = -1;
+      if (isMutating) {
+        const matches = [];
+        const m1 = stripped.match(mutatingCmdRe);
+        if (m1 && m1.index !== undefined) matches.push(m1.index);
+        const m2 = stripped.match(sedMutatingRe);
+        if (m2 && m2.index !== undefined) matches.push(m2.index);
+        const m3 = stripped.match(gitMutatingCmdRe);
+        if (m3 && m3.index !== undefined) matches.push(m3.index);
+        const m4 = stripped.match(redirectionRe);
+        if (m4 && m4.index !== undefined) matches.push(m4.index);
+        firstMut = matches.length > 0 ? Math.min(...matches) : 0;
+      }
 
       const r3shell = rules.self_protect || {};
       const protectedHit = (registry.protected_config_paths || []).find(
-        (p) => isMutating && stripped.indexOf(p, firstMut) !== -1
+        (p) => isMutating && cmd.indexOf(p, firstMut) !== -1
       );
       if (isMutating && protectedHit && !(r3shell.allowed_roles || []).includes(role)) {
         return denyResult(
@@ -274,7 +297,7 @@ export function evaluateBoundaryPayload(payload, options = {}) {
       }
 
       const touchesTestPath = (r2.shell_path_markers || []).some(
-        (m) => isMutating && stripped.indexOf(m, firstMut) !== -1
+        (m) => isMutating && cmd.indexOf(m, firstMut) !== -1
       );
       if (touchesTestPath && isMutating && !(r2.allowed_roles || []).includes(role)) {
         return denyResult(
@@ -289,8 +312,8 @@ export function evaluateBoundaryPayload(payload, options = {}) {
 
       const touchesMigrationPath =
         isMutating &&
-        (stripped.indexOf("Migrations/", firstMut) !== -1 ||
-          (registry.migration_paths || []).some((m) => stripped.indexOf(m.replace(/\/\*\*$/, "/"), firstMut) !== -1));
+        (cmd.indexOf("Migrations/", firstMut) !== -1 ||
+          (registry.migration_paths || []).some((m) => cmd.indexOf(m.replace(/\/\*\*$/, "/"), firstMut) !== -1));
       const r7shell = rules.migration_write || {};
       if (touchesMigrationPath && isMutating && !(r7shell.allowed_roles || []).includes(role)) {
         return denyResult(
@@ -300,6 +323,25 @@ export function evaluateBoundaryPayload(payload, options = {}) {
             `Lệnh bị chặn: ${cmd.slice(0, 200)}\n` +
             `Role hiện tại: ${role} (nguồn: ${source}).`
         );
+      }
+
+      if (agentEntry && agentEntry.kind === "gate" && role !== DEFAULT_ROLE && (source === "subagent" || source === "env")) {
+        const gitMutatingRe =
+          role === "verifier"
+            ? /\bgit\s+(?:commit|push|reset|clean|checkout|restore|apply|merge|rebase|cherry-pick)\b/i
+            : /\bgit\s+(?:commit|push|reset|clean|checkout|restore|apply|merge|rebase|cherry-pick|stash)\b/i;
+        const nonReadOnlyExecRe =
+          role === "researcher" || role === "reviewer"
+            ? /(?:^|[;&|(`])\s*(?:env\s+)?(?:dotnet|npm|pnpm|yarn|npx|pnpx|bunx|bun|psql|pg_restore|sqlite3|docker)\b/i
+            : null;
+        if (isMutating || gitMutatingRe.test(stripped) || (nonReadOnlyExecRe && nonReadOnlyExecRe.test(stripped))) {
+          return denyResult(
+            "R4-gate-readonly-shell",
+            role,
+            `Permission Denied: '${role}' là cổng chỉ đọc, không được chạy lệnh ghi/sửa tệp hoặc lệnh thực thi nặng qua shell.\n\n` +
+              `Lệnh bị chặn: ${cmd.slice(0, 200)}`
+          );
+        }
       }
 
       return { decision: "allow" };

@@ -14,7 +14,7 @@ Trước khi bắt đầu, Main ghi rõ:
 - Giới hạn nguồn cho mỗi câu hỏi, tổng thể và mỗi lượt tìm kiếm. Các giới hạn phải hữu hạn và được chốt trước khi tìm.
 - Dạng bàn giao mong muốn.
 
-Nếu chưa có người được nêu tên cho một câu hỏi, Main phải ghi chính xác ai sẽ tìm hiểu theo vai trò được phép; không ngụ ý rằng đã có người được giao. Chỉ chạy các câu hỏi song song khi DEEP đã được cho phép và có khả năng thực hiện độc lập. Nếu một câu hỏi phụ thuộc kết quả của câu khác, chờ kết quả đó hoặc chỉ chuyển phát hiện cần thiết. Nếu không có khả năng chạy đồng thời, thực hiện tuần tự.
+Nếu chưa có người được nêu tên cho một câu hỏi, Main phải ghi chính xác ai sẽ tìm hiểu theo vai trò được phép; không ngụ ý rằng đã có người được giao. Chỉ chạy các câu hỏi song song khi DEEP đã được cho phép và có khả năng thực hiện độc lập. Nếu một câu hỏi phụ thuộc kết quả của câu khác, chờ kết quả đó hoặc chỉ chuyển phát hiện cần thiết. Nếu không có khả năng chạy đồng thời, thực hiện tuần tự. Khi khởi chạy từ 3 nhánh `invoke_subagent` trở lên trong cùng một lượt trên CLI mà 1 nhánh báo lỗi tranh chấp mở cơ sở dữ liệu phiên (`initialized by another opener`), giữ nguyên các nhánh đã chạy và chỉ gọi bù lại đúng nhánh bị trượt ở lượt kế tiếp.
 
 Ví dụ chia phạm vi: “Quyết định chung: chọn phương án lưu trữ; câu hỏi A, người phụ trách A, tìm hiểu khả năng khôi phục; câu hỏi B, người phụ trách B, tìm hiểu chi phí vận hành; B dùng kết quả A để so sánh nên bắt đầu sau khi A bàn giao.”
 

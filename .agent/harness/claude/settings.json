@@ -16,7 +16,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|Task|Agent|mcp__.*",
+        "matcher": "Edit|Write|MultiEdit|Task|Agent|call_mcp_tool|mcp__.*",
         "hooks": [
           {
             "type": "command",

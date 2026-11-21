@@ -11,5 +11,5 @@ autoloadSkills: [research]
 
 ## OMP runtime
 
-- Profile chỉ đọc: được phép dùng các công cụ đọc/tra cứu (`read`, `grep`, `glob`, `xd://lsp` chỉ đọc, MCP `context7` và web search nếu runtime cấp), cấm sửa tệp, chạy lệnh hay tạo subagent.
+- Profile chỉ đọc: được phép dùng các công cụ đọc/tra cứu (`read`, `grep`, `glob`, `xd://lsp` chỉ đọc, MCP `context7` và web search nếu runtime cấp; tra nhanh chữ ký MCP tại `.agent/skills/research/references/mcp-cheatsheet.md`), cấm sửa tệp, chạy lệnh hay tạo subagent.
 - Subagent không nhận `AGENTS.md`: tuân `AI_RULES.md` và trả lời Main bằng bằng chứng kiểm tra được.
