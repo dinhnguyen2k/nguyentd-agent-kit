@@ -30,31 +30,39 @@
     "AI_RULES.md",
     "OPINION.md"
   ],
-  "shared_write_paths": [".agent/reports/**", ".agent/scratch/**", ".agent/task-manifests/**"],
+  "shared_write_paths": [
+    ".agent/reports/**",
+    ".agent/scratch/**",
+    ".agent/task-manifests/**"
+  ],
   "enforcement": {
     "guard": ".agent/scripts/agent-boundary-guard.mjs",
     "guard_modes": {
-      "hook": "stdin JSON -> JSON quyết định (Claude Code PreToolUse; OMP tool_call qua .agent/harness/omp/hooks/pre/boundary-guard.ts; AGY PreToolUse qua .agent/harness/agy/boundary-guard.mjs)",
-      "cli": "--check-command <cmd> | --check-write <path> [--role <role>], exit 2 khi bị chặn"
+      "in_process": "import trực tiếp evaluateBoundaryChecks từ .agent/scripts/agent-boundary-guard.mjs (OMP tool_call qua boundary-guard.ts; AGY PreToolUse qua agy/boundary-guard.mjs; cache registry theo mtimeMs, 0 lần spawn tiến trình phụ)",
+      "hook": "stdin JSON -> JSON quyết định (Claude Code PreToolUse)",
+      "cli": "--check-command <cmd> | --check-write <path> [--content <text>] [--role <role>], exit 2 khi bị chặn"
     },
     "harness": {
       "canonical_wiring_dir": ".agent/harness",
       "installer": ".agent/scripts/install-harness-wiring.sh",
       "claude": {
         "wiring": ".agent/harness/claude/settings.json",
-        "symlink": ".claude/settings.json -> ../.agent/harness/claude/settings.json",
+        "symlink": ".claude/settings.json -> ../.agent/harness/claude/settings.json; .claude/{skills,rules,commands} -> ../.agent/{skills,rules,workflows}; .claude/agents/*.md -> ../../.agent/agents/*.md",
         "enforcement": "hook (cứng)"
       },
       "omp": {
         "wiring": ".agent/harness/omp/ (RULES.md, WATCHDOG.md, WATCHDOG.yml, config.yml, rules/, hooks/, agents/)",
-        "symlink": ".omp/{RULES.md,WATCHDOG.md,WATCHDOG.yml,config.yml,rules,hooks} -> ../.agent/harness/omp/*; .omp/agents/*.md là file sinh (header OMP + thân .agent/agents/)",
-        "enforcement": "hook (cứng): tool_call dịch bash/edit/write/ast_edit/eval/MCP filesystem sang payload Bash/Write; role subagent lấy từ ctx.agent.name"
+        "symlink": ".omp/RULES.md -> ../AI_RULES.md; .omp/{WATCHDOG.md,WATCHDOG.yml,config.yml,lsp.json,rules,hooks} -> ../.agent/harness/omp/*; .omp/agents/*.md là file sinh (header OMP + thân .agent/agents/)",
+        "enforcement": "hook in-process (cứng R1-R10): tool_call gọi trực tiếp evaluateBoundaryChecks (kể cả nội dung + của apply_patch); role subagent lấy từ ctx.agent.name"
       },
-      "codex": { "enforcement": "CLI mode + prose", "note": "chưa có PreToolUse hook" },
+      "codex": {
+        "enforcement": "CLI mode + prose",
+        "note": "chưa có PreToolUse hook"
+      },
       "antigravity": {
         "wiring": ".agent/harness/agy/ (hooks.json, boundary-guard.mjs, agents/)",
         "symlink": ".agents/hooks.json -> ../.agent/harness/agy/hooks.json; .agents/{skills,workflows} -> ../.agent/*; .agents/agents/*.md là file sinh (header AGY + thân .agent/agents/)",
-        "enforcement": "hook (cứng cho R1/R2/R3/R5/R6/R7/R8/R9): PreToolUse dịch run_command/write_file/edit_file/MCP filesystem/run_workflow sang payload Bash/Write; stdin chưa có agent_name nên R4 dựa vào toolset/prompt hoặc env"
+        "enforcement": "hook regex-filtered + in-process (cứng R1-R3, R5-R10): PreToolUse chỉ kích hoạt trên tool ghi/chạy lệnh và gọi trực tiếp evaluateBoundaryChecks; R4 theo worker dựa vào danh tính agent/env"
       }
     },
     "role_state": ".agent/scratch/.runtime/agent-role",
@@ -68,18 +76,26 @@
     "task_contract": {
       "contract_engine": ".agent/scripts/task-contract.mjs",
       "contract_requirement": "Dùng canonical TASK khi công việc yêu cầu contract lưu trên đĩa; task nhỏ có thể ghi allowed_paths, Reuse, Acceptance ngay trong assignment.",
-      "checkpoint_owners": ["orchestrator", "maintainer"]
+      "checkpoint_owners": [
+        "orchestrator",
+        "maintainer"
+      ]
     },
     "limits": "Guard chặn được nhầm lẫn và thói quen, không chặn được cố ý mạo danh role trong cùng một process. Nó làm việc vượt ranh giới trở nên tường minh và có log, thay vì âm thầm.",
     "rules": {
       "test_runner": {
         "id": "R1",
-        "applies_to": ["Bash"],
-        "allowed_roles": ["verifier", "test-author"],
+        "applies_to": [
+          "Bash"
+        ],
+        "allowed_roles": [
+          "verifier",
+          "test-author"
+        ],
         "deny_message": "Permission Denied: Running test suites is strictly reserved for 'verifier' and 'test-author'.",
         "patterns": [
           "\\bdotnet\\s+test\\b",
-          "\\bdotnet\\s+.*\\s+test\\b",
+          "\\bdotnet\\s+[^;&|]+\\s+test\\b",
           "\\bvitest\\b",
           "\\bjest\\b",
           "\\bplaywright\\s+test\\b",
@@ -89,8 +105,16 @@
       },
       "test_write": {
         "id": "R2",
-        "applies_to": ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"],
-        "allowed_roles": ["test-author"],
+        "applies_to": [
+          "Edit",
+          "Write",
+          "MultiEdit",
+          "NotebookEdit",
+          "Bash"
+        ],
+        "allowed_roles": [
+          "test-author"
+        ],
         "shell_path_markers": [
           "backend/tests/",
           "__tests__/",
@@ -116,19 +140,33 @@
       },
       "self_protect": {
         "id": "R3",
-        "applies_to": ["Edit", "Write", "MultiEdit", "Bash"],
-        "allowed_roles": ["maintainer"],
+        "applies_to": [
+          "Edit",
+          "Write",
+          "MultiEdit",
+          "Bash"
+        ],
+        "allowed_roles": [
+          "maintainer"
+        ],
         "shell_matching": "Nhánh Bash bỏ qua `2>&1` và `>/dev/null`, và chỉ tính khi đường dẫn được bảo vệ đứng SAU token ghi. `cat settings.json > /tmp/x` không bị chặn; `sed -i ... settings.json` thì bị.",
         "known_false_positive": "Đường dẫn được bảo vệ nằm trong chuỗi trích dẫn ĐỨNG SAU một token ghi (ví dụ `sed -i 's|registry.json|...|' file-khac.md`) vẫn bị chặn. Dùng Edit/Write cho file không được bảo vệ, hoặc bật maintainer."
       },
       "write_boundary": {
         "id": "R4",
-        "applies_to": ["Edit", "Write", "MultiEdit", "NotebookEdit"],
+        "applies_to": [
+          "Edit",
+          "Write",
+          "MultiEdit",
+          "NotebookEdit"
+        ],
         "note": "write_paths/deny_write_paths chỉ được áp khi một role cụ thể đang bật. Role mặc định `implementer` chỉ chịu R1/R2/R3 để phiên làm việc thường không bị chặn oan."
       },
       "secret_inline": {
         "id": "R5",
-        "applies_to": ["Bash"],
+        "applies_to": [
+          "Bash"
+        ],
         "allowed_roles": [],
         "echo_command": false,
         "deny_message": "Permission Denied: lệnh viết thẳng credential trên dòng lệnh, credential sẽ lộ vào transcript và shell history (AI_RULES.md §4). Cách đúng: đọc password từ file cấu hình vào env ngay trong lệnh, ví dụ `PGPASSWORD=\"$(jq -r '.ConnectionStrings.DefaultConnection' <appsettings.json> | sed -E 's/.*Password=([^;]*).*/\\1/')\" psql -h <host> -U <user> -d <db> -c '<SELECT ...>'`, hoặc dùng ~/.pgpass; không echo/in giá trị.",
@@ -140,7 +178,9 @@
       },
       "db_destructive": {
         "id": "R6",
-        "applies_to": ["Bash"],
+        "applies_to": [
+          "Bash"
+        ],
         "allowed_roles": [],
         "echo_command": true,
         "deny_message": "Permission Denied: lệnh phá huỷ dữ liệu DB (drop, truncate, delete không có WHERE, drop migration) chỉ do người dùng tự chạy (AI_RULES.md §4).",
@@ -154,8 +194,14 @@
       },
       "build_runner": {
         "id": "R8",
-        "applies_to": ["Bash"],
-        "allowed_roles": ["verifier", "test-author", "maintainer"],
+        "applies_to": [
+          "Bash"
+        ],
+        "allowed_roles": [
+          "verifier",
+          "test-author",
+          "maintainer"
+        ],
         "echo_command": true,
         "deny_message": "Permission Denied: build/typecheck ON-DEMAND ONLY, chỉ chạy khi user yêu cầu rõ ràng. CI parity qua verifier/maintainer; test-author chỉ chạy trong phạm vi test được cấp. Worker và main không tự build.",
         "known_false_positive": "Lệnh chỉ đọc có nhắc tên script (`cat backend/fast-build.sh`) cũng bị chặn; đọc file bằng tool `read`.",
@@ -173,8 +219,12 @@
       },
       "migration_runner": {
         "id": "R9",
-        "applies_to": ["Bash"],
-        "allowed_roles": ["maintainer"],
+        "applies_to": [
+          "Bash"
+        ],
+        "allowed_roles": [
+          "maintainer"
+        ],
         "echo_command": true,
         "deny_message": "Permission Denied: Agent không chạy trực tiếp dotnet ef migrations add/remove, dotnet ef database update hoặc update-db. Chỉ sinh/gỡ migration chưa apply qua ./dev.sh add-migration|remove-migration khi user yêu cầu rõ ràng; không tự áp DB hoặc sửa tay migration/snapshot (backend.md §4.6).",
         "patterns": [
@@ -185,30 +235,53 @@
       },
       "migration_write": {
         "id": "R7",
-        "applies_to": ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"],
-        "allowed_roles": ["maintainer"],
+        "applies_to": [
+          "Edit",
+          "Write",
+          "MultiEdit",
+          "NotebookEdit",
+          "Bash"
+        ],
+        "allowed_roles": [
+          "maintainer"
+        ],
         "deny_message": "Permission Denied: CẤM TUYỆT ĐỐI Agent tự viết tay hoặc chỉnh sửa file migration/snapshot EF Core. Phải sửa Entity/Fluent API Configuration rồi sinh migration qua ./dev.sh add-migration <Service> <MigrationName> khi user yêu cầu rõ ràng (backend.md §4.6)."
       },
       "code_conventions": {
         "id": "R10",
-        "applies_to": ["Edit", "Write", "MultiEdit"],
-        "allowed_roles": ["maintainer"],
+        "applies_to": [
+          "Edit",
+          "Write",
+          "MultiEdit"
+        ],
+        "allowed_roles": [
+          "maintainer"
+        ],
         "checks": [
           {
             "id": "no-shared-barrel",
-            "path_globs": ["frontend/**/*.ts", "frontend/**/*.tsx"],
+            "path_globs": [
+              "frontend/**/*.ts",
+              "frontend/**/*.tsx"
+            ],
             "pattern": "from\\s+['\"]@shared/(?:components|hooks|services)(?:/index|/master-data(?:/index)?)?['\"]",
             "message": "Cấm import qua barrel '@shared/components|hooks|services'. Hãy import trực tiếp từ file định nghĩa (ví dụ '@shared/components/custom-table', '@shared/hooks/use-audit-columns')."
           },
           {
             "id": "no-zod-uuid",
-            "path_globs": ["frontend/**/*.ts", "frontend/**/*.tsx"],
+            "path_globs": [
+              "frontend/**/*.ts",
+              "frontend/**/*.tsx"
+            ],
             "pattern": "\\.\\s*uuid\\s*\\(",
             "message": "Cấm dùng '.uuid()' của Zod 4 cho ID .NET vì từ chối ngầm GUID không chuẩn RFC. Hãy dùng 'z.guid()'."
           },
           {
             "id": "no-route-catch-empty",
-            "path_globs": ["frontend/*/src/routes/**/*.ts", "frontend/*/src/routes/**/*.tsx"],
+            "path_globs": [
+              "frontend/*/src/routes/**/*.ts",
+              "frontend/*/src/routes/**/*.tsx"
+            ],
             "pattern": "\\.catch\\(\\s*['\"]{2}\\s*\\)",
             "message": "Cấm dùng \".catch('')\" trong SearchSchema của route vì làm tràn query param rỗng lên URL. Hãy dùng '.optional()' và đặt default khi đọc."
           }
@@ -218,8 +291,17 @@
   },
   "command_policy": {
     "note": "Whitelist mô tả ý định; cưỡng chế thật nằm ở enforcement.rules và permissions trong .claude/settings.json.",
-    "build_only": [".agent/scripts/ci-parity.sh (verifier/maintainer, chỉ khi user yêu cầu CI/build, R8)", "backend/fast-build.sh <tests project> (test-author/verifier, R8)", "dotnet format style --verify-no-changes", "eslint <changed files>"],
-    "verification_only": ["dotnet test", "vitest", "playwright test"]
+    "build_only": [
+      ".agent/scripts/ci-parity.sh (verifier/maintainer, chỉ khi user yêu cầu CI/build, R8)",
+      "backend/fast-build.sh <tests project> (test-author/verifier, R8)",
+      "dotnet format style --verify-no-changes",
+      "eslint <changed files>"
+    ],
+    "verification_only": [
+      "dotnet test",
+      "vitest",
+      "playwright test"
+    ]
   },
   "agents": [
     {
@@ -228,21 +310,56 @@
       "kind": "control",
       "write_paths": [],
       "deny_write_paths": [],
-      "tools": ["Read", "Grep", "Glob", "Bash"],
-      "skills": ["orchestrate"],
-      "commands": { "allow": [], "deny": ["dotnet test", "dotnet build"] }
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash"
+      ],
+      "skills": [
+        "orchestrate"
+      ],
+      "commands": {
+        "allow": [],
+        "deny": [
+          "dotnet test",
+          "dotnet build"
+        ]
+      }
     },
     {
       "name": "backend-specialist",
       "profile": ".agent/agents/backend-specialist.md",
       "kind": "worker",
-      "write_paths": ["backend/**"],
-      "deny_write_paths": ["backend/tests/**", "backend/src/**/Migrations/**"],
-      "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
-      "skills": ["backend-development"],
+      "write_paths": [
+        "backend/**"
+      ],
+      "deny_write_paths": [
+        "backend/tests/**",
+        "backend/src/**/Migrations/**"
+      ],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "skills": [
+        "backend-development"
+      ],
       "commands": {
-        "allow": ["dotnet format style", "dotnet restore"],
-        "deny": ["dotnet test", "dotnet ef database update", "add-migration", "build/typecheck (R8: chỉ verifier/maintainer chạy CI parity khi user yêu cầu)"]
+        "allow": [
+          "dotnet format style",
+          "dotnet restore"
+        ],
+        "deny": [
+          "dotnet test",
+          "dotnet ef database update",
+          "add-migration",
+          "build/typecheck (R8: chỉ verifier/maintainer chạy CI parity khi user yêu cầu)"
+        ]
       },
       "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN build, format, restore, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the action."
     },
@@ -250,7 +367,9 @@
       "name": "frontend-specialist",
       "profile": ".agent/agents/frontend-specialist.md",
       "kind": "worker",
-      "write_paths": ["frontend/**"],
+      "write_paths": [
+        "frontend/**"
+      ],
       "deny_write_paths": [
         "frontend/**/__tests__/**",
         "frontend/**/*.test.ts",
@@ -258,11 +377,26 @@
         "frontend/**/*.spec.ts",
         "frontend/**/*.spec.tsx"
       ],
-      "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
-      "skills": ["frontend-development"],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "skills": [
+        "frontend-development"
+      ],
       "commands": {
-        "allow": ["eslint <changed files>"],
-        "deny": ["vitest", "playwright test", "tsc/vite build/fast-check.sh (R8: chỉ verifier/maintainer chạy CI parity khi user yêu cầu)"]
+        "allow": [
+          "eslint <changed files>"
+        ],
+        "deny": [
+          "vitest",
+          "playwright test",
+          "tsc/vite build/fast-check.sh (R8: chỉ verifier/maintainer chạy CI parity khi user yêu cầu)"
+        ]
       },
       "handoff": "HAND OFF IMPLEMENTATION WITHOUT WAITING FOR UNREQUESTED VALIDATION. DO NOT RUN lint, typecheck, route generation, build, browser checks, or tests automatically. ON-DEMAND ONLY: the user must explicitly request the validation action by name. Use `verified` only with command evidence."
     },
@@ -279,14 +413,37 @@
         "frontend/**/*.spec.tsx",
         ".agent/evals/gate-identity-refresh.test.mjs"
       ],
-      "deny_write_paths": ["backend/src/**", "frontend/src/**"],
-      "tools": ["Read", "Grep", "Glob", "Bash", "Edit", "Write"],
-      "skills": ["testing-patterns", "tdd-workflow"],
+      "deny_write_paths": [
+        "backend/src/**",
+        "frontend/src/**"
+      ],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "skills": [
+        "testing-patterns",
+        "tdd-workflow"
+      ],
       "commands": {
-        "allow": ["backend/fast-build.sh backend/tests/<Project>", "dotnet test --filter <new tests>", "vitest run <file>", "node --test .agent/evals/gate-identity-refresh.test.mjs"],
-        "deny": ["dotnet test (toàn bộ suite không filter)"]
+        "allow": [
+          "backend/fast-build.sh backend/tests/<Project>",
+          "dotnet test --filter <new tests>",
+          "vitest run <file>",
+          "node --test .agent/evals/gate-identity-refresh.test.mjs"
+        ],
+        "deny": [
+          "dotnet test (toàn bộ suite không filter)"
+        ]
       },
-      "parallel_safe_with": ["backend-specialist", "frontend-specialist"],
+      "parallel_safe_with": [
+        "backend-specialist",
+        "frontend-specialist"
+      ],
       "runtime_registration": "subagent thật: .claude/agents/test-author.md -> ../../.agent/agents/test-author.md"
     },
     {
@@ -294,12 +451,31 @@
       "profile": ".agent/agents/verifier.md",
       "kind": "gate",
       "write_paths": [],
-      "deny_write_paths": ["backend/**", "frontend/**"],
-      "tools": ["Read", "Grep", "Glob", "Bash"],
-      "skills": ["lint-and-validate", "testing-patterns", "requesting-code-review"],
+      "deny_write_paths": [
+        "backend/**",
+        "frontend/**"
+      ],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash"
+      ],
+      "skills": [
+        "lint-and-validate",
+        "testing-patterns",
+        "requesting-code-review"
+      ],
       "commands": {
-        "allow": ["dotnet test", "dotnet format --verify-no-changes", "vitest run", "git stash/diff"],
-        "deny": ["mọi lệnh ghi vào backend/src/** hoặc frontend/src/**"]
+        "allow": [
+          "dotnet test",
+          "dotnet format --verify-no-changes",
+          "vitest run",
+          "git stash/diff"
+        ],
+        "deny": [
+          "mọi lệnh ghi vào backend/src/** hoặc frontend/src/**"
+        ]
       },
       "activation": "A governed task may activate read-only source verification. DO NOT RUN validation commands unless the user explicitly requests the action and scope.",
       "runtime_registration": "subagent thật: .claude/agents/verifier.md -> ../../.agent/agents/verifier.md. Không có Edit/Write ở tầng runtime, đó là ranh giới cứng thật sự."
@@ -309,26 +485,55 @@
       "profile": ".agent/agents/researcher.md",
       "kind": "gate",
       "write_paths": [],
-      "deny_write_paths": ["**"],
-      "tools": ["Read", "Grep", "Glob", "WebSearch", "WebFetch"],
-      "skills": ["research"],
+      "deny_write_paths": [
+        "**"
+      ],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "skills": [
+        "research"
+      ],
       "commands": {
         "allow": [],
-        "deny": ["mọi lệnh shell"]
+        "deny": [
+          "mọi lệnh shell"
+        ]
       },
       "activation": "Main giao một cuộc điều tra có phạm vi cụ thể; Researcher trả lời kèm nguồn và không triển khai."
     },
     {
       "name": "reviewer",
-      "profile": null,
+      "profile": ".agent/agents/reviewer.md",
       "kind": "gate",
       "write_paths": [],
-      "deny_write_paths": ["backend/**", "frontend/**"],
-      "tools": ["Read", "Grep", "Glob", "Bash"],
-      "skills": ["code-reviewer", "clean-code"],
-      "commands": { "allow": ["git diff/log (chỉ đọc)"], "deny": ["build, test, format"] },
-      "activation": "Chỉ khi user yêu cầu review rõ ràng và Main quyết định cần subagent read-only. Không tự kích hoạt sau task triển khai; dùng skill code-reviewer/code-review phù hợp phạm vi.",
-      "runtime_registration": "OMP: .agent/harness/omp/agents/reviewer.md chứa toàn bộ profile; không có thân trong .agent/agents/."
+      "deny_write_paths": [
+        "backend/**",
+        "frontend/**"
+      ],
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash"
+      ],
+      "skills": [
+        "code-reviewer",
+        "clean-code"
+      ],
+      "commands": {
+        "allow": [
+          "git diff/log (chỉ đọc)"
+        ],
+        "deny": [
+          "build, test, format"
+        ]
+      },
+      "activation": "Chỉ khi user yêu cầu review rõ ràng và Main quyết định cần subagent read-only. Không tự kích hoạt sau task triển khai; dùng skill code-reviewer/code-review phù hợp phạm vi."
     }
   ]
 }

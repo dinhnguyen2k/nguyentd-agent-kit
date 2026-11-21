@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 /**
- * Nối Antigravity (AGY) `PreToolUse` vào `.agent/scripts/agent-boundary-guard.mjs`.
+ * Nối Antigravity (AGY) `PreToolUse` trực tiếp vào `evaluateBoundaryChecks` trong cùng tiến trình Node.
  * Nguồn luật duy nhất nằm ở `.agent/contracts/agent-registry.json`.
- * File này dịch payload stdin của AGY (`toolCall.name`, `toolCall.args`) sang
- * định dạng `Bash` / `Write` rồi trả `{"decision": "allow" | "deny"}`.
  * Fail-open có chủ đích: lỗi của chính hook không được chặn tool.
  */
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { evaluateBoundaryChecks } from "../../scripts/agent-boundary-guard.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GUARD_REL = join(".agent", "scripts", "agent-boundary-guard.mjs");
@@ -83,8 +81,8 @@ function isInsideDir(targetPath, dirPath) {
 }
 
 function argPaths(args) {
-  const single = ["Path", "TargetFile", "file_path", "path", "notebook_path", "source", "destination"].map(
-    (k) => str(args[k])
+  const single = ["Path", "TargetFile", "file_path", "path", "notebook_path", "source", "destination"].map((k) =>
+    str(args[k])
   );
   const many = Array.isArray(args.paths) ? args.paths.map(str) : [];
   return [...single, ...many].filter((p) => p !== null);
@@ -158,37 +156,27 @@ function toChecks(toolName, args, baseCwd) {
   return [];
 }
 
-function denyReason(root, check, agentName) {
-  const payload = { ...check, ...(agentName ? { agent_name: agentName } : {}) };
-  const run = spawnSync(process.execPath, [join(root, GUARD_REL)], {
-    cwd: root,
-    input: JSON.stringify(payload),
-    encoding: "utf8",
-    timeout: 10_000,
-  });
-  if (run.error || run.status !== 0 || !run.stdout.trim()) return null;
-  const out = parseJsonObject(run.stdout).hookSpecificOutput;
-  return out && out.permissionDecision === "deny"
-    ? String(out.permissionDecisionReason ?? "blocked by boundary-guard")
-    : null;
-}
-
 try {
   const raw = readFileSync(0, "utf8");
   if (!raw.trim()) allow();
   const event = parseJsonObject(raw);
+  const toolCall = parseJsonObject(event.toolCall);
+  const toolName = (str(toolCall.name) ?? "").toLowerCase();
+  if (!toolName) allow();
+
   const workspaceFirst = Array.isArray(event.workspacePaths) ? str(event.workspacePaths[0]) : null;
   const root = findRepoRoot(str(event.cwd)) ?? findRepoRoot(workspaceFirst) ?? findRepoRoot(HERE);
   if (!root) allow();
 
-  const toolCall = parseJsonObject(event.toolCall);
-  const toolName = (str(toolCall.name) ?? "").toLowerCase();
   const args = parseJsonObject(toolCall.args);
   const baseCwd = str(event.cwd) ?? workspaceFirst ?? root;
+  const rawChecks = toChecks(toolName, args, baseCwd);
+  if (rawChecks.length === 0) allow();
+
   const artifactDir = str(event.artifactDirectoryPath);
   const skipArtifactDir = artifactDir && !isInsideDir(artifactDir, root) ? artifactDir : null;
 
-  const checks = toChecks(toolName, args, baseCwd).flatMap((check) => {
+  const checks = rawChecks.flatMap((check) => {
     if (!check.tool_input.file_path) return [check];
     const resolved = isAbsolute(check.tool_input.file_path)
       ? resolve(check.tool_input.file_path)
@@ -205,10 +193,8 @@ try {
     str(event.subagentType) ??
     str(parseJsonObject(event.agent).name);
 
-  for (const check of checks) {
-    const reason = denyReason(root, check, agentName);
-    if (reason) deny(reason);
-  }
+  const reason = evaluateBoundaryChecks(checks, { root, agentName });
+  if (reason) deny(reason);
 } catch {
   // Fail-open có chủ đích, khớp `fail_mode: open-on-crash` trong agent-registry.json.
 }

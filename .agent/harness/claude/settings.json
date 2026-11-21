@@ -1,15 +1,5 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "permissions": {
-    "ask": [
-      "Bash(dotnet test:*)",
-      "Bash(dotnet test *)",
-      "Bash(npx vitest:*)",
-      "Bash(npx playwright test:*)",
-      "Bash(pnpm test:*)",
-      "Bash(npm test:*)"
-    ]
-  },
   "hooks": {
     "PreToolUse": [
       {
@@ -17,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-/home/nguyentd/cogain/cogain-core}/.agent/scripts/agent-boundary-guard.mjs\"",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/scripts/agent-boundary-guard.mjs\"",
             "timeout": 10,
             "statusMessage": "Kiểm tra ranh giới agent..."
           }

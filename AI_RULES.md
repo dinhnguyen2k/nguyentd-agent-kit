@@ -16,7 +16,7 @@
 - **Implementation**: Chỉ sửa trong phạm vi yêu cầu. Sửa code KHÔNG cấp quyền chạy lệnh validation.
 - **CẤM tự ý chạy lệnh nặng**: build, lint, typecheck, test, codegen, format chỉ chạy khi user nêu đích danh hành động (`run build`, `typecheck`, `run tests`, `/verify`).
 - Không suy diễn quyền từ checklist, task tier hay thông lệ. User intent là quyết định.
-- Chẩn đoán thụ động từ LSP không phải validation command và không dùng làm bằng chứng `Status: verified`. Không có yêu cầu validation thì ghi: `Validation: not run - not requested`.
+- Trước khi bàn giao thay đổi mã nguồn, xử lý sạch lỗi chẩn đoán tĩnh (syntax/type/compile) trên các tệp vừa sửa khi môi trường có công cụ chẩn đoán ngôn ngữ. Chẩn đoán tĩnh không phải validation command và không dùng làm bằng chứng `Status: verified`; không có yêu cầu validation thì ghi: `Validation: not run - not requested`.
 - Cấm build trực tiếp (bị chặn bởi guard R8); `.agent/scripts/ci-parity.sh` chỉ chạy khi user yêu cầu rõ ràng.
 - Cấm tự chạy app/build/test để reproduce bug trừ khi được yêu cầu đích danh.
 
@@ -53,7 +53,7 @@ Chỉ ghi command và kết quả khi command thực sự đã chạy. Không c�
 Phân biệt rõ: **Hiện trạng** / **Đề xuất** / **Đã thay đổi**.
 
 ## 8. Quy Ước Đầu Ra
-- Output cho người dùng bằng Tiếng Việt; identifier, API name, cú pháp code giữ Tiếng Anh.
+- Output cho người dùng bằng Tiếng Việt có dấu đầy đủ (cấm Tiếng Việt không dấu trong trả lời, kế hoạch, giao việc, comment); identifier, API name, cú pháp code giữ Tiếng Anh.
 - Nói với người dùng như đang trao đổi với người cùng dự án: câu đầy đủ, nói kết quả và ảnh hưởng thực tế trước, chi tiết kỹ thuật sau; cấm lan man, lặp ý.
 - Ngắn gọn nghĩa là bỏ ý thừa, không phải nén câu thành ký hiệu, viết tắt hay câu cụt.
 - Không đưa từ nội bộ giữa các agent (slice, contract, lane, dispatch, scout, LSP...) vào câu trả lời cho người dùng; tên file, lệnh hay cấu hình khi cần nêu thì giải thích nó dùng để làm gì ngay trong câu.
@@ -62,6 +62,7 @@ Phân biệt rõ: **Hiện trạng** / **Đề xuất** / **Đã thay đổi**.
 - Comment/XML doc: Tiếng Việt.
 - Không dùng em dash, dùng dấu gạch ngang thường `-`.
 - File Markdown dài: mỗi câu hoàn chỉnh nằm trên một dòng riêng.
+- Commit message của mã ứng dụng không nhắc đường dẫn cục bộ bị Git bỏ qua (`.agent/**`, `.omp/**`, `.claude/**`, `.agents/**`).
 - Không sửa tay `CHANGELOG.md` hoặc file auto-generated.
 
 ## 9. Kỷ Luật Chất Lượng

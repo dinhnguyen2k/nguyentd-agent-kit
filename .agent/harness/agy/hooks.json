@@ -2,11 +2,11 @@
   "cogain-boundary-guard": {
     "PreToolUse": [
       {
-        "matcher": "*",
+        "matcher": "^(run_command|bash|write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content|create_file|delete_file|edit|write|notebook_edit|call_mcp_tool|mcp_+filesystem_.*|run_workflow|eval)$",
         "hooks": [
           {
             "type": "command",
-            "command": "for p in ./boundary-guard.mjs ../.agent/harness/agy/boundary-guard.mjs ./.agent/harness/agy/boundary-guard.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{\"decision\":\"allow\"}\\n'",
+            "command": "for p in ../.agent/harness/agy/boundary-guard.mjs ./boundary-guard.mjs ./.agent/harness/agy/boundary-guard.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{\"decision\":\"allow\"}\\n'",
             "timeout": 10
           }
         ]

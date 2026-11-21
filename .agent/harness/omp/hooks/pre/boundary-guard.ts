@@ -1,19 +1,21 @@
 /**
- * Nối OMP `tool_call` vào `.agent/scripts/agent-boundary-guard.mjs` (hook mode, stdin JSON).
+ * Nối OMP `tool_call` trực tiếp vào `evaluateBoundaryChecks` trong bộ nhớ (0 lần spawn tiến trình con).
  * Luật nằm ở `.agent/contracts/agent-registry.json`; file này chỉ dịch tool call của OMP
- * sang payload kiểu Claude Code (`Bash` / `Write`) rồi đọc quyết định của guard.
+ * sang payload chuẩn (`Bash` / `Write`) rồi đọc quyết định từ engine dùng chung.
  * Fail-open như guard: lỗi của chính hook không được chặn tool.
  */
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { evaluateBoundaryChecks } from "../../../../scripts/agent-boundary-guard.mjs";
 
-type GuardCheck = { tool_name: "Bash" | "Write"; tool_input: { command?: string; file_path?: string; new_content?: string } };
+type GuardCheck = {
+	tool_name: "Bash" | "Write";
+	tool_input: { command?: string; file_path?: string; new_content?: string };
+};
 
 const GUARD_REL = join(".agent", "scripts", "agent-boundary-guard.mjs");
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
-// Paths tìm thấy trong payload của các chế độ edit: hashline, apply_patch, unified diff.
 const EDIT_PATH_PATTERNS = [
 	/^\[([^\]#\n]+)#[0-9A-Fa-f]{4}\]/gm,
 	/^MV\s+"?([^"\n]+?)"?\s*$/gm,
@@ -21,7 +23,6 @@ const EDIT_PATH_PATTERNS = [
 	/^\*\*\* Move to:\s*(.+)$/gm,
 	/^\+\+\+ b\/(.+)$/gm,
 ];
-// Đường ghi file trong code `eval` (Python prelude, Bun, Node, pathlib).
 const EVAL_WRITE_PATTERNS = [
 	/\bwrite\(\s*["'`]([^"'`]+)["'`]/g,
 	/\bBun\.write\(\s*["'`]([^"'`]+)["'`]/g,
@@ -43,7 +44,6 @@ function str(value: unknown): string | null {
 	return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-/** Path trong tham số của MCP filesystem (`write_file`, `edit_file`, `move_file`, `create_directory`) và `ast_edit`. */
 function argPaths(args: Record<string, unknown>): string[] {
 	const single = ["path", "file_path", "source", "destination"].map(k => str(args[k]));
 	const many = Array.isArray(args.paths) ? args.paths.map(str) : [];
@@ -59,8 +59,25 @@ function parseJson(text: unknown): Record<string, unknown> {
 	}
 }
 
+function extractPatchAddedContent(input: Record<string, unknown>, fullText: string): string | null {
+	const direct =
+		str(input.newText) ??
+		str(input.new_string) ??
+		str(input.content) ??
+		(Array.isArray(input.edits)
+			? input.edits.map(e => str((e as Record<string, unknown> | null)?.new_string) ?? str((e as Record<string, unknown> | null)?.newText) ?? "").join("\n") || null
+			: null);
+	if (direct) return direct;
+	const added = fullText
+		.split("\n")
+		.filter(line => line.startsWith("+") && !line.startsWith("+++ "))
+		.map(line => line.slice(1))
+		.join("\n");
+	return added || null;
+}
+
 function writes(paths: string[], newContent?: string | null): GuardCheck[] {
-	return paths
+	return [...new Set(paths)]
 		.filter(p => !URL_SCHEME.test(p))
 		.map(p => ({ tool_name: "Write", tool_input: { file_path: p, ...(newContent ? { new_content: newContent } : {}) } }));
 }
@@ -73,7 +90,7 @@ function toChecks(toolName: string, input: Record<string, unknown>): GuardCheck[
 	if (toolName === "edit" || toolName === "apply_patch") {
 		const text = Object.values(input).filter((v): v is string => typeof v === "string").join("\n");
 		const found = EDIT_PATH_PATTERNS.flatMap(p => [...text.matchAll(p)].map(m => m[1].trim()));
-		const newContent = str(input.newText) ?? str(input.new_string) ?? str(input.content);
+		const newContent = extractPatchAddedContent(input, text);
 		return writes([...found, ...argPaths(input)], newContent);
 	}
 	if (toolName === "write") {
@@ -94,24 +111,10 @@ function toChecks(toolName: string, input: Record<string, unknown>): GuardCheck[
 		const code = str(input.code);
 		if (!code) return [];
 		const checks = writes(EVAL_WRITE_PATTERNS.flatMap(p => [...code.matchAll(p)].map(m => m[1].trim())));
-		// Bỏ dấu nháy để regex lệnh của guard (viết cho shell) thấy `pnpm test` trong `run('pnpm test')`.
 		if (EVAL_SPAWNS_PROCESS.test(code)) checks.push({ tool_name: "Bash", tool_input: { command: code.replace(/["'`]/g, " ") } });
 		return checks;
 	}
 	return [];
-}
-
-function denyReason(root: string, check: GuardCheck, agentName: string | undefined): string | null {
-	const payload = { ...check, ...(agentName ? { agent_name: agentName } : {}) };
-	const run = spawnSync("node", [join(root, GUARD_REL)], {
-		cwd: root,
-		input: JSON.stringify(payload),
-		encoding: "utf8",
-		timeout: 10_000,
-	});
-	if (run.error || run.status !== 0 || !run.stdout.trim()) return null;
-	const out = parseJson(run.stdout).hookSpecificOutput as Record<string, unknown> | undefined;
-	return out?.permissionDecision === "deny" ? String(out.permissionDecisionReason ?? "blocked by boundary-guard") : null;
 }
 
 export default function boundaryGuard(pi: ExtensionAPI): void {
@@ -125,12 +128,10 @@ export default function boundaryGuard(pi: ExtensionAPI): void {
 					? { ...c, tool_input: { ...c.tool_input, file_path: resolve(ctx.cwd, c.tool_input.file_path) } }
 					: c,
 			);
-			// Subagent: tên agent là danh tính thật để guard áp write boundary (R4). Main: guard tự lấy env/state/default.
+			if (checks.length === 0) return;
 			const agentName = ctx.agent?.kind === "sub" && ctx.agent.name !== "sub" ? ctx.agent.name : undefined;
-			for (const check of checks) {
-				const reason = denyReason(root, check, agentName);
-				if (reason) return { block: true, reason: `[boundary-guard] ${reason}` };
-			}
+			const reason = evaluateBoundaryChecks(checks, { root, agentName });
+			if (reason) return { block: true, reason: `[boundary-guard] ${reason}` };
 		} catch {
 			// Fail-open có chủ đích, khớp `fail_mode: open-on-crash` trong agent-registry.json.
 		}
