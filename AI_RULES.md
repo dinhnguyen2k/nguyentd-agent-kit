@@ -25,7 +25,7 @@ Tin source code/runtime hơn doc, doc hơn best practice chung.
 Khi gặp điểm chưa tường minh hoặc doc/comment cũ lệch code, phân loại vào 3 vùng để vận hành xuyên suốt thay vì dừng hỏi việc nhỏ:
 - **Vùng Xanh (Tự nghiên cứu & tự chốt ngay)**: chi tiết kỹ thuật cục bộ, mẫu chuẩn trong repo/`.agent/contracts/archetype-exemplars.json`, tối ưu hiệu năng/bộ nhớ theo `OPINION.md`, hoặc doc/comment cũ lệch runtime code mà luồng code thực tế đã rõ -> tin runtime code, tự quyết và làm thẳng, không hỏi user.
 - **Vùng Vàng (Cửa 2 chiều khả nghịch)**: giá trị hiển thị mặc định khi trống, thứ tự cột phụ, nhánh biên kỹ thuật dễ đảo ngược trên Git mà không đổi công thức nghiệp vụ, schema DB hay phá tương thích ngược -> tự tra tiền lệ gần nhất + `OPINION.md`, chọn phương án tương thích ngược tối ưu, làm tiếp không dừng và ghi vào bảng `Quyết định kỹ thuật đã tự chốt` (tối đa 5 mục) ở báo cáo cuối.
-- **Vùng Đỏ (Cửa 1 chiều & Kiến trúc nghiệp vụ gốc)**: công thức tiền/lương/quyền/tồn kho/mốc hiệu lực chưa có tiền lệ rõ, breaking public contract, schema DB/migration phá huỷ, mâu thuẫn nghiệp vụ thật sự -> cấm tự đoán; đóng gói câu hỏi kèm đề xuất có bằng chứng vào `Hộp thư Quyết định`, **chỉ treo riêng nhánh vướng Vùng Đỏ** (và nhánh phụ thuộc trực tiếp), tiếp tục chạy xuyên suốt các nhánh độc lập còn lại.
+- **Vùng Đỏ (Cửa 1 chiều & Kiến trúc nghiệp vụ gốc)**: công thức tiền/lương/quyền/tồn kho/mốc hiệu lực chưa có tiền lệ rõ, breaking public contract, schema DB/migration phá huỷ, mâu thuẫn nghiệp vụ thật sự -> cấm tự đoán; đóng gói câu hỏi kèm đề xuất có bằng chứng vào `Hộp thư Quyết định`, **chỉ treo riêng nhánh vướng Vùng Đỏ hoặc lỗi công cụ/worktree/guard cục bộ** (cùng nhánh phụ thuộc trực tiếp), bắt buộc chạy xuyên suốt hết các nhánh độc lập còn lại và cấm dừng phiên sau báo cáo tiến độ trung gian khi còn hạng mục sẵn sàng.
 
 ## 4. Cổng An Toàn (Safety Gates)
 - Cấm tự ý chạy `git commit`. Chỉ chạy khi user yêu cầu rõ ràng.
@@ -47,7 +47,7 @@ Xếp hạng theo correctness, simplicity, robustness, maintainability; không l
 - Main chỉ code trực tiếp khi user giao rõ cho Main làm trực tiếp task hiện tại, ví dụ `làm trực tiếp phiên main`, `main làm luôn`, `không dùng subagent, tự sửa ở main`.
   Yêu cầu `sửa`/`fix`/`triển khai`, mức độ `gấp`, ít dòng hoặc giải pháp đã rõ không cấp quyền Main code; quyền của task trước không tự áp cho task sau.
 - Khi chưa có quyền Main code: `backend/**` → `backend-specialist`, `frontend/**` → `frontend-specialist`, kể cả một slice; không gọi thêm agent chỉ để đủ quy trình.
-  Nếu không thể dispatch specialist thì báo blocker, không tự chuyển sang Main code.
+  Nếu một nhánh không thể dispatch specialist thì chỉ treo riêng nhánh đó kèm blocker, hoàn tất các nhánh độc lập còn lại, không tự chuyển sang Main code.
 - Review dùng skill hoặc reviewer khi user yêu cầu rõ; ý định chỉ đọc vẫn không cấp quyền sửa.
 - Nhất quán BE ↔ FE (enum, nullable ID, public contract): `.agent/rules/domain-parity.md`.
 

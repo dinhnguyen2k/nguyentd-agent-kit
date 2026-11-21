@@ -658,6 +658,25 @@
       "expected_decision": "allow"
     },
     {
+      "id": "R4-valid-researcher-rg-quoted-angle-regex",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "rg -n -A 6 \"CreateMap<.*(PaymentVoucher|PaymentRequest)\\s*>\" backend/src/Services/HR/HR.Services/AutoMapperConfig/MappingProfile.cs; echo \"=== AfterUpdateAsync ===\"; rg -n \"AfterUpdateAsync\" -A 15 backend/src/Services" }
+      },
+      "options": { "envRole": "researcher" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R4-invalid-researcher-rg-redirect-outside-quotes",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "rg -n \"CreateMap<[^,]+,\\s*(TripOrder)>\" backend/src > /tmp/maps.txt" }
+      },
+      "options": { "envRole": "researcher" },
+      "expected_decision": "deny",
+      "expected_rule": "R4-gate-readonly-shell"
+    },
+    {
       "id": "R4-valid-verifier-git-stash",
       "payload": {
         "tool_name": "Bash",
@@ -729,6 +748,17 @@
         "tool_input": {
           "file_path": "backend/src/Services/ERP/Services/OrderService.cs",
           "new_string": "using Cogain.Services.ERP.Data.Entities;\nusing Cogain.Services.HR.Contracts;"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-valid-buildingblocks-infrastructure-using",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/HR/HR.Data/Persistence/EmployeeBankAccountHistoryAuditHook.cs",
+          "new_string": "using Infrastructure.Persistence;\nusing Contracts.Services;"
         }
       },
       "expected_decision": "allow"
@@ -818,6 +848,115 @@
       },
       "expected_decision": "deny",
       "expected_rule": "R10-no-zod-uuid"
+    },
+    {
+      "id": "R10-valid-buildingblocks-infrastructure-using",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/HR/HR.Data/Persistence/EmployeeBankAccountHistoryAuditHook.cs",
+          "new_string": "using Infrastructure.Persistence;\nusing Contracts.Services;\nusing System.Data;"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-cross-service-short-using",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/HR/HR.Data/Persistence/EmployeeBankAccountHistoryAuditHook.cs",
+          "new_string": "using MasterData.Data.Entities;"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-cross-service-data-using"
+    },
+    {
+      "id": "R10-valid-baseservice-legacy-reconcile",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/BuildingBlocks/Infrastructure/Services/BaseService.cs",
+          "new_string": "ReconcileCollections(existingEntity, dto);"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-git-ls-tree-pipe-grep",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git ls-tree --name-only origin/develop:frontend/bizdoc | grep -E 'package|vite build|dotnet build'"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-valid-rg-dotnet-build",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "rg -n \"dotnet build|pnpm run build|tsc --noEmit\" .agent/"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-invalid-bash-c-dotnet-build",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "bash -c \"dotnet build backend/CogainSolution.sln\""
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R5-valid-regex-password-group",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "python3 -c 'import re; print(re.sub(r\"(Password=)[^;]+\", r\"\\1<REDACTED>\", \"x\"))'"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R5-invalid-connection-string-password",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "psql \"Host=localhost;Username=postgres;Password=MySecret123\""
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R5-secret-inline"
+    },
+    {
+      "id": "R4-valid-researcher-single-quote-backslash-and-gte",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "rg -n 'foo\\' backend/src && python3 -c 'print(3 >= 2)' &>/dev/null"
+        }
+      },
+      "options": { "envRole": "researcher" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R4-invalid-researcher-python-write",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "python3 -c \"open('backend/x.txt', 'w').write('bad')\""
+        }
+      },
+      "options": { "envRole": "researcher" },
+      "expected_decision": "deny",
+      "expected_rule": "R4-gate-readonly-shell"
     }
   ]
 }

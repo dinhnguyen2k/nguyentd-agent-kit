@@ -30,7 +30,32 @@ const DEFAULT_ROOT = resolve(HERE, "..", "..");
 const ROLE_TTL_MS = 14 * 60 * 60 * 1000;
 const DEFAULT_ROLE = "implementer";
 const PRIVILEGED_INLINE_ROLES = new Set(["verifier", "test-author", "maintainer"]);
+const NON_SERVICE_BACKEND_NAMESPACES = new Set([
+  "Infrastructure",
+  "BuildingBlocks",
+  "Contracts",
+  "Shared",
+  "Common",
+  "System",
+  "Microsoft",
+  "Cogain",
+]);
+const SHELL_QUOTE_RE = /"(?:[^"\\]|\\.)*"|'[^']*'/g;
+const EXEC_WRAPPER_BEFORE_QUOTE_RE =
+  /(?:(?:^|[;&|(`])\s*(?:env\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:bash|sh|zsh)\s+(?:-[a-zA-Z]+\s+)*-[a-zA-Z]*c\s*|\b(?:eval|execSync|spawnSync|exec|system)\s*\(?\s*)$/;
+const READONLY_INTERPRETER_MUTATION_RE =
+  /\b(?:open\s*\([^)]*,\s*['"][wax+]|write_text\s*\(|write_bytes\s*\(|writeFileSync\s*\(|writeFile\s*\(|appendFileSync\s*\(|appendFile\s*\(|unlinkSync\s*\(|unlink\s*\(|rmSync\s*\(|rmdirSync\s*\(|mkdirSync\s*\(|renameSync\s*\(|copyFileSync\s*\(|shutil\s*\.|os\s*\.\s*(?:remove|unlink|rmdir|rename|replace|system|popen)|subprocess\b|child_process\b)/;
 const registryCache = new Map();
+
+function stripQuotesForCommandMatch(cmd) {
+  return cmd.replace(SHELL_QUOTE_RE, (match, offset) => {
+    const prefix = cmd.slice(Math.max(0, offset - 80), offset);
+    if (EXEC_WRAPPER_BEFORE_QUOTE_RE.test(prefix)) {
+      return ` ; ${match.slice(1, -1)} ; `;
+    }
+    return " ";
+  });
+}
 
 function appendLog(logFile, line) {
   if (!logFile) return;
@@ -224,16 +249,19 @@ export function evaluateBoundaryPayload(payload, options = {}) {
         }
       }
 
+      const cmdForVerbMatch = stripQuotesForCommandMatch(cmd);
+
       for (const key of ["secret_inline", "db_destructive", "build_runner", "migration_runner"]) {
         const r = rules[key];
-        if (!r || !(r.patterns || []).some((p) => new RegExp(p, "i").test(cmd))) continue;
+        const targetCmd = key === "build_runner" || key === "migration_runner" ? cmdForVerbMatch : cmd;
+        if (!r || !(r.patterns || []).some((p) => new RegExp(p, "i").test(targetCmd))) continue;
         if ((r.allowed_roles || []).includes(role)) continue;
         const shown = r.echo_command ? `\n\nLệnh bị chặn: ${cmd.slice(0, 200)}` : "";
         return denyResult(`${r.id}-${key.replace("_", "-")}`, role, `${r.deny_message}${shown}`);
       }
 
       const r1 = rules.test_runner || {};
-      const hitsRunner = (r1.patterns || []).some((p) => new RegExp(p, "i").test(cmd));
+      const hitsRunner = (r1.patterns || []).some((p) => new RegExp(p, "i").test(cmdForVerbMatch));
       if (hitsRunner && !(r1.allowed_roles || []).includes(role)) {
         return denyResult(
           "R1-test-runner",
@@ -241,7 +269,7 @@ export function evaluateBoundaryPayload(payload, options = {}) {
           `${r1.deny_message}\n\n` +
             `Lệnh bị chặn: ${cmd.slice(0, 200)}\n` +
             `Role hiện tại: ${role} (nguồn: ${source}).\n\n` +
-            `Agent triển khai không tự build hay chạy test; CI parity qua verifier/maintainer chỉ khi user yêu cầu CI/build. DỪNG và bàn giao.\n` +
+            `Agent triển khai không tự build hay chạy test; CI parity qua verifier/maintainer chỉ khi user yêu cầu CI/build. Dừng riêng lệnh chạy test này (tiếp tục các nhánh độc lập khác nếu còn).\n` +
             `Chạy test là quyết định của người dùng. Nếu người dùng muốn mở cổng, người dùng chạy:\n` +
             `  ! .agent/scripts/agent-role.sh verifier\n` +
             `Không tự ý mở cổng rồi chạy tiếp.`
@@ -249,18 +277,19 @@ export function evaluateBoundaryPayload(payload, options = {}) {
       }
 
       const r2 = rules.test_write || {};
-      const stripQuotes = (s) => s.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, " ");
+      const stripQuotes = (s) => s.replace(SHELL_QUOTE_RE, " ");
       const unquoted = stripQuotes(cmd);
       const stripped = unquoted
         .replace(/\d?>\s*&\s*\d/g, " ")
-        .replace(/\d?>>?\s*\/dev\/null/g, " ")
-        .replace(/[=-]>/g, "  ");
+        .replace(/(?:&|\d?)>>?\s*\/dev\/null/g, " ")
+        .replace(/[=-]>/g, "  ")
+        .replace(/[<>!]=(?!=)/g, "  ");
 
       const cmdPrefix = "(?:^|[;&|(`]|\\b(?:sudo|xargs|env)\\s+)\\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|\"[^\"]*\"|\\S+)\\s+)*";
       const mutatingCmdRe = new RegExp(cmdPrefix + "(?:rm|cp|mv|truncate|tee|ln|patch)\\b", "i");
       const sedMutatingRe = new RegExp(cmdPrefix + "sed\\b[^;&|]*(?:^|\\s)-[a-zA-Z]*i", "i");
       const gitMutatingCmdRe = new RegExp(cmdPrefix + "git\\s+(?:checkout|restore|apply)\\b", "i");
-      const redirectionRe = />>?[^&]/;
+      const redirectionRe = /(?:>>?|(?<![<>=!])>)(?![&=])/;
 
       const isMutating =
         mutatingCmdRe.test(stripped) ||
@@ -334,7 +363,16 @@ export function evaluateBoundaryPayload(payload, options = {}) {
           role === "researcher" || role === "reviewer"
             ? /(?:^|[;&|(`])\s*(?:env\s+)?(?:dotnet|npm|pnpm|yarn|npx|pnpx|bunx|bun|psql|pg_restore|sqlite3|docker)\b/i
             : null;
-        if (isMutating || gitMutatingRe.test(stripped) || (nonReadOnlyExecRe && nonReadOnlyExecRe.test(stripped))) {
+        const interpreterMutating =
+          (role === "researcher" || role === "reviewer") &&
+          /(?:^|[;&|(`])\s*(?:env\s+)?(?:python3?|node|perl|ruby)\b/i.test(stripped) &&
+          READONLY_INTERPRETER_MUTATION_RE.test(cmd);
+        if (
+          isMutating ||
+          gitMutatingRe.test(stripped) ||
+          (nonReadOnlyExecRe && nonReadOnlyExecRe.test(stripped)) ||
+          interpreterMutating
+        ) {
           return denyResult(
             "R4-gate-readonly-shell",
             role,
@@ -427,6 +465,7 @@ export function evaluateBoundaryPayload(payload, options = {}) {
         for (const chk of r10.checks || []) {
           if (
             matchesAny(target, chk.path_globs) &&
+            !matchesAny(target, chk.exclude_globs) &&
             !isAllowlisted(allowlist, chk.id, target, now) &&
             new RegExp(chk.pattern).test(writtenText)
           ) {
@@ -437,15 +476,20 @@ export function evaluateBoundaryPayload(payload, options = {}) {
         const csServiceMatch = target.match(/^backend\/src\/Services\/([^/]+)\/.*\.cs$/);
         if (csServiceMatch && writtenText && !isAllowlisted(allowlist, "no-cross-service-data-using", target, now)) {
           const currentService = csServiceMatch[1];
-          const usingRe = /\busing\s+(?:Cogain\.)?(?:Services\.)?([A-Za-z0-9_]+)\.(?:Data|Repositories|Persistence)\b/g;
+          const usingRe =
+            /(?:^|[;\n])[ \t]*using\s+(?:static\s+)?(?:Cogain\.)?(?:Services\.)?([A-Za-z0-9_]+)\.(?:Data|Repositories|Persistence)\b/g;
           for (const m of writtenText.matchAll(usingRe)) {
-            if (m[1] !== currentService) {
-              return denyResult(
-                "R10-no-cross-service-data-using",
-                role,
-                `Permission Denied: Service '${currentService}' không được 'using' trực tiếp tầng ${m[0].split(".").at(-1)} của service khác ('${m[1]}'). Hãy giao tiếp qua Contracts/API/gRPC.\n\nFile: ${target}`
-              );
+            const targetService = m[1];
+            if (targetService === currentService || NON_SERVICE_BACKEND_NAMESPACES.has(targetService)) continue;
+            if (checkFs) {
+              const servicesDir = join(root, "backend", "src", "Services");
+              if (existsSync(servicesDir) && !existsSync(join(servicesDir, targetService))) continue;
             }
+            return denyResult(
+              "R10-no-cross-service-data-using",
+              role,
+              `Permission Denied: Service '${currentService}' không được 'using' trực tiếp tầng ${m[0].split(".").at(-1)} của service khác ('${targetService}'). Hãy giao tiếp qua Contracts/API/gRPC.\n\nFile: ${target}`
+            );
           }
         }
 

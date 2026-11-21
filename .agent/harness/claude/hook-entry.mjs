@@ -10,9 +10,12 @@ import { fileURLToPath } from "node:url";
 import { evaluateBoundaryChecks } from "../../scripts/agent-boundary-guard.mjs";
 import { prepareDispatchAssignment } from "../../scripts/dispatch-contract.mjs";
 import {
+  armSessionContinuation,
   checkLspCircuit,
   checkSubagentStopGate,
   clearSessionFilesForLanguage,
+  evaluateMainStopGate,
+  extractPlanDirFromPath,
   findRepoRoot,
   getCompactionSummary,
   inferLspLanguage,
@@ -24,6 +27,8 @@ import {
   recordLspOutcome,
   recordSessionDispatch,
   recordSessionEdit,
+  recordSessionToolOutcome,
+  updateSessionTodoState,
 } from "../../scripts/agent-lifecycle-core.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -140,6 +145,7 @@ try {
 
   if (eventName === "PostToolUse") {
     const errText = str(payload.error) ?? (payload.is_error ? extractLspErrorText(payload) : null);
+    recordSessionToolOutcome(root, sessionId, { failed: Boolean(errText), errorText: errText ?? "" });
     if (errText && (toolName === "Task" || toolName === "Agent" || /^mcp__/i.test(toolName) || toolName === "call_mcp_tool") && !isLspToolCall(toolName, toolInput)) {
       recordAgentFriction(root, {
         type: toolName === "Task" || toolName === "Agent" ? "subagent-dispatch-error" : "mcp-tool-error",
@@ -148,14 +154,27 @@ try {
         summary: errText.slice(0, 200),
       });
     }
+    if (toolName === "TodoWrite" && Array.isArray(toolInput.todos)) {
+      const openTodos = toolInput.todos.filter((t) => t && (t.status === "pending" || t.status === "in_progress"));
+      const completedTodos = toolInput.todos.filter((t) => t && t.status === "completed");
+      updateSessionTodoState(root, sessionId, {
+        openCount: openTodos.length,
+        completedCount: completedTodos.length,
+        sample: openTodos.map((t) => str(t.content)).filter(Boolean).slice(0, 5),
+      });
+      process.exit(0);
+    }
     if (toolName === "Task" || toolName === "Agent") {
       const prompt = str(toolInput.prompt) ?? "";
       const refMatch = prompt.match(/^contract_ref:[ \t]*(\S+)/m);
+      const contractRef = refMatch ? refMatch[1] : null;
       recordSessionDispatch(root, sessionId, {
         agentType: str(toolInput.subagent_type) ?? str(toolInput.agent_type),
-        contractRef: refMatch ? refMatch[1] : null,
+        contractRef,
         summary: str(toolInput.description) ?? prompt.slice(0, 140),
       });
+      const pDir = contractRef ? extractPlanDirFromPath(root, contractRef) : null;
+      if (pDir) armSessionContinuation(root, sessionId, { planDir: pDir });
       process.exit(0);
     }
 
@@ -184,13 +203,29 @@ try {
 
     const checks = normalizeToolChecks(toolName, toolInput, baseCwd);
     const edited = checks.map((c) => c.tool_input?.file_path).filter(Boolean);
-    if (edited.length > 0) recordSessionEdit(root, sessionId, edited);
+    if (edited.length > 0) {
+      recordSessionEdit(root, sessionId, edited);
+      for (const p of edited) {
+        const pDir = extractPlanDirFromPath(root, p);
+        if (pDir) armSessionContinuation(root, sessionId, { planDir: pDir });
+      }
+    }
     process.exit(0);
   }
 
   if (eventName === "PreCompact") {
     const summary = getCompactionSummary(root, sessionId);
     if (summary) out({ systemMessage: summary });
+    process.exit(0);
+  }
+
+  if (eventName === "Stop") {
+    const gate = evaluateMainStopGate(root, sessionId, {
+      lastAssistantText: str(payload.last_assistant_message) ?? "",
+    });
+    if (gate.decision === "block" && gate.reason) {
+      out({ decision: "block", reason: gate.reason });
+    }
     process.exit(0);
   }
 

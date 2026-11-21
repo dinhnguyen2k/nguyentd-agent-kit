@@ -14,7 +14,9 @@ SHARED_PATHS = (
     "AGENTS.md",
     "AI_RULES.md",
     "OPINION.md",
+    ".agent/agents",
     ".agent/rules",
+    ".agent/skills",
     ".agent/workflows",
     ".agent/harness/claude",
     ".agent/harness/codex",
@@ -22,11 +24,17 @@ SHARED_PATHS = (
     ".agent/harness/agy",
     ".agent/harness/README.md",
     ".agent/contracts/agent-registry.json",
+    ".agent/contracts/archetype-exemplars.json",
+    ".agent/contracts/context-budget.json",
     ".agent/contracts/task-manifest.schema.json",
     ".agent/scripts/agent-lifecycle-core.mjs",
     ".agent/scripts/task-contract.mjs",
     ".agent/scripts/dispatch-contract.mjs",
     ".agent/scripts/treehouse_harness.py",
+)
+OPTIONAL_SHARED_PATHS = (
+    ".omp/agents",
+    ".agents/agents",
 )
 LOCAL_LINKS = {
     "CLAUDE.md": "AGENTS.md",
@@ -84,8 +92,10 @@ def link_matches(destination, source):
 
 
 def link_plan(root, target):
-    sources = [(relative, root / relative) for relative in SHARED_PATHS]
-    for relative in (*SHARED_PATHS, *LOCAL_LINKS.values()):
+    present_optional = tuple(rel for rel in OPTIONAL_SHARED_PATHS if (root / rel).exists())
+    all_shared = (*SHARED_PATHS, *present_optional)
+    sources = [(relative, root / relative) for relative in all_shared]
+    for relative in (*all_shared, *LOCAL_LINKS.values()):
         source = (root / relative).resolve(strict=True)
         if not source.is_relative_to(root):
             raise ValueError(f"Nguồn dùng chung thoát repo: {relative}")
@@ -102,7 +112,7 @@ def link_plan(root, target):
             parent = parent.parent
         if not parent.is_dir():
             raise ValueError(f"Parent không phải thư mục: {parent}")
-        link = str(source) if relative in SHARED_PATHS else os.path.relpath(source, destination.parent)
+        link = str(source) if relative in all_shared else os.path.relpath(source, destination.parent)
         plan.append((destination, link))
     return plan
 
@@ -145,7 +155,7 @@ def share_worktree(root, target):
 def excluded_seed_path(relative):
     return any(
         relative == path or relative.startswith(path + "/")
-        for path in (*SHARED_PATHS, *LOCAL_LINKS, *PRIVATE_STATE)
+        for path in (*SHARED_PATHS, *OPTIONAL_SHARED_PATHS, *LOCAL_LINKS, *PRIVATE_STATE)
     )
 
 

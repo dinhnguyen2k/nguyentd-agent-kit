@@ -16,7 +16,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|Task|Agent|call_mcp_tool|mcp__.*",
+        "matcher": "Edit|Write|MultiEdit|Task|Agent|TodoWrite|call_mcp_tool|mcp__.*",
         "hooks": [
           {
             "type": "command",
@@ -27,6 +27,17 @@
       }
     ],
     "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
       {
         "hooks": [
           {

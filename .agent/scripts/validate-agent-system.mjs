@@ -1,17 +1,23 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { evaluateBoundaryPayload } from './agent-boundary-guard.mjs';
 import {
+  armSessionContinuation,
   checkLspCircuit,
+  evaluateMainStopGate,
   inferLspLanguage,
   isLspFailureOrTimeout,
   isLspToolCall,
   LSP_CIRCUIT_TTL_MS,
   recordLspOutcome,
+  recordSessionSliceCompleted,
+  recordSessionToolOutcome,
+  resetSessionTurnCounters,
+  updateSessionTodoState,
 } from './agent-lifecycle-core.mjs';
 import { deriveTaskManifest, readLegacyEvidence, readTaskContract, readTaskLifecycle, validateContractSchema } from './task-contract.mjs';
 
@@ -782,10 +788,108 @@ function validateMultiHarnessAgentConfigs() {
   }
 }
 
+function validateAutonomousContinuationGate() {
+  const tmpDir = mkdtempSync(join(tmpdir(), 'cogain-stop-gate-'));
+  const stateFile = join(tmpDir, 'session.json');
+  const planRel = '.agent/planning/2026-11-22-test-plan';
+  const planAbs = join(tmpDir, planRel);
+  try {
+    mkdirSync(planAbs, { recursive: true });
+    writeFileSync(
+      join(planAbs, '00-OVERVIEW.md'),
+      '# Test Plan\n\n```json task-lifecycle\n{"task_id":"t1","status":"active","archived":false,"superseded_by":null,"contract_versions":{"s1":1,"s2":1}}\n```\n'
+    );
+    writeFileSync(
+      join(planAbs, 'TASK-01-a.md'),
+      '```json task-contract\n{"mode":"implementation","slice_id":"s1"}\n```\n'
+    );
+    writeFileSync(
+      join(planAbs, 'TASK-02-b.md'),
+      '```json task-contract\n{"mode":"implementation","slice_id":"s2"}\n```\n'
+    );
+
+    const opts = { stateFile, sandbox: true, now: 1_700_000_000_000 };
+
+    // 1. Phiên hỏi đáp thường (chưa arm) -> allow stop ngay
+    const qaRes = evaluateMainStopGate(tmpDir, 's-qa', {}, opts);
+    if (qaRes.decision !== 'allow') {
+      errors.push(`stop-gate: unarmed Q&A session must allow stop, got ${JSON.stringify(qaRes)}`);
+    }
+
+    // 2. Arm kế hoạch 2 TASK -> chặn dừng non lần 1
+    armSessionContinuation(tmpDir, 's-main', { planDir: planRel }, opts);
+    const stop1 = evaluateMainStopGate(tmpDir, 's-main', { lastAssistantText: 'Đã xong bước chuẩn bị.' }, opts);
+    if (stop1.decision !== 'block' || !stop1.reason?.includes('[autonomous-continuation 1/')) {
+      errors.push(`stop-gate: armed plan should block premature stop #1, got ${JSON.stringify(stop1)}`);
+    }
+
+    // 3. Có tiến triển thật (hoàn tất TASK-01) -> tiếp tục giữ nhịp sang TASK-02 và reset noProgressStreak
+    recordSessionSliceCompleted(tmpDir, 's-main', `${planRel}/TASK-01-a.md`, opts);
+    const stop2 = evaluateMainStopGate(tmpDir, 's-main', { lastAssistantText: 'Đã xong TASK-01.' }, opts);
+    if (stop2.decision !== 'block' || !stop2.reason?.includes('TASK-02-b.md')) {
+      errors.push(`stop-gate: after TASK-01 progress, should continue to TASK-02, got ${JSON.stringify(stop2)}`);
+    }
+
+    // 4. Không có tiến triển 2 lần liên tiếp -> ngắt cầu chì chống lặp vô hạn (allow stop)
+    const noProg1 = evaluateMainStopGate(tmpDir, 's-main', { lastAssistantText: 'Vẫn đang kẹt.' }, opts);
+    if (noProg1.decision !== 'block') {
+      errors.push(`stop-gate: first zero-progress strike should warn once more, got ${JSON.stringify(noProg1)}`);
+    }
+    const noProg2 = evaluateMainStopGate(tmpDir, 's-main', { lastAssistantText: 'Vẫn đang kẹt.' }, opts);
+    if (noProg2.decision !== 'allow') {
+      errors.push(`stop-gate: second consecutive zero-progress strike must trip circuit and allow stop, got ${JSON.stringify(noProg2)}`);
+    }
+
+    // 5. Reset lượt user mới + toàn bộ nhánh còn lại vướng Vùng Đỏ -> allow stop
+    resetSessionTurnCounters(tmpDir, 's-main', { userPrompt: 'làm tiếp' }, opts);
+    const redZoneStop = evaluateMainStopGate(
+      tmpDir,
+      's-main',
+      {
+        lastAssistantText:
+          '## Hộp thư Quyết định\nCần chốt công thức giá vốn; toàn bộ nhánh còn lại đều vướng quyết định này.',
+      },
+      opts
+    );
+    if (redZoneStop.decision !== 'allow') {
+      errors.push(`stop-gate: all-blocked Red-Zone must allow stop, got ${JSON.stringify(redZoneStop)}`);
+    }
+
+    // 6. 3 lỗi quota/429 liên tiếp -> ngắt cầu chì hạ tầng
+    const errStateFile = join(tmpDir, 'err-session.json');
+    const errOpts = { stateFile: errStateFile, sandbox: true, now: 1_700_000_000_000 };
+    updateSessionTodoState(tmpDir, 's-err', { openCount: 2, completedCount: 0, sample: ['Build', 'Test'] }, errOpts);
+    recordSessionToolOutcome(tmpDir, 's-err', { failed: true, errorText: 'HTTP 429 rate_limit exceeded' }, errOpts);
+    recordSessionToolOutcome(tmpDir, 's-err', { failed: true, errorText: 'HTTP 429 rate_limit exceeded' }, errOpts);
+    recordSessionToolOutcome(tmpDir, 's-err', { failed: true, errorText: 'insufficient_quota' }, errOpts);
+    const quotaStop = evaluateMainStopGate(tmpDir, 's-err', {}, errOpts);
+    if (quotaStop.decision !== 'allow') {
+      errors.push(`stop-gate: 3 consecutive quota/429 errors must trip circuit and allow stop, got ${JSON.stringify(quotaStop)}`);
+    }
+
+    // 7. User chủ động yêu cầu dừng -> hủy arm và cho dừng ngay
+    const userStopFile = join(tmpDir, 'user-stop.json');
+    const userStopOpts = { stateFile: userStopFile, sandbox: true, now: 1_700_000_000_000 };
+    updateSessionTodoState(tmpDir, 's-user', { openCount: 3, completedCount: 1, sample: ['Slice 2'] }, userStopOpts);
+    const usrStop = evaluateMainStopGate(
+      tmpDir,
+      's-user',
+      { lastUserText: 'có lẽ nên dừng do tôi mở phiên khác' },
+      userStopOpts
+    );
+    if (usrStop.decision !== 'allow') {
+      errors.push(`stop-gate: explicit user stop intent must allow stop, got ${JSON.stringify(usrStop)}`);
+    }
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
 validateGuardFixturesAndAllowlist();
 validateDocHygieneAndExemplars();
 validateLspCircuitAndSlnf();
 validateMultiHarnessAgentConfigs();
+validateAutonomousContinuationGate();
 
 function writeCatalog() {
   const entries = [...skills.entries()].sort(([a], [b]) => a.localeCompare(b));

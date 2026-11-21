@@ -227,9 +227,9 @@
     },
     {
       "id": "INV-PAYROLL-PERIOD",
-      "rule": "Cắt kỳ lương chuẩn qua PayrollReportQueryHelper.TryResolvePayrollPeriod và AttendanceReportPeriod.Resolve(..., payroll: true) từ ngày 16 tháng chọn đến hết ngày 15 tháng sau theo giờ Việt Nam.",
-      "forbidden": "Tự cộng trừ DateTime/DateTimeOffset cục bộ hoặc lệch ranh giới múi giờ VN.",
-      "evidence": "backend/src/BuildingBlocks/Shared/Helpers/AttendanceReportHelper.cs"
+      "rule": "Báo cáo kỳ lương ServiceDesk cắt kỳ qua PayrollReportQueryHelper.TryResolvePayrollPeriod và AttendanceReportPeriod.Resolve(..., payroll: true) từ ngày 16 tháng chọn đến hết ngày 15 tháng sau theo giờ Việt Nam. Chấm công/chốt công (HR TimesheetClosing, ServiceDesk Attendance) lấy kỳ qua AttendancePeriodCalendar (danh mục kỳ TYPQUA03 từ MasterData, dựng bằng MasterDataAttendancePeriodCalendar.CreateAttendancePeriodCalendar); 16..15 chỉ là DefaultWindow khi tháng chưa cấu hình kỳ.",
+      "forbidden": "Tự cộng trừ DateTime/DateTimeOffset cục bộ, lệch ranh giới múi giờ VN, hoặc hardcode 16..15 trong luồng chấm công thay vì AttendancePeriodCalendar.",
+      "evidence": "backend/src/BuildingBlocks/Shared/Helpers/AttendancePeriodCalendar.cs"
     },
     {
       "id": "INV-CHILD-SYNC-SNAPSHOT",

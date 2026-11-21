@@ -36,13 +36,81 @@ export function validateContractSchema(value, definition = schema, label = 'mani
   return value;
 }
 
-export function repoPath(root, path, mustExist = true) {
+const SHARED_READ_PREFIXES = [
+  'AI_RULES.md',
+  'AGENTS.md',
+  'OPINION.md',
+  '.agent/agents/',
+  '.agent/rules/',
+  '.agent/skills/',
+  '.agent/workflows/',
+  '.agent/contracts/',
+  '.agent/harness/',
+];
+const sharedMainWorktreeCache = new Map();
+
+function isSharedReadCandidate(relPath) {
+  return SHARED_READ_PREFIXES.some((prefix) =>
+    prefix.endsWith('/') ? relPath.startsWith(prefix) : relPath === prefix
+  );
+}
+
+function resolveSharedMainWorktree(root) {
+  if (sharedMainWorktreeCache.has(root)) return sharedMainWorktreeCache.get(root);
+  let resolvedMain = null;
+  try {
+    const commonRaw = execFileSync('git', ['-C', root, 'rev-parse', '--git-common-dir'], {
+      encoding: 'utf8',
+      timeout: 5000,
+    }).trim();
+    const rootCommon = realpathSync(resolve(root, commonRaw));
+    const wtFields = execFileSync('git', ['-C', root, 'worktree', 'list', '--porcelain', '-z'], {
+      encoding: 'utf8',
+      timeout: 5000,
+    }).split('\0');
+    const firstWt = wtFields.find((f) => f.startsWith('worktree '));
+    if (firstWt) {
+      const candidate = realpathSync(firstWt.slice(9));
+      const candCommonRaw = execFileSync('git', ['-C', candidate, 'rev-parse', '--git-common-dir'], {
+        encoding: 'utf8',
+        timeout: 5000,
+      }).trim();
+      if (realpathSync(resolve(candidate, candCommonRaw)) === rootCommon && candidate !== root) {
+        resolvedMain = candidate;
+      }
+    }
+  } catch {
+    resolvedMain = null;
+  }
+  sharedMainWorktreeCache.set(root, resolvedMain);
+  return resolvedMain;
+}
+
+export function repoPath(root, path, mustExist = true, { allowSharedRead = false } = {}) {
   if (typeof path !== 'string' || !path || isAbsolute(path) || path.split(/[\\/]/).includes('..') || path.includes('\\') || path.includes('\0')) fail('INVALID_PATH', `invalid repository path ${path}`);
   const absolute = resolve(root, path);
   let ancestor = absolute;
   while (!existsSync(ancestor)) ancestor = dirname(ancestor);
   const actual = realpathSync(ancestor);
-  if (actual !== root && !actual.startsWith(`${root}${sep}`)) fail('INVALID_PATH', `${path} escapes repository`);
+  const inWorktree = actual === root || actual.startsWith(`${root}${sep}`);
+  if (!inWorktree) {
+    let allowedShared = false;
+    if (allowSharedRead && isSharedReadCandidate(path)) {
+      const mainRoot = resolveSharedMainWorktree(root);
+      if (mainRoot) {
+        const expectedInMain = resolve(mainRoot, relative(root, ancestor));
+        try {
+          const expectedReal = realpathSync(expectedInMain);
+          allowedShared =
+            expectedReal === actual &&
+            (actual === mainRoot || actual.startsWith(`${mainRoot}${sep}`));
+        } catch {
+          allowedShared = false;
+        }
+      }
+    }
+    if (!allowedShared) fail('INVALID_PATH', `${path} escapes repository`);
+  }
   if (mustExist && !existsSync(absolute)) fail('MISSING_PATH', `${path} does not exist`);
   return absolute;
 }
@@ -68,7 +136,11 @@ function readCanonicalContract(repoRoot, contractPath, dispatch) {
   if (lifecycle.task_id !== metadata.task_id) fail('INVALID_LIFECYCLE', 'task_id mismatch');
   if (lifecycle.contract_versions[metadata.slice_id] !== metadata.contract_version) fail('INVALID_VERSION', 'lifecycle contract_versions entry mismatch');
   if (dispatch && metadata.mode === 'implementation' && (lifecycle.archived || lifecycle.status !== 'active' || lifecycle.superseded_by !== null)) fail('INACTIVE_CONTRACT', `implementation cannot dispatch lifecycle ${lifecycle.status}, archived=${lifecycle.archived}`);
-  for (const path of [...metadata.allowed_paths, ...metadata.source_paths]) repoPath(root, path, false);
+  for (const path of metadata.allowed_paths) repoPath(root, path, false);
+  for (const path of metadata.source_paths) {
+    const isWritable = metadata.allowed_paths.some((allowed) => matches(path, allowed) || matches(allowed, path));
+    repoPath(root, path, false, { allowSharedRead: !isWritable });
+  }
   for (const path of metadata.allowed_paths) {
     if (!metadata.source_paths.some((input) => matches(path, input))) fail('SOURCE_SCOPE_INCOMPLETE', `allowed path is outside source scope: ${path}`);
   }
@@ -124,7 +196,7 @@ export function matches(path, input) {
 export function computeSourceSnapshot(repoRoot, sourcePaths, { sourceFiles } = {}) {
   const root = realpathSync(repoRoot);
   validateContractSchema(sourcePaths, schema.$defs.strings, 'source_paths');
-  for (const path of sourcePaths) repoPath(root, path, false);
+  for (const path of sourcePaths) repoPath(root, path, false, { allowSharedRead: true });
   const evidenceRoots = ['.agent/reports', '.agent/scratch', '.agent/task-manifests'];
   for (const input of sourcePaths) {
     if (evidenceRoots.some((path) => matches(path, input) || input.startsWith(`${path}/`))) fail('SOURCE_SCOPE_INCOMPLETE', `runtime/generated evidence is not source: ${input}`);
@@ -136,7 +208,7 @@ export function computeSourceSnapshot(repoRoot, sourcePaths, { sourceFiles } = {
   if (sourceFiles !== undefined) {
     // Dev build đã liệt kê source sau khi loại output; không truyền danh sách lớn qua argv.
     validateContractSchema(sourceFiles, schema.$defs.strings, 'source_files');
-    for (const path of sourceFiles) repoPath(root, path, false);
+    for (const path of sourceFiles) repoPath(root, path, false, { allowSharedRead: true });
     paths = new Set(sourceFiles);
   } else {
     paths = new Set(git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard']).split('\0').filter(Boolean));
@@ -144,10 +216,20 @@ export function computeSourceSnapshot(repoRoot, sourcePaths, { sourceFiles } = {
     for (const path of git(root, ['diff', '--name-only', '-z', 'HEAD', '--']).split('\0').filter(Boolean)) paths.add(path);
     const collect = (absolute) => {
       const stat = lstatSync(absolute);
+      if (stat.isSymbolicLink()) {
+        const rel = relative(root, absolute).split(sep).join('/');
+        if (isSharedReadCandidate(rel) && existsSync(absolute) && lstatSync(realpathSync(absolute)).isDirectory()) {
+          for (const name of readdirSync(absolute).sort()) collect(join(absolute, name));
+          return;
+        }
+      }
       if (stat.isDirectory()) for (const name of readdirSync(absolute).sort()) collect(join(absolute, name));
       else paths.add(relative(root, absolute).split(sep).join('/'));
     };
-    for (const input of sourcePaths) if (!/[?*]/.test(input) && existsSync(join(root, input))) collect(join(root, input));
+    for (const input of sourcePaths) {
+      const base = input.replace(/\/\*\*.*$/, '').replace(/\/\*.*$/, '');
+      if (base && !/[?*]/.test(base) && existsSync(join(root, base))) collect(join(root, base));
+    }
   }
   const selected = [...paths].filter((path) => sourcePaths.some((input) => matches(path, input))).sort();
   if (selected.some((path) => evidenceRoots.some((rootPath) => path === rootPath || path.startsWith(`${rootPath}/`)))) fail('SOURCE_SCOPE_INCOMPLETE', 'source scope includes runtime/generated evidence');
@@ -157,7 +239,7 @@ export function computeSourceSnapshot(repoRoot, sourcePaths, { sourceFiles } = {
     let stat;
     try { stat = lstatSync(absolute); } catch (error) { if (error.code === 'ENOENT') return { path, kind: 'deleted' }; throw error; }
     if (stat.isSymbolicLink()) return { path, kind: 'symlink', target: readlinkSync(absolute) };
-    repoPath(root, path);
+    repoPath(root, path, true, { allowSharedRead: true });
     if (!stat.isFile()) fail('SOURCE_SCOPE_INCOMPLETE', `unsupported source type: ${path}`);
     return { path, kind: 'file', executable: Boolean(stat.mode & 0o111), hash: hash(readFileSync(absolute)) };
   });
@@ -1008,6 +1090,14 @@ async function cli() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+let isMainModule = false;
+if (process.argv[1]) {
+  try {
+    isMainModule = realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    isMainModule = resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  }
+}
+if (isMainModule) {
   try { await cli(); } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

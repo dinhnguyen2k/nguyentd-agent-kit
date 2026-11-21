@@ -139,4 +139,4 @@ public record OrderStatusChangedIntegrationEvent(
 2. **CQRS concept áp dụng gián tiếp**: Cogain phân biệt read (GetPaged, GetById, GetDropdown) vs write (Create, Update, Delete) nhưng qua BaseService methods, không qua CQRS handlers.
 3. **Bounded Context**: Cogain đã áp dụng — mỗi Module (HR, MasterData, ServiceDesk) là một bounded context riêng.
 4. **Domain Events**: Cogain dùng gRPC integration events thay vì in-process domain events.
-5. **DDD Aggregates**: Áp dụng concept aggregate root khi thiết kế Entity mới. Dùng `ReconcileCollections()` để đồng bộ child entities.
+5. **DDD Aggregates**: Áp dụng concept aggregate root khi thiết kế Entity mới. Đồng bộ child entities bằng `ISyncsChildren<TEntity>` + `BuildIncomingGraph` (xem skill `cogain-child-sync`); `ReconcileCollections` đã Obsolete và bị chặn tại `R10`.

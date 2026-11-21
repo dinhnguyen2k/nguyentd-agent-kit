@@ -21,8 +21,8 @@ skills:
     - update
 # Số đo 28-30/09 và lý do: .agent/artifacts/omp-agent-lanes-quota-research.md
 compaction:
-  # Đo 28/09-03/10: request main trên 200k context chiếm 30% cost; mốc mặc định theo reserve để main phình tới 703k.
-  thresholdTokens: 150000
+  # Đo 28/09-03/10: request main trên 200k context chiếm 30% cost; mốc 180k kết hợp tỉa gọn compaction giữ mạch kế hoạch dài qua đêm mà không phình tới 703k.
+  thresholdTokens: 180000
 advisor:
   # Main (Opus) là nơi chốt; advisor main chiếm ~12.7% cost. Luật cứng máy kiểm được nằm ở boundary-guard (R1-R6); vẫn bật tay được bằng `/advisor on`.
   enabled: false
@@ -54,8 +54,19 @@ task:
     reviewer: "off"
     security-reviewer: "off"
     verifier: "off"
-  # Lưới an toàn cho slice quá dài: nhắc gói lại ở 50 request, OMP dừng cứng ở 1.5x. Worker từ 80 turn trở lên chiếm 62% cost subagent (28/09-03/10).
-  softRequestBudget: 50
+  # Ngân sách request theo vai trò (OMP 18.22+ dừng cứng ở 1.5x): tránh cắt ngang slice BE/FE lớn ở turn 50/75 nhưng vẫn chặn vòng lặp vô ích ở lane nhẹ.
+  softRequestBudget: 60
+  agentSoftRequestBudget:
+    backend-specialist: 110
+    frontend-specialist: 110
+    test-author: 90
+    verifier: 80
+    reviewer: 80
+    security-reviewer: 80
+    researcher: 75
+    task: 60
+    sonic: 50
+    scout: 45
   # Mặc định OMP tắt LSP cho subagent; không bật thì worker không có `xd://lsp` và `lsp.diagnosticsOnEdit` ở trên vô tác dụng.
   enableLsp: true
 edit:

@@ -32,6 +32,7 @@ Khi mở rộng hoặc tạo mới màn hình/service theo một trong 4 archety
 - Mẫu chuẩn BE/FE: xem mục `archetypes.payroll-period-report` trong `.agent/contracts/archetype-exemplars.json` (`LaborOrderPayrollReportService.cs`, `labor-order-payroll-report/index.tsx`).
 - **Backend**:
   - Kỳ lương & phiếu đóng: dùng `PayrollReportQueryHelper.TryResolvePayrollPeriod` (bọc `AttendanceReportPeriod.Resolve(..., payroll: true)`) và `PayrollReportQueryHelper.GetClosedWorkItemIdsAsync` (lọc `EWorkItemStatus.Closed`; cấm đếm phiếu chưa `Closed`).
+  - Kỳ chấm công/chốt công (không phải báo cáo kỳ lương ServiceDesk): lấy qua `AttendancePeriodCalendar` (danh mục kỳ `TYPQUA03` của MasterData, dựng bằng `MasterDataAttendancePeriodCalendar.CreateAttendancePeriodCalendar`); `16..15` chỉ là `DefaultWindow` khi tháng chưa cấu hình kỳ.
   - Mốc thời gian hiệu lực: cắt kỳ theo mốc nghiệp vụ đã chốt (như `HrConfirmedDate`), không tự đổi sang `CreatedDate`.
   - Khung thực thi & xuất Excel: dùng `ReportExecution.RunPageAsync` / `RunReadAsync` / `RunExportAsync` kết hợp `ExcelReportWriter`, `ReportCol`, `ExcelReportLabels.ResolveFilterLabel` và `Dictionary<string, string>? FilterLabels` (cấm khai báo lặp cặp `*Label` cho từng `*Id`).
 - **Frontend**:

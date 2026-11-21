@@ -29,6 +29,15 @@ const LSP_FRICTION_REL = join(".agent", "reports", "agent-friction.jsonl");
 export const LSP_CIRCUIT_TTL_MS = 4 * 60 * 1000;
 const LSP_PROBE_TIMEOUT_MS = 30 * 1000;
 const STATE_TTL_MS = 24 * 60 * 60 * 1000;
+export const CONTINUATION_MAX_NO_PROGRESS = 2;
+export const CONTINUATION_MAX_ERROR_STREAK = 3;
+export const CONTINUATION_MAX_PER_TURN = 20;
+const INFRA_ERROR_STREAK_RE =
+  /\b(429|rate[_\s-]?limit|insufficient[_\s-]?quota|quota\s+exceeded|overloaded|503\s+service|502\s+bad\s+gateway|econnreset|socket\s+hang\s+up|upstream\s+connect\s+error)\b/i;
+const USER_STOP_INTENT_RE =
+  /^\s*(?:dừng|stop|thôi|cancel|pause|nghỉ|abort)\s*[.!?]*\s*$|(?:\b(?:dừng\s+lại|tạm\s+dừng|dừng\s+phiên|nên\s+dừng|hủy\s+phiên|stop\s+now|cancel\s+run|abort\s+run)\b)/i;
+const RED_ZONE_ALL_BLOCKED_RE =
+  /Hộp\s+thư\s+Quyết\s+định[\s\S]{0,600}(?:không\s+còn\s+nhánh\s+độc\s+lập|toàn\s+bộ\s+nhánh\s+còn\s+lại|mọi\s+nhánh\s+còn\s+lại\s+đều\s+vướng|tất\s+cả\s+hạng\s+mục\s+còn\s+lại\s+đều\s+cần)/i;
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 const CODE_FILE_RE = /\.(?:cs|ts|tsx)$/i;
 const CSHARP_PATH_RE = /\.(?:cs|sln|csproj)$/i;
@@ -422,7 +431,28 @@ function pruneExpiredStateFiles(stateDir, now) {
   }
 }
 
-function loadSessionState(root, sessionId, now = Date.now()) {
+function normalizeContinuationState(raw) {
+  const obj = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  return {
+    armed: Boolean(obj.armed),
+    tripped: Boolean(obj.tripped),
+    planDir: typeof obj.planDir === "string" && obj.planDir ? obj.planDir : null,
+    openTodoCount: Number.isInteger(obj.openTodoCount) && obj.openTodoCount >= 0 ? obj.openTodoCount : 0,
+    completedTodoCount:
+      Number.isInteger(obj.completedTodoCount) && obj.completedTodoCount >= 0 ? obj.completedTodoCount : 0,
+    todoSample: Array.isArray(obj.todoSample) ? obj.todoSample.filter((x) => typeof x === "string").slice(0, 5) : [],
+    completedSlices: Array.isArray(obj.completedSlices)
+      ? obj.completedSlices.filter((x) => typeof x === "string").slice(-40)
+      : [],
+    autoContinueCount:
+      Number.isInteger(obj.autoContinueCount) && obj.autoContinueCount >= 0 ? obj.autoContinueCount : 0,
+    noProgressStreak: Number.isInteger(obj.noProgressStreak) && obj.noProgressStreak >= 0 ? obj.noProgressStreak : 0,
+    errorStreak: Number.isInteger(obj.errorStreak) && obj.errorStreak >= 0 ? obj.errorStreak : 0,
+    lastProgressHash: typeof obj.lastProgressHash === "string" ? obj.lastProgressHash : "",
+  };
+}
+
+function loadSessionState(root, sessionId, now = Date.now(), opts = {}) {
   const empty = {
     version: 1,
     sessionId: String(sessionId || "default"),
@@ -431,9 +461,10 @@ function loadSessionState(root, sessionId, now = Date.now()) {
     uncheckedFiles: [],
     dispatches: [],
     stopReminded: false,
+    continuation: normalizeContinuationState(null),
   };
   try {
-    const file = stateFilePath(root, sessionId);
+    const file = str(opts?.stateFile) || stateFilePath(root, sessionId);
     if (!existsSync(file)) return empty;
     const parsed = JSON.parse(readFileSync(file, "utf8"));
     if (!parsed || typeof parsed !== "object") return empty;
@@ -446,18 +477,19 @@ function loadSessionState(root, sessionId, now = Date.now()) {
       uncheckedFiles: Array.isArray(parsed.uncheckedFiles) ? parsed.uncheckedFiles.filter((x) => typeof x === "string") : [],
       dispatches: Array.isArray(parsed.dispatches) ? parsed.dispatches : [],
       stopReminded: Boolean(parsed.stopReminded),
+      continuation: normalizeContinuationState(parsed.continuation),
     };
   } catch {
     return empty;
   }
 }
 
-function saveSessionState(root, sessionId, state, now = Date.now()) {
+function saveSessionState(root, sessionId, state, now = Date.now(), opts = {}) {
   try {
-    const file = stateFilePath(root, sessionId);
+    const file = str(opts?.stateFile) || stateFilePath(root, sessionId);
     const dir = dirname(file);
     mkdirSync(dir, { recursive: true });
-    pruneExpiredStateFiles(dir, now);
+    if (!opts?.stateFile) pruneExpiredStateFiles(dir, now);
     state.updatedAt = now;
     writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`);
   } catch {
@@ -563,6 +595,300 @@ export function getCompactionSummary(root, sessionId) {
     return parts.length > 0 ? `[workflow-state] ${parts.join(". ")}.` : null;
   } catch {
     return null;
+  }
+}
+
+export function extractPlanDirFromPath(root, rawPath) {
+  const rel = toRepoRel(root, rawPath) || (typeof rawPath === "string" ? rawPath.replace(/\\/g, "/").replace(/^\.\//, "") : null);
+  if (!rel) return null;
+  const m = rel.match(/^(\.agent\/planning\/[^/]+)\/(?:00-OVERVIEW|TASK-[^/]+)\.md$/);
+  return m ? m[1] : null;
+}
+
+export function isUserStopIntent(text) {
+  if (typeof text !== "string" || !text.trim()) return false;
+  const trimmed = text.trim();
+  if (trimmed.length > 260) return false;
+  return USER_STOP_INTENT_RE.test(trimmed);
+}
+
+export function inspectPlanDirRemaining(root, planDir, { completedRefs = [], dispatchedRefs = [] } = {}) {
+  const empty = { active: false, totalSlices: 0, remainingSlices: [], inFlightSlices: [] };
+  if (!root || !planDir || typeof planDir !== "string") return empty;
+  try {
+    const absDir = resolve(root, planDir);
+    if (!existsSync(absDir) || !statSync(absDir).isDirectory()) return empty;
+
+    const overviewFile = join(absDir, "00-OVERVIEW.md");
+    let overviewText = "";
+    if (existsSync(overviewFile)) {
+      overviewText = readFileSync(overviewFile, "utf8");
+      const lifecycleMatch = overviewText.match(/^```(?:json[ \t]+)?task-lifecycle[ \t]*\r?\n([\s\S]*?)^```[ \t]*\r?$/m);
+      if (lifecycleMatch) {
+        const lifecycle = JSON.parse(lifecycleMatch[1]);
+        if (lifecycle.archived === true || lifecycle.status !== "active" || lifecycle.superseded_by !== null) {
+          return empty;
+        }
+      }
+      if (/\b(?:status|trạng\s+thái)\s*:\s*(?:paused|tạm\s+dừng|completed|closed|archived)\b/i.test(overviewText)) {
+        return empty;
+      }
+    }
+
+    const doneSet = new Set(completedRefs.map((r) => String(r).replace(/\\/g, "/")));
+    const dispatchedSet = new Set(dispatchedRefs.map((r) => String(r).replace(/\\/g, "/")));
+    const taskFiles = readdirSync(absDir)
+      .filter((f) => /^TASK-.*\.md$/.test(f))
+      .sort();
+    if (taskFiles.length === 0) return empty;
+
+    const implSlices = [];
+    for (const fileName of taskFiles) {
+      const relRef = `${planDir.replace(/\/$/, "")}/${fileName}`;
+      const content = readFileSync(join(absDir, fileName), "utf8");
+      const contractMatch = content.match(/^```(?:json[ \t]+)?task-contract[ \t]*\r?\n([\s\S]*?)^```[ \t]*\r?$/m);
+      if (contractMatch) {
+        try {
+          const parsed = JSON.parse(contractMatch[1]);
+          if (parsed.mode && parsed.mode !== "implementation") continue;
+        } catch {
+          /* ignore malformed block */
+        }
+      }
+      const checkedInOverview =
+        overviewText &&
+        new RegExp(`-\\s*\\[[xX]\\][^\\n]*\\b${fileName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(overviewText);
+      implSlices.push({ relRef, fileName, done: doneSet.has(relRef) || doneSet.has(fileName) || Boolean(checkedInOverview) });
+    }
+
+    if (implSlices.length === 0) return empty;
+    const remaining = implSlices.filter((s) => !s.done && !dispatchedSet.has(s.relRef)).map((s) => s.relRef);
+    const inFlight = implSlices.filter((s) => !s.done && dispatchedSet.has(s.relRef)).map((s) => s.relRef);
+    return {
+      active: true,
+      totalSlices: implSlices.length,
+      remainingSlices: remaining,
+      inFlightSlices: inFlight,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+export function armSessionContinuation(root, sessionId, info = {}, opts = {}) {
+  try {
+    if (!root || !sessionId) return;
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const state = loadSessionState(root, sessionId, now, opts);
+    state.continuation.armed = true;
+    state.continuation.tripped = false;
+    if (typeof info.planDir === "string" && info.planDir) {
+      state.continuation.planDir = info.planDir;
+    }
+    saveSessionState(root, sessionId, state, now, opts);
+  } catch {
+    /* fail-open */
+  }
+}
+
+export function updateSessionTodoState(root, sessionId, todo = {}, opts = {}) {
+  try {
+    if (!root || !sessionId) return;
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const state = loadSessionState(root, sessionId, now, opts);
+    const openCount = Number.isInteger(todo.openCount) && todo.openCount >= 0 ? todo.openCount : 0;
+    const completedCount = Number.isInteger(todo.completedCount) && todo.completedCount >= 0 ? todo.completedCount : 0;
+    state.continuation.openTodoCount = openCount;
+    state.continuation.completedTodoCount = completedCount;
+    state.continuation.todoSample = Array.isArray(todo.sample)
+      ? todo.sample.filter((x) => typeof x === "string").slice(0, 5)
+      : [];
+    if (openCount > 0) {
+      state.continuation.armed = true;
+      state.continuation.tripped = false;
+    } else if (!state.continuation.planDir) {
+      state.continuation.armed = false;
+    }
+    saveSessionState(root, sessionId, state, now, opts);
+  } catch {
+    /* fail-open */
+  }
+}
+
+export function recordSessionSliceCompleted(root, sessionId, sliceRef, opts = {}) {
+  try {
+    if (!root || !sessionId || !sliceRef) return;
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const state = loadSessionState(root, sessionId, now, opts);
+    const norm = String(sliceRef).replace(/\\/g, "/");
+    if (!state.continuation.completedSlices.includes(norm)) {
+      state.continuation.completedSlices.push(norm);
+    }
+    saveSessionState(root, sessionId, state, now, opts);
+  } catch {
+    /* fail-open */
+  }
+}
+
+export function recordSessionToolOutcome(root, sessionId, outcome = {}, opts = {}) {
+  try {
+    if (!root || !sessionId) return;
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const state = loadSessionState(root, sessionId, now, opts);
+    const errText = String(outcome.errorText ?? "");
+    if (outcome.failed && INFRA_ERROR_STREAK_RE.test(errText)) {
+      state.continuation.errorStreak += 1;
+      saveSessionState(root, sessionId, state, now, opts);
+    } else if (!outcome.failed && state.continuation.errorStreak > 0) {
+      state.continuation.errorStreak = 0;
+      saveSessionState(root, sessionId, state, now, opts);
+    }
+  } catch {
+    /* fail-open */
+  }
+}
+
+export function resetSessionTurnCounters(root, sessionId, { userPrompt = "" } = {}, opts = {}) {
+  try {
+    if (!root || !sessionId) return;
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const state = loadSessionState(root, sessionId, now, opts);
+    state.continuation.autoContinueCount = 0;
+    state.continuation.noProgressStreak = 0;
+    state.continuation.errorStreak = 0;
+    state.continuation.tripped = false;
+    if (isUserStopIntent(userPrompt)) {
+      state.continuation.armed = false;
+      state.continuation.openTodoCount = 0;
+      state.continuation.todoSample = [];
+      state.continuation.planDir = null;
+    }
+    saveSessionState(root, sessionId, state, now, opts);
+  } catch {
+    /* fail-open */
+  }
+}
+
+/**
+ * Đánh giá cổng chống dừng non cho phiên Main (dùng chung OMP `session_stop`, AGY `Stop`, Claude `Stop`).
+ * Trả `{ decision: "allow" }` khi phiên hỏi đáp thường / đã xong / vướng toàn bộ Vùng Đỏ / chạm cầu chì chống lặp;
+ * trả `{ decision: "block", reason }` khi còn todo/TASK độc lập khả thi mà Main lỡ dừng sau báo cáo trung gian.
+ */
+export function evaluateMainStopGate(root, sessionId, context = {}, opts = {}) {
+  try {
+    if (!root || !sessionId) return { decision: "allow" };
+    if (context.signalAborted || context.userStopRequested || isUserStopIntent(context.lastUserText || "")) {
+      resetSessionTurnCounters(root, sessionId, { userPrompt: "stop" }, opts);
+      return { decision: "allow" };
+    }
+
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const state = loadSessionState(root, sessionId, now, opts);
+    const cont = state.continuation;
+    if (cont.tripped) return { decision: "allow" };
+
+    const openTodoCount = Number.isInteger(context.openTodoCount) ? context.openTodoCount : cont.openTodoCount;
+    const completedTodoCount = Number.isInteger(context.completedTodoCount)
+      ? context.completedTodoCount
+      : cont.completedTodoCount;
+    const todoSample = Array.isArray(context.todoSample) ? context.todoSample : cont.todoSample;
+    const planDir = str(context.planDir) ?? cont.planDir;
+    const armed = Boolean(context.armed ?? cont.armed) || openTodoCount > 0 || Boolean(planDir);
+
+    if (!armed) return { decision: "allow" };
+
+    const dispatchedRefs = Array.isArray(context.dispatchedRefs)
+      ? context.dispatchedRefs
+      : state.dispatches.map((d) => d.contractRef).filter(Boolean);
+    const completedRefs = Array.isArray(context.completedRefs) ? context.completedRefs : cont.completedSlices;
+    const planStatus = planDir
+      ? inspectPlanDirRemaining(root, planDir, { completedRefs, dispatchedRefs })
+      : { active: false, remainingSlices: [], inFlightSlices: [] };
+
+    const remainingSlices = planStatus.remainingSlices;
+    if (openTodoCount <= 0 && remainingSlices.length === 0) {
+      cont.armed = false;
+      saveSessionState(root, sessionId, state, now, opts);
+      return { decision: "allow" };
+    }
+
+    const lastAssistantText = String(context.lastAssistantText ?? "");
+    if (RED_ZONE_ALL_BLOCKED_RE.test(lastAssistantText)) {
+      return { decision: "allow" };
+    }
+
+    const progressCount = Number.isInteger(context.progressMarker)
+      ? context.progressMarker
+      : completedTodoCount * 1000 +
+        state.dispatches.length * 100 +
+        state.editedFiles.length * 10 +
+        completedRefs.length;
+    const progressHash = `${progressCount}|open:${openTodoCount}|rem:${remainingSlices.join(",")}`;
+
+    if (cont.autoContinueCount > 0 && progressHash === cont.lastProgressHash) {
+      cont.noProgressStreak += 1;
+    } else {
+      cont.noProgressStreak = 0;
+    }
+
+    const trip = (tripKind, detail) => {
+      cont.tripped = true;
+      saveSessionState(root, sessionId, state, now, opts);
+      recordAgentFriction(
+        root,
+        {
+          type: "auto-continue-circuit-open",
+          reason: tripKind,
+          summary: detail.slice(0, 200),
+        },
+        opts
+      );
+      return { decision: "allow" };
+    };
+
+    if (cont.errorStreak >= CONTINUATION_MAX_ERROR_STREAK) {
+      return trip("infra-error-streak", `Dừng auto-continue sau ${cont.errorStreak} lỗi hạ tầng/quota liên tiếp`);
+    }
+    if (cont.noProgressStreak >= CONTINUATION_MAX_NO_PROGRESS) {
+      return trip(
+        "no-progress-streak",
+        `Dừng auto-continue sau ${cont.noProgressStreak} lượt liên tiếp không có tiến triển tool/dispatch/todo mới`
+      );
+    }
+    const maxPerTurn = Number.isInteger(opts.maxPerTurn) ? opts.maxPerTurn : CONTINUATION_MAX_PER_TURN;
+    if (cont.autoContinueCount >= maxPerTurn) {
+      return trip("max-continuations", `Chạm trần an toàn ${maxPerTurn} lượt auto-continue trong một yêu cầu`);
+    }
+
+    cont.autoContinueCount += 1;
+    cont.lastProgressHash = progressHash;
+    saveSessionState(root, sessionId, state, now, opts);
+
+    const targets = [];
+    if (openTodoCount > 0) {
+      const preview = todoSample.slice(0, 3).join("; ");
+      targets.push(`còn ${openTodoCount} mục todo chưa đóng${preview ? ` (${preview})` : ""}`);
+    }
+    if (remainingSlices.length > 0) {
+      targets.push(
+        `còn ${remainingSlices.length} TASK chưa triển khai (${remainingSlices.slice(0, 3).join(", ")}${
+          remainingSlices.length > 3 ? ", ..." : ""
+        })`
+      );
+    }
+
+    return {
+      decision: "block",
+      reason:
+        `[autonomous-continuation ${cont.autoContinueCount}/${maxPerTurn}] Phiên chạy xuyên suốt chưa hoàn tất: ${targets.join(
+          " | "
+        )}. ` +
+        `Cấm dừng lượt sau báo cáo trung gian khi còn hạng mục khả thi. Hãy gọi ngay công cụ thực thi/dispatch cho hạng mục độc lập kế tiếp ` +
+        `(nếu 1 nhánh vướng Vùng Đỏ hoặc lỗi công cụ cục bộ, chỉ treo riêng nhánh đó vào Hộp thư Quyết định và làm tiếp các nhánh độc lập còn lại; ` +
+        `nếu thực sự đã xong hết thì cập nhật đóng hết todo/overview trước khi kết thúc).`,
+    };
+  } catch {
+    return { decision: "allow" };
   }
 }
 

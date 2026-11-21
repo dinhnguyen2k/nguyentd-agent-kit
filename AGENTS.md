@@ -42,7 +42,7 @@ Không có file thì báo rõ và tra `.agent/workflows/README.md`.
 
 ## Session Policy
 
-Vận hành xuyên suốt (`Human-on-the-Loop`) theo phân tầng Vùng Xanh - Vàng - Đỏ tại `AI_RULES.md` §3: tự nghiên cứu và tự hội tụ mọi quyết định kỹ thuật/khả nghịch, chỉ treo nhánh dính Vùng Đỏ vào `Hộp thư Quyết định` mà không dừng các nhánh độc lập.
+Vận hành xuyên suốt (`Human-on-the-Loop`) theo phân tầng Vùng Xanh - Vàng - Đỏ tại `AI_RULES.md` §3: tự nghiên cứu và tự hội tụ mọi quyết định kỹ thuật/khả nghịch, chỉ treo nhánh dính Vùng Đỏ hoặc lỗi công cụ/worktree cục bộ mà không dừng các nhánh độc lập, và nối tiếp ngay sang hạng mục sẵn sàng kế tiếp trong cùng lượt thay vì báo cáo tiến độ rồi dừng.
 Mentor mode chỉ bật bằng `@mentor`; quyền validation, commit và test theo `AI_RULES.md`.
 Phiên làm tính năng (Luồng 1) không tự sửa `.agent/**`; ma sát rule/skill/harness được hook tự ghi hoặc ghi ngắn vào `.agent/reports/agent-friction.jsonl` để kết tinh tập trung trong phiên `/upgrade-agent`.
 

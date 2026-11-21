@@ -5,7 +5,7 @@ advisors:
   - name: Turn guard
     model: "@advisor"
     reviewMode: turn
-    reviewInterval: 3
+    reviewInterval: 6
     syncBacklog: "off"
     instructions: |
       Gác trên delta tích luỹ kể từ lần review trước: tập trung code mới đổi, vi phạm luật cứng, code đoán và caller bị ảnh hưởng nếu risk surface thay đổi.

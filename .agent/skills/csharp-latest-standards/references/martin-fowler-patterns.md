@@ -78,4 +78,4 @@
 1. **Cogain đã là microservices**: "Monolith First" KHÔNG áp dụng — hệ thống đã tách thành HR, MasterData, ServiceDesk, WorkFlow, ERP, BusinessDoc.
 2. **Decentralized Data**: Mỗi module Cogain có DbContext riêng — đã tuân thủ.
 3. **Cross-service communication**: Cogain dùng gRPC (synchronous) + Compensation pattern. Chưa có EventBus (RabbitMQ) — cân nhắc cho tương lai.
-4. **Small Aggregates**: Entity Cogain nên tập trung vào aggregate root với child collections nhỏ. Dùng `ReconcileCollections()` cho đồng bộ.
+4. **Small Aggregates**: Entity Cogain nên tập trung vào aggregate root với child collections nhỏ. Đồng bộ child bằng `ISyncsChildren<TEntity>` (skill `cogain-child-sync`), không dùng `ReconcileCollections` (Obsolete, bị chặn tại `R10`).

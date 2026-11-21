@@ -172,7 +172,7 @@
         "patterns": [
           "(^|[\\s;&|(])PGPASSWORD=(['\"]?)[^\\s'\"$\\[{(;&|]+\\2([\\s;&|]|$)",
           "\\bpostgres(ql)?://[^\\s/:@]+:[^\\s/@$]+@",
-          "\\bpassword=[^\\s;\"'$\\[{(\\\\]"
+          "\\bpassword=[^\\s;\"'$\\[{()<>\\\\*]"
         ]
       },
       "db_destructive": {
@@ -204,15 +204,15 @@
         "echo_command": true,
         "deny_message": "Permission Denied: build/typecheck ON-DEMAND ONLY, chỉ chạy khi user yêu cầu rõ ràng. CI parity qua verifier/maintainer; test-author chỉ chạy trong phạm vi test được cấp. Worker và main không tự build.",
         "patterns": [
-          "\\bdotnet\\s+(build|publish|msbuild)\\b",
-          "\\bmsbuild\\b",
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*dotnet\\s+(?:build|publish|msbuild)\\b",
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*msbuild\\b",
           "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:bash|sh|zsh)\\s+(?:-[exuo]+\\s+|-c\\s+['\"]?)?|(?:source|\\.)\\s+)?(?:\\./|[\\w./-]*/)?fast-build\\.sh(?:\\s|[;&|)'\"]|$)",
           "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:bash|sh|zsh)\\s+(?:-[exuo]+\\s+|-c\\s+['\"]?)?|(?:source|\\.)\\s+)?(?:\\./|[\\w./-]*/)?fast-check\\.sh(?:\\s|[;&|)'\"]|$)",
           "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:bash|sh|zsh)\\s+(?:-[exuo]+\\s+|-c\\s+['\"]?)?|(?:source|\\.)\\s+)?(?:\\./|[\\w./-]*/)?ci-parity\\.sh(?:\\s|[;&|)'\"]|$)",
-          "\\bvite\\s+build\\b",
-          "\\btsc\\b[^;&|]*\\s(-b|--build|-p|--project|--noEmit)\\b",
-          "\\b(pnpm|npm|yarn)\\b[^;&|]*\\s(run\\s+)?build(:|\\s|$)",
-          "\\b(nx|turbo)\\b[^;&|]*\\sbuild\\b"
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:npx|pnpx|bunx)\\s+)?vite\\s+build\\b",
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:npx|pnpx|bunx)\\s+|(?:pnpm|npm|yarn)\\s+(?:--filter\\s+\\S+\\s+)?(?:exec|dlx)\\s+)?(?:\\./node_modules/\\.bin/)?tsc\\b[^;&|]*\\s(-b|--build|-p|--project|--noEmit)\\b",
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:pnpm|npm|yarn)\\b[^;&|]*\\s(run\\s+)?build(:|\\s|[;&|)'\"]|$)",
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:npx|pnpx|bunx)\\s+)?(?:nx|turbo)\\b[^;&|]*\\sbuild\\b"
         ]
       },
       "migration_runner": {
@@ -312,6 +312,9 @@
             "path_globs": [
               "frontend/**/*.tsx"
             ],
+            "exclude_globs": [
+              "frontend/shared/ui/**/numeric-input*.tsx"
+            ],
             "pattern": "<input[^>]{0,200}\\btype\\s*=\\s*[\"']number[\"']",
             "message": "Cấm dùng <input type=\"number\"> thô. Hãy dùng 'NumericInput' từ '@shared/ui' để đồng bộ định dạng số.",
             "source_feedback": ".agent/rules/guard-frontend-antipatterns.md"
@@ -368,6 +371,9 @@
             "id": "no-obsolete-reconcile-collections",
             "path_globs": [
               "backend/src/**/*.cs"
+            ],
+            "exclude_globs": [
+              "backend/src/BuildingBlocks/Infrastructure/Services/BaseService*.cs"
             ],
             "pattern": "\\bReconcileCollections(?:Async)?\\s*(?:<|\\()",
             "message": "Cấm dùng 'ReconcileCollections' hoặc 'ReconcileCollectionsAsync' (đã Obsolete, dùng reflection dễ gãy FK). Hãy implement 'ISyncsChildren<TEntity>' trên aggregate và override 'BuildIncomingGraph' trong Service (xem [skill:cogain-child-sync]).",

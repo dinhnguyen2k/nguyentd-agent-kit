@@ -10,11 +10,18 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  armSessionContinuation,
   checkLspCircuit,
+  evaluateMainStopGate,
+  extractPlanDirFromPath,
   inferLspLanguage,
   isLspFailureOrTimeout,
   isLspToolCall,
   recordLspOutcome,
+  recordSessionDispatch,
+  recordSessionEdit,
+  recordSessionToolOutcome,
+  resetSessionTurnCounters,
 } from "../../scripts/agent-lifecycle-core.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -207,6 +214,7 @@ function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
 
   if (event.error) {
     const errText = extractLspErrorText(event);
+    if (convId) recordSessionToolOutcome(root, convId, { failed: true, errorText: errText }, { now });
     appendFriction(root, {
       type:
         toolName === "invoke_subagent" || toolName === "swarm"
@@ -223,6 +231,7 @@ function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
     return {};
   }
   if (!convId) return {};
+  recordSessionToolOutcome(root, convId, { failed: false }, { now });
 
   const state = loadSessions(sessionFile, now);
   let dirty = false;
@@ -266,13 +275,31 @@ function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
       }
       dirty = true;
     }
+    const promptText = str(args.Prompt) ?? str(args.prompt) ?? "";
+    const refMatch = promptText.match(/^contract_ref:[ \t]*(\S+)/m);
+    const contractRef = refMatch ? refMatch[1] : null;
+    recordSessionDispatch(root, convId, { agentType: typeName, contractRef, summary: promptText.slice(0, 120) });
+    const pDir = contractRef ? extractPlanDirFromPath(root, contractRef) : null;
+    if (pDir) armSessionContinuation(root, convId, { planDir: pDir }, { now });
+  } else if (toolName === "swarm" && String(args.action || "").toLowerCase() === "add") {
+    const briefText = str(args.brief) ?? "";
+    const refMatch = briefText.match(/^contract_ref:[ \t]*(\S+)/m);
+    const contractRef = refMatch ? refMatch[1] : null;
+    recordSessionDispatch(root, convId, { agentType: str(args.name) ?? "swarm", contractRef, summary: briefText.slice(0, 120) });
+    const pDir = contractRef ? extractPlanDirFromPath(root, contractRef) : null;
+    if (pDir) armSessionContinuation(root, convId, { planDir: pDir }, { now });
   }
 
   if (writePaths && writePaths.length > 0) {
+    recordSessionEdit(root, convId, writePaths);
     const conv = ensureConv(state, convId, now);
     for (const rawPath of writePaths) {
       const rel = toRepoRelative(rawPath, baseCwd, root);
       if (!rel) continue;
+      const pDir = extractPlanDirFromPath(root, rel);
+      if (pDir && !conv.role) {
+        armSessionContinuation(root, convId, { planDir: pDir }, { now });
+      }
       if (CODE_FILE_RE.test(rel)) {
         if (toolName === "delete_file") {
           const next = conv.dirtyFiles.filter((f) => f !== rel);
@@ -308,7 +335,7 @@ function appendFriction(root, entry) {
   }
 }
 
-function handlePreInvocation(event, sessionFile, now) {
+function handlePreInvocation(event, root, sessionFile, now) {
   const convId = str(event.conversationId);
   if (convId) {
     const state = loadSessions(sessionFile, now);
@@ -339,6 +366,8 @@ function handlePreInvocation(event, sessionFile, now) {
         const conv = ensureConv(state, convId, now);
         conv.role = matchedRole;
         saveSessions(sessionFile, state, now);
+      } else if (root && event.invocationNum === 1 && str(event.lastUserInput)) {
+        resetSessionTurnCounters(root, convId, { userPrompt: str(event.lastUserInput) }, { now });
       }
     }
   }
@@ -365,10 +394,9 @@ function handleStop(event, root, sessionFile, now) {
   if (!convId) return { decision: "allow" };
 
   const state = loadSessions(sessionFile, now);
-  const conv = state.conversations[convId];
-  if (!conv) return { decision: "allow" };
+  const conv = state.conversations[convId] || null;
 
-  const remainingDirty = conv.dirtyFiles.filter(
+  const remainingDirty = (conv?.dirtyFiles || []).filter(
     (f) => checkLspCircuit(root, inferLspLanguage({ path: f }), { peek: true, now }).allowed
   );
   if (remainingDirty.length > 0) {
@@ -387,10 +415,24 @@ function handleStop(event, root, sessionFile, now) {
     };
   }
 
-  if (conv.codegenTouched) {
+  if (conv && conv.codegenTouched) {
     conv.codegenTouched = false;
     conv.updatedAt = now;
     saveSessions(sessionFile, state, now);
+  }
+
+  if (!conv?.role) {
+    const lastText = str(event.lastAssistantMessage) ?? str(event.response) ?? "";
+    const lastUser = str(event.lastUserInput) ?? "";
+    const gate = evaluateMainStopGate(
+      root,
+      convId,
+      { lastAssistantText: lastText, lastUserText: lastUser },
+      { now, maxPerTurn: 15 }
+    );
+    if (gate.decision === "block" && gate.reason) {
+      return { decision: "continue", reason: gate.reason };
+    }
   }
   return { decision: "allow" };
 }
@@ -415,7 +457,7 @@ try {
     out(handlePostToolUse(event, root, baseCwd, sessionFile, now));
   }
   if (hookEventName === "PreInvocation") {
-    out(handlePreInvocation(event, sessionFile, now));
+    out(handlePreInvocation(event, root, sessionFile, now));
   }
   if (hookEventName === "Stop") {
     out(handleStop(event, root, sessionFile, now));

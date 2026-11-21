@@ -34,7 +34,7 @@ function checkEvidence(root, reference, lineCounts, sourcePaths) {
   if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) fail(`Khoảng dòng evidence không hợp lệ: ${reference}`);
   if (sourcePaths && !sourcePaths.some((input) => matches(path, input))) fail(`Evidence chưa nằm trong source_paths của TASK: ${path}`);
   if (!lineCounts.has(path)) {
-    const absolute = repoPath(root, path);
+    const absolute = repoPath(root, path, true, { allowSharedRead: true });
     if (!statSync(absolute).isFile()) fail(`Evidence phải trỏ tới file: ${path}`);
     const source = readFileSync(absolute, 'utf8');
     lineCounts.set(path, source.length === 0 ? 0 : source.split('\n').length - Number(source.endsWith('\n')));

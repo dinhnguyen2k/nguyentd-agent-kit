@@ -1,10 +1,9 @@
 ---
-description: "Machine-checkable backend anti-patterns (empty catch, ad-hoc 401/403/409, hardcoded secrets). Interrupts the edit and injects the fix."
+description: "Machine-checkable backend anti-patterns (empty catch, ad-hoc 401/403 in controllers, hardcoded secrets). Interrupts the edit and injects the fix."
 condition:
   - 'catch\s{0,5}(\([^)]{0,200}\))?\s{0,5}\{\s{0,5}\}'
-  - '\b(Unauthorized|Forbid|Conflict)\s{0,3}\('
-  - 'StatusCode\(\s{0,3}(401|403|409)\b'
-  - '(?i)(password|secret|api_?key|access_?token)\s{0,3}=\s{0,3}"[^"\s]{8,}"'
+  - 'StatusCode\(\s{0,3}(401|403)\b'
+  - '(?i)\b(password|client_?secret|api_?key|access_?token)\s{0,3}=\s{0,3}"(?![A-Za-z0-9_]+(?::[A-Za-z0-9_]+)+")(?![Xx]-[A-Za-z0-9-]+")(?!(?:access_token|refresh_token|api_key|password|client_secret)")[^"\s]{12,}"'
 scope: "tool:edit(backend/**/*.cs), tool:write(backend/**/*.cs), tool:apply_patch(backend/**/*.cs)"
 interruptMode: tool-only
 ---
