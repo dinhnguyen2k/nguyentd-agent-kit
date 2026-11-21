@@ -22,7 +22,7 @@ Use this as a router, not a React textbook. `AI_RULES.md`, `.agent/rules/fronten
 | Triển khai, sửa hoặc chẩn đoán search/filter danh sách | [Search và filter](references/search-and-filter.md), chỉ đọc khi task chạm luồng này |
 | Component composition, state ownership, or useEffect     | [skill:cogain-react-state-effects]                                       |
 | Reusable TypeScript generics                             | [skill:typescript-pro]                                                   |
-| Tailwind tokens/shared primitives                        | [skill:tailwind-patterns] and, only when shared, [skill:core-components] |
+| Tailwind tokens/shared primitives                        | [skill:tailwind-patterns] and, only when shared, [skill:cogain-screen-archetypes] |
 | Explicit design/visual exploration                       | [skill:frontend-design]                                                  |
 | Browser behavior/E2E                                     | [skill:playwright-skill] or [skill:webapp-testing]                       |
 
@@ -37,16 +37,10 @@ Không nạp reference search/filter khi task chỉ sửa layout, màu sắc, fo
 ## UI reference (on demand)
 
 Shared components in `frontend/shared/` and [skill:cogain-screen-archetypes] are priority #1.
-Only open a matching file in `references/ui-ux-evondev/` (never load the whole folder) when needing detailed micro-interaction rules not defined by shared components:
-`rules-core.md` (states), `rules-layout.md` (nesting), `rules-text.md` (text/numbers/dates), `rules-interaction.md` (hover/loading/empty/focus), `responsive-tailwind.md`, `layout-page.md`, `layout-form.md`, `layout-overlay.md`, `components/<button|breadcrumb|description-list|inline-edit|empty-state|file-upload|quantity-input|charts>.md`, `review-taxonomy.md`.
+Read the Cogain-native references on demand when checking UI states, layout, controls, overlays, performance discipline, or review severity:
 
-Cogain overrides win over every file above:
-
-- Keep `frontend/shared/ui` as-is: `Button` default `variant: 'default'`, solid `destructive`, `transition-all`, `whitespace-nowrap`; `Card` keeps `shadow-sm`; `Badge` keeps its variants; primitives keep `focus-visible:ring-[3px]` (ignore `I13`/`I14`).
-- Colors, radius, heights, density come from Figma tokens and `frontend/erp/src/index.css` (`h-9`, `h-8` compact, `rounded-md`); source examples (`rose-*`, `emerald-*`, `bg-surface`, `bg-item-hover`, `--border-strong`, `shadow-modal`, `rounded-xl`, `h-10`/`h-11`) are illustrations, not tokens to add.
-- Page background stays `--background`; existing "Nhập..." placeholders stay; empty cells show `-`; sort arrows keep `custom-table.tsx` direction; overlays portal via `getPortalContainer()`.
-- Ignore probe, screenshot, wireframe, mock-data, and empty-handler instructions; verify by reading code only.
-- Cross-references to rules not present in the folder (`M30`, `N8`, `budgets.md`, ...) are not loaded; do not infer them.
+- [Cogain UI Guide](references/cogain-ui-guide.md)
+- [UI Review Taxonomy](references/ui-review-taxonomy.md)
 
 ## Workflow
 

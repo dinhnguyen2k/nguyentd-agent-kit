@@ -44,9 +44,9 @@ conventions that already exist in this repository — not generic textbook patte
 
 ## Do not use this skill when
 
-- The change is frontend-only (`frontend/**`) -> use `agent-frontend-patterns`
-- You need language-level C# guidance only -> use `csharp-latest-standards` / `csharp-pro`
-- You need deep .NET architecture theory -> use `dotnet-backend-patterns`
+- The change is frontend-only (`frontend/**`) -> use `frontend-development` / `cogain-react-state-effects`
+- You need language-level C# guidance only -> use `csharp-latest-standards`
+- You need deep .NET architecture theory -> use `dotnet-architect`
 
 ## Precedence
 

@@ -28,22 +28,16 @@ description: "When reviewing code quality, naming conventions, refactoring anti-
     *   Constant: `SCREAMING_SNAKE_CASE` (e.g., `MAX_RETRIES`)
     *   File: frontend `kebab-case` (e.g., `user-profile.ts`); C# `PascalCase` trùng tên type chính (e.g., `UserProfileService.cs`)
 
-2.  **Comments**:
-    *   Giải thích "TẠI SAO", không giải thích "CÁI GÌ".
-    *   Dùng JSDoc/DocString cho các hàm public.
-
-3.  **Error Handling**:
+2.  **Error Handling**:
     *   Không nuốt lỗi (silent fail). Chỉ bắt lỗi ở ranh giới có xử lý thật: log đủ context rồi trả lỗi theo pattern hệ thống (`.agent/rules/business.md` §6).
     *   Không bọc `try/catch` mặc định quanh mọi `async`/`await`; để lỗi không xử lý được đi lên middleware/interceptor.
 
-4.  **Độ dài hàm và trách nhiệm**:
+3.  **Độ dài hàm và trách nhiệm**:
     *   Độ dài là tín hiệu để rà soát trách nhiệm, mức trừu tượng và flow điều khiển; không đặt ngưỡng dòng cứng để ép tách hàm tự động.
-    *   Chỉ tách khi có boundary hoặc trách nhiệm có nghĩa; không chia vụn code thành các hàm con chỉ để đạt LOC, tránh indirection tax và phân mảnh luồng đọc.
-    *   Xem xét các đánh đổi tại `skill://clean-code` (§When The Rules Are Wrong - Small functions) và nguyên tắc thiết kế thực dụng tại `.agent/rules/backend-pragmatic-solid.md` (§2 Abstraction Gate, §3 SOLID as Tool).
+    *   Chỉ tách khi có boundary hoặc trách nhiệm có nghĩa (xem `skill://clean-code` và `.agent/rules/backend-pragmatic-solid.md` §2 Abstraction Gate, §3 SOLID as Tool).
 
-5.  **Concise Syntax & Modern Idioms**: chủ sở hữu duy nhất là
-    `.agent/rules/code-style-concise.md`, gồm cả ngoại lệ Primary Constructor với
-    `BaseService`. Không chép lại ở đây để tránh hai bản trôi lệch nhau.
+4.  **Concise Syntax, Comments & Anti Micro-Files**: chủ sở hữu duy nhất là
+    `.agent/rules/code-style-concise.md` (tự nạp theo glob khi chạm file code, gồm biểu thức 1 dòng, comment `<= 2` dòng giải thích WHY, anti micro-files và ngoại lệ Primary Constructor với `BaseService`). Không lặp lại tại đây để tránh hai bản trôi lệch nhau.
 ---
 
 ## 🧪 3. Testing Requirements

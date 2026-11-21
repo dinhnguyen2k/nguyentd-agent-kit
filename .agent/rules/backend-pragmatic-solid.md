@@ -3,6 +3,7 @@ trigger: glob
 glob: "backend/**/*"
 description: "Pragmatic SOLID and abstraction gate for backend .NET code; read before adding interfaces, strategies, or factories."
 condition: ["backend/**/*"]
+paths: ["backend/**/*"]
 interruptMode: never
 ---
 

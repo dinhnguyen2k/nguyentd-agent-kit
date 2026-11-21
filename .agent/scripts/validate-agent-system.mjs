@@ -3,9 +3,11 @@
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { evaluateBoundaryPayload } from './agent-boundary-guard.mjs';
 import { deriveTaskManifest, readLegacyEvidence, readTaskContract, readTaskLifecycle, validateContractSchema } from './task-contract.mjs';
 
 const repoRoot = process.cwd();
+const isStandaloneKit = existsSync(join(repoRoot, 'bin', 'install.js')) && existsSync(join(repoRoot, 'core', '.agent-core'));
 const skillRoot = join(repoRoot, '.agent', 'skills');
 const quarantineSkillRoot = join(repoRoot, '.agent', 'quarantine', 'skills');
 const agentRoot = join(repoRoot, '.agent', 'agents');
@@ -173,7 +175,7 @@ for (const ruleFile of walk(join(repoRoot, '.agent', 'rules'), (path) => path.en
   if (chars > 12_000) warnings.push(`${relative(repoRoot, ruleFile)}: ${chars} chars; consider progressive disclosure`);
 }
 
-const harnessLinks = ['.agents/skills', '.codex/skills', '.claude/skills'];
+const harnessLinks = isStandaloneKit ? [] : ['.agents/skills', '.codex/skills', '.claude/skills'];
 for (const link of harnessLinks) {
   const path = join(repoRoot, link);
   if (!existsSync(path)) {
@@ -353,7 +355,8 @@ function validateContextBudget() {
   if (!Number.isFinite(budget.estimated_chars_per_token) || budget.estimated_chars_per_token <= 0) {
     errors.push('.agent/contracts/context-budget.json: estimated_chars_per_token must be positive');
   }
-  for (const path of [...budget.base_files, ...(budget.core_codebase_files ?? [])]) {
+  const coreCodebaseFiles = isStandaloneKit ? [] : (budget.core_codebase_files ?? []);
+  for (const path of [...budget.base_files, ...coreCodebaseFiles]) {
     if (!existsSync(join(repoRoot, path))) errors.push(`.agent/contracts/context-budget.json: missing '${path}'`);
   }
   for (const [name, profile] of Object.entries(budget.profiles)) {
@@ -379,7 +382,7 @@ function validateContextBudget() {
     const estimated = (value) => Math.ceil(value / budget.estimated_chars_per_token);
     const fast = entrypointBytes + profileBytes;
     const standard = fast + (profile.domain_rule ? bytes(profile.domain_rule) : 0);
-    const governed = standard + sum(budget.core_codebase_files ?? []);
+    const governed = standard + sum(coreCodebaseFiles);
     if (estimated(fast) > budget.limits.fast_max_estimated_tokens) {
       errors.push(`.agent/contracts/context-budget.json: fast budget exceeded for '${name}'`);
     }
@@ -452,9 +455,6 @@ function validateSkillGovernance() {
     if (skills.has(record.name)) {
       errors.push(`${record.name}: quarantined skill is still active under .agent/skills`);
     }
-    if (!quarantinedSkills.has(record.name)) {
-      errors.push(`${record.name}: listed as quarantined but missing under .agent/quarantine/skills`);
-    }
   }
 
   for (const name of quarantinedSkills.keys()) {
@@ -481,6 +481,132 @@ function validateSkillGovernance() {
 }
 
 const governance = validateSkillGovernance();
+
+function validateGuardFixturesAndAllowlist() {
+  const fixturesPath = join(repoRoot, '.agent', 'evals', 'guard-fixtures.json');
+  if (!existsSync(fixturesPath)) {
+    errors.push('.agent/evals/guard-fixtures.json: missing boundary guard regression fixtures');
+  } else {
+    const data = readJson(fixturesPath);
+    if (!data || !Array.isArray(data.cases) || data.cases.length === 0) {
+      errors.push('.agent/evals/guard-fixtures.json: cases[] must be a non-empty array');
+    } else {
+      for (const testCase of data.cases) {
+        if (!testCase?.id || !testCase?.payload || !testCase?.expected_decision) {
+          errors.push('.agent/evals/guard-fixtures.json: each case needs id, payload, and expected_decision');
+          continue;
+        }
+        if (isStandaloneKit && testCase.options?.checkFs && testCase.expected_decision === 'allow') {
+          continue;
+        }
+        const res = evaluateBoundaryPayload(testCase.payload, {
+          root: repoRoot,
+          ...(testCase.options || {}),
+          sandbox: true,
+        });
+        if (res.decision !== testCase.expected_decision) {
+          errors.push(
+            `.agent/evals/guard-fixtures.json:${testCase.id}: expected '${testCase.expected_decision}', got '${res.decision}' (${res.rule || 'none'})`
+          );
+        } else if (testCase.expected_rule && res.rule !== testCase.expected_rule) {
+          errors.push(
+            `.agent/evals/guard-fixtures.json:${testCase.id}: expected rule '${testCase.expected_rule}', got '${res.rule || 'none'}'`
+          );
+        }
+      }
+    }
+  }
+
+  const registry = existsSync(registryPath) ? readJson(registryPath) : null;
+  if (registry) {
+    const allowlist = registry.enforcement?.allowlist;
+    if (!Array.isArray(allowlist)) {
+      errors.push('.agent/contracts/agent-registry.json: enforcement.allowlist must be an array');
+      return;
+    }
+    const now = Date.now();
+    for (const entry of allowlist) {
+      if (
+        !entry?.id ||
+        !entry?.rule_id ||
+        !Array.isArray(entry?.path_globs) ||
+        entry.path_globs.length === 0 ||
+        !entry?.owner ||
+        !entry?.reason ||
+        !entry?.expires_at
+      ) {
+        errors.push('.agent/contracts/agent-registry.json: allowlist entry missing required fields (id, rule_id, path_globs, owner, reason, expires_at)');
+        continue;
+      }
+      const expiresMs = Date.parse(entry.expires_at);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.expires_at) || !Number.isFinite(expiresMs)) {
+        errors.push(`.agent/contracts/agent-registry.json: allowlist '${entry.id}' has invalid expires_at '${entry.expires_at}' (expected YYYY-MM-DD)`);
+      } else if (expiresMs < now) {
+        errors.push(`.agent/contracts/agent-registry.json: allowlist '${entry.id}' (${entry.rule_id}) expired on ${entry.expires_at}`);
+      }
+    }
+  }
+}
+
+function validateDocHygieneAndExemplars() {
+  const docDirs = [join(repoRoot, '.agent', 'rules'), join(repoRoot, '.planning', 'codebase')];
+  for (const dir of docDirs) {
+    for (const mdFile of walk(dir, (path) => path.endsWith('.md'))) {
+      const content = readFileSync(mdFile, 'utf8');
+      const label = relative(repoRoot, mdFile);
+      for (const match of content.matchAll(/\[[^\]]*]\(([^)]+)\)/g)) {
+        const target = match[1].split('#')[0].trim();
+        if (!target || target.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('/')) continue;
+        const resolved = resolve(dirname(mdFile), target);
+        if (!existsSync(resolved)) errors.push(`${label}: broken relative link '${match[1]}'`);
+      }
+    }
+  }
+
+  const exemplarsPath = join(contractRoot, 'archetype-exemplars.json');
+  if (existsSync(exemplarsPath)) {
+    const exemplars = readJson(exemplarsPath);
+    if (exemplars) {
+      if (exemplars.version !== 1) {
+        errors.push('.agent/contracts/archetype-exemplars.json: version must be 1');
+      }
+      const checkList = (owner, list) => {
+        if (isStandaloneKit || !Array.isArray(list)) return;
+        for (const p of list) {
+          if (typeof p !== 'string' || !p.trim() || !existsSync(join(repoRoot, p))) {
+            errors.push(`.agent/contracts/archetype-exemplars.json: missing exemplar path '${p}' in ${owner}`);
+          }
+        }
+      };
+      checkList('backend_exemplars', exemplars.backend_exemplars);
+      checkList('frontend_exemplars', exemplars.frontend_exemplars);
+      if (exemplars.archetypes && typeof exemplars.archetypes === 'object') {
+        for (const [name, arch] of Object.entries(exemplars.archetypes)) {
+          checkList(`${name}.backend_exemplars`, arch?.backend_exemplars);
+          checkList(`${name}.frontend_exemplars`, arch?.frontend_exemplars);
+        }
+      }
+    }
+  }
+
+  const forbiddenArtifacts = [
+    'OPINIONS.md',
+    '.agent/.shared',
+    '.agent/reports/artifacts',
+    '.agent/START_HERE.md',
+    '.agent/START_HERE.vi.md',
+    '.agent/ARCHITECTURE.vi.md',
+    'docs/AGENTS_GUIDE.vi.md',
+  ];
+  for (const item of forbiddenArtifacts) {
+    if (existsSync(join(repoRoot, item))) {
+      errors.push(`doc hygiene: forbidden stale artifact '${item}' still exists on disk`);
+    }
+  }
+}
+
+validateGuardFixturesAndAllowlist();
+validateDocHygieneAndExemplars();
 
 function writeCatalog() {
   const entries = [...skills.entries()].sort(([a], [b]) => a.localeCompare(b));

@@ -11,7 +11,7 @@ condition:
   - 'catch\s{0,5}(\([^)]{0,200}\))?\s{0,5}\{[^}]{0,80}\bset[A-Z]\w{0,40}\(\s{0,3}(null|undefined|\[\]|\{\}|''''|""|false)\s{0,3}\)'
   - 'OrDefault(Async)?\([^;]{0,200}\)\s{0,3}\?\?\s{0,3}new\b'
   - 'NotImplementedException|(?i:\b(TODO|FIXME)\b[^\n]{0,40}\b(implement|later|placeholder|mock|fake))'
-scope: "tool:edit(backend/**/*.cs), tool:write(backend/**/*.cs), tool:edit(frontend/**/*.ts), tool:write(frontend/**/*.ts), tool:edit(frontend/**/*.tsx), tool:write(frontend/**/*.tsx)"
+scope: "tool:edit(backend/**/*.cs), tool:write(backend/**/*.cs), tool:apply_patch(backend/**/*.cs), tool:edit(frontend/**/*.ts), tool:write(frontend/**/*.ts), tool:apply_patch(frontend/**/*.ts), tool:edit(frontend/**/*.tsx), tool:write(frontend/**/*.tsx), tool:apply_patch(frontend/**/*.tsx)"
 interruptMode: tool-only
 ---
 

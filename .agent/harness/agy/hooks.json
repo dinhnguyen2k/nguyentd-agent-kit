@@ -2,7 +2,7 @@
   "cogain-boundary-guard": {
     "PreToolUse": [
       {
-        "matcher": "^(run_command|bash|write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content|create_file|delete_file|edit|write|notebook_edit|call_mcp_tool|mcp_+filesystem_.*|run_workflow|eval)$",
+        "matcher": "^(run_command|bash|write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content|create_file|delete_file|edit|write|notebook_edit|call_mcp_tool|mcp_+filesystem_.*|run_workflow|eval|invoke_subagent|swarm)$",
         "hooks": [
           {
             "type": "command",
@@ -10,6 +10,32 @@
             "timeout": 10
           }
         ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content|create_file|delete_file|edit|write|notebook_edit|call_mcp_tool|mcp_+filesystem_.*|mcp_+lsp_.*|invoke_subagent|swarm)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{}\\n'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{}\\n'",
+        "timeout": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{\"decision\":\"allow\"}\\n'",
+        "timeout": 10
       }
     ]
   }

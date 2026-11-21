@@ -59,7 +59,7 @@ $ARGUMENTS
 - **Execution role**: `backend-specialist` / `frontend-specialist`
 - **Nguyên tắc**: Không load tràn lan codebase. Chỉ Lazy Load context khi có **Finding** (Lỗi/Nghi vấn).
 - **Skills Nạp Theo Loại Finding**:
-  - 🐞 *Nghi vấn Logic / Code quality*: Nạp `debugging-master`, `clean-code`.
+  - 🐞 *Nghi vấn Logic / Code quality*: Nạp `debug`, `clean-code`.
   - 🔒 *Nghi vấn Bảo mật (Security)*: Nạp `vulnerability-scanner`, `determine_threat_model`.
   - 🗄️ *Nghi vấn Database / Migration*: Nạp `postgresql`, `database-optimizer`.
   - ⚡ *Nghi vấn Hiệu năng (Performance)*: Nạp `performance-profiling`, `performance-engineer`.

@@ -23,7 +23,7 @@ $ARGUMENTS
 
 ## 🟢 PHASE 1: Forensic Discovery & RCA (The "Crime Scene")
 
-**Skill**: `debugging-master`
+**Skill**: `debug`
 **Mission**: Isolate the exact point of failure and formulate a hypothesis.
 
 - **Action**: Read the Stack Trace or Terminal Logs. Locate the failing file:line.
@@ -32,7 +32,7 @@ $ARGUMENTS
 
 ## 🟡 PHASE 2: Strategic Instrumentation (If needed)
 
-**Skill**: `debugging-master`
+**Skill**: `debug`
 **Mission**: Gather more evidence if the root cause is unclear.
 
 - **Action**: Suggest strategic debug logging, or breakpoint placement.
@@ -51,7 +51,7 @@ $ARGUMENTS
 ## 🔵 PHASE 3: Surgical Repair
 
 **Execution role**: `backend-specialist` or `frontend-specialist`
-**Mission**: Apply the targetted fix based on `debugging-master`'s analysis.
+**Mission**: Apply the targetted fix based on root-cause analysis.
 
 - **Correction**: Apply the smallest root-cause fix; add defensive code only when it preserves the intended contract.
 - **Gate**: Chỉ sửa khi user yêu cầu implementation; test do `test-author` sở hữu, không để production writer sửa test.

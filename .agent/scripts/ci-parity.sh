@@ -132,8 +132,7 @@ const subject = path => {
   const { task_id, slice_id, contract_ref, contract_version, contract_hash, lifecycle_hash } = c;
   return { task_id, slice_id, contract_ref, contract_version, contract_hash, lifecycle_hash, ...computeSourceIdentity(root, c.source_paths) };
 };
-const identity = () => {
-  if (taskBound) return contractPaths.map(subject).sort((a, b) => a.slice_id.localeCompare(b.slice_id) || a.contract_ref.localeCompare(b.contract_ref));
+const legacyUnboundIdentity = () => {
   const evidenceRoots = ['.agent/reports', '.agent/scratch', '.agent/task-manifests'];
   const isEvidence = path => evidenceRoots.some(prefix => path === prefix || path.startsWith(`${prefix}/`));
   // Giữ cả source bị ignore và file tracked đã xóa, nhưng không quét output build.
@@ -156,6 +155,60 @@ const identity = () => {
   const sourceFiles = [...paths].sort();
   const sourcePaths = [...new Set(sourceFiles.map(path => path.startsWith('.agent/') ? path.split('/').slice(0, 2).join('/') : path.split('/')[0]))].sort();
   return computeSourceIdentity(root, sourcePaths, { sourceFiles });
+};
+const identity = () => {
+  if (taskBound) return contractPaths.map(subject).sort((a, b) => a.slice_id.localeCompare(b.slice_id) || a.contract_ref.localeCompare(b.contract_ref));
+  try {
+    const evidenceRoots = ['.agent/reports', '.agent/scratch', '.agent/task-manifests'];
+    const outputDirectories = new Set(['bin', 'obj', 'dist', 'node_modules']);
+    const isIgnoredPath = path => {
+      if (!path || evidenceRoots.some(prefix => path === prefix || path.startsWith(`${prefix}/`))) return true;
+      if (path === 'backend/logs' || path === '.dotnet/.dotnet' || path === '.nuget/packages' || path.endsWith('/.nuget/packages')) return true;
+      return path.split('/').some(seg => outputDirectories.has(seg.toLowerCase()));
+    };
+    const common = realpathSync(resolve(root, execFileSync('git', ['-C', root, 'rev-parse', '--git-common-dir'], { encoding: 'utf8', timeout: 10000 }).trim()));
+    const worktree = realpathSync(execFileSync('git', ['-C', root, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', timeout: 10000 }).trim());
+    const head = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8', timeout: 10000 }).trim();
+    const statusRaw = execFileSync('git', ['-C', root, 'status', '--porcelain=v1', '-z', '--untracked-files=all'], { encoding: 'utf8', timeout: 10000, maxBuffer: 32 * 1024 * 1024 });
+    const statusTokens = statusRaw.split('\0');
+    const dirtyPaths = new Set();
+    for (let idx = 0; idx < statusTokens.length; idx++) {
+      const token = statusTokens[idx];
+      if (!token) continue;
+      const code = token.slice(0, 2);
+      const filePath = token.slice(3);
+      if (filePath && !isIgnoredPath(filePath)) dirtyPaths.add(filePath);
+      if (code.includes('R') || code.includes('C')) {
+        const oldPath = statusTokens[idx + 1];
+        if (oldPath && !isIgnoredPath(oldPath)) dirtyPaths.add(oldPath);
+        idx += 1;
+      }
+    }
+    const localInputs = execFileSync('git', ['-C', root, 'ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--',
+      '.agent/scripts', '.agent/contracts', 'backend/Directory.Build.props', '.editorconfig', 'backend/.editorconfig', 'backend/fast-build.sh', 'frontend/fast-check.sh'
+    ], { encoding: 'utf8', timeout: 10000, maxBuffer: 32 * 1024 * 1024 });
+    for (const p of localInputs.split('\0')) {
+      if (p && !isIgnoredPath(p)) dirtyPaths.add(p);
+    }
+    const hashFileStat = p => {
+      const abs = resolve(root, p);
+      if (!existsSync(abs)) return { path: p, kind: 'deleted' };
+      const st = statSync(abs);
+      if (!st.isFile()) return { path: p, kind: 'other' };
+      return { path: p, kind: 'file', executable: Boolean(st.mode & 0o111), hash: hash(abs) };
+    };
+    const entries = [...dirtyPaths].sort().map(hashFileStat);
+    const sourcePaths = [...new Set(['git:HEAD', ...entries.map(e => e.path.startsWith('.agent/') ? e.path.split('/').slice(0, 2).join('/') : e.path.split('/')[0])])].sort();
+    const sha = value => createHash('sha256').update(value).digest('hex');
+    return {
+      repo_id: sha(common),
+      worktree_id: sha(worktree),
+      source_fingerprint: sha(canonicalJSON({ head, source_paths: sourcePaths, entries })),
+      source_paths: sourcePaths
+    };
+  } catch {
+    return legacyUnboundIdentity();
+  }
 };
 
 const validTaskSetSummary = summary => {

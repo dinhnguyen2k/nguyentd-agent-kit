@@ -3,7 +3,7 @@
   "cases": [
     {
       "id": "small-task-stays-single-agent",
-      "skills": ["agent-orchestration"],
+      "skills": ["orchestrate"],
       "query": "Sửa một lỗi validation backend cục bộ trong một service, không yêu cầu chạy validation.",
       "expected_behavior": [
         "Main chốt recipe có evidence rồi giao một backend-specialist, không gọi thêm agent để nghiệm thu",
@@ -18,7 +18,7 @@
     },
     {
       "id": "standard-task-selective-context",
-      "skills": ["agent-orchestration"],
+      "skills": ["orchestrate"],
       "query": "Refactor ba React component liên quan trong một app, không đổi API, phân quyền hoặc shared package.",
       "expected_behavior": [
         "Main chốt cách sửa, giữ một frontend-specialist sở hữu cùng luồng",
@@ -32,7 +32,7 @@
     },
     {
       "id": "dual-domain-manifest-boundary",
-      "skills": ["agent-orchestration"],
+      "skills": ["orchestrate"],
       "query": "Dùng /orchestrate để đổi backend DTO và React form tương ứng ở các package riêng, chưa yêu cầu chạy lệnh validation.",
       "expected_behavior": [
         "Tạo Task Manifest với owner rõ ràng và allowed_paths tách biệt",
@@ -46,7 +46,7 @@
     },
     {
       "id": "verification-failure-loop",
-      "skills": ["agent-orchestration"],
+      "skills": ["orchestrate"],
       "query": "Trong /orchestrate, user đã yêu cầu chạy test và verifier báo regression test thất bại sau khi compile thành công.",
       "expected_behavior": [
         "Giữ nguyên bằng chứng lệnh thất bại của verifier, không chạy lại chỉ để xác nhận",
@@ -60,7 +60,7 @@
     },
     {
       "id": "high-risk-human-gate",
-      "skills": ["agent-orchestration"],
+      "skills": ["orchestrate"],
       "query": "Một thay đổi chạm phân quyền và public API contract.",
       "expected_behavior": [
         "Main xác định rủi ro và chốt hành vi phân quyền cùng tác động tới consumer trước khi giao",
@@ -74,7 +74,7 @@
     },
     {
       "id": "main-owns-rework",
-      "skills": ["agent-orchestration"],
+      "skills": ["orchestrate"],
       "query": "Hai frontend slice đã bàn giao; diff tích hợp bị lặp column definition và một slice ép kiểu shared type đã cũ.",
       "expected_behavior": [
         "Main đối chiếu source và contract để xác định finding, không giao lại việc nghiệm thu cho một gate tự động",

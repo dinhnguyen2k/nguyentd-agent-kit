@@ -7,7 +7,7 @@ Sử dụng Sub-Skill này khi anh làm việc với mã nguồn C# (.NET 8) li�
 ## 🚀 Kịch bản Rà soát tự động (Automated Linter Tool)
 
 Sub-Skill này đi kèm với một **Tool rà soát tự động** bằng Python đặt tại:
-`[scan-linq.py](file:///home/nguyentd/cogain/cogain-core/.agent/skills/backend-csharp-optimization/scripts/scan-linq.py)`
+`[scan-linq.py](../scripts/scan-linq.py)`
 
 ### Cách sử dụng dành cho Agent & Nhà phát triển:
 Trước khi hoàn tất bất kỳ thay đổi backend nào liên quan đến file C# (`*.cs`), **BẮT BUỘC** chạy lệnh sau từ terminal tại thư mục gốc của dự án để quét lỗi tự động.

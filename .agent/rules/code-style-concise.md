@@ -3,6 +3,7 @@ trigger: glob
 glob: "**/*.{cs,ts,tsx,js,jsx}"
 description: "Code style for C#/TS edits: follow .editorconfig/.prettierrc, concise one-line forms, one-line doc comments."
 condition: ["**/*.cs", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+paths: ["**/*.cs", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
 interruptMode: never
 ---
 
@@ -17,10 +18,10 @@ interruptMode: never
 - Giữ phép gán, `return`, lời gọi hàm, ternary, lambda, LINQ/fluent chain, literal và JSX ngắn trên một dòng nếu dễ đọc và không vượt `max_line_length`/`printWidth`; không tự xuống dòng theo từng toán tử, đối số, prop hoặc bước gọi đơn giản.
 - Với nhánh hoặc vòng lặp chỉ có một câu lệnh, bỏ `{}` và viết cùng dòng khi cú pháp, cấu hình và tính rõ ràng cho phép; không giữ block chỉ vì thói quen. Giữ `{}` khi có nhiều câu lệnh, cú pháp/lint bắt buộc hoặc bỏ block gây nhập nhằng như `dangling else`.
 - C# ưu tiên expression body cho member một biểu thức; dùng guard clause, ternary, null-coalescing hoặc switch expression khi thể hiện trực tiếp cùng logic và giảm nhánh/lồng không cần thiết.
-- Không tạo biến trung gian, helper hoặc nhánh `if/else` chỉ để chuyển tiếp hay gán một giá trị đơn giản; giữ lại khi giúp đặt tên ý nghĩa, tránh tính lặp hoặc cần cho debug/side effect. Không nén nhiều câu lệnh độc lập vào một dòng.
+- Không tạo biến trung gian, helper, sub-component hoặc file con chỉ dùng một lần để chuyển tiếp hay chia vụn logic (anti micro-files); giữ co-located trong cùng file/module cha trừ khi tái sử dụng thực tế (>= 2 nơi) hoặc có ranh giới nghiệp vụ độc lập, rõ ràng. Không nén nhiều câu lệnh độc lập vào một dòng.
 - Chỉ tách dòng khi vượt giới hạn cấu hình hoặc biểu thức thực sự khó đọc; không đánh đổi correctness, thứ tự thực thi, short-circuit, nullability hay khả năng hiểu logic để giảm số dòng.
 - Prettier giữ nguyên object literal đã xuống dòng (có newline sau `{`) nên chạy formatter không tự rút ngắn; muốn gọn phải gom tay rồi mới format lại.
-- Doc comment tối đa một dòng (`///` hoặc `/** */`) và chỉ viết khi WHY không hiển nhiên; tránh `<summary>` nhiều dòng kèm `<para>`.
+- Comment và doc comment (`///`, `/** */`) tối đa 2 dòng (ưu tiên 1 dòng) và chỉ viết khi WHY không hiển nhiên (không giải thích WHAT); tránh `<summary>` nhiều dòng kèm `<para>`.
 - Với C# kế thừa `BaseService`, chỉ đổi sang primary constructor khi đã kiểm tra source và chứng minh constructor shape an toàn.
 - `CS1998` là diagnostic cần kiểm tra logic async, không xử lý như hint thẩm mỹ.
 - Trước bàn giao, bắt buộc rà phần code vừa thêm/sửa để bỏ block, nhánh, biến và xuống dòng không cần thiết theo các tiêu chí trên; LSP sạch hoặc formatter chạy thành công không thay thế việc rà này.

@@ -1,6 +1,6 @@
 # Cogain Agent Architecture
 
-**Updated:** 2026-10-05  
+**Updated:** 2026-11-21  
 **Scope:** coding agents for the Cogain .NET 8 microservices and React/Vite monorepo
 
 ## Goal
@@ -17,7 +17,6 @@ Entry (AGENTS/CLAUDE/GEMINI)
   -> .agent/agents/*.md                  role, routing, evidence policy
   -> .agent/skills/*/SKILL.md            task procedure loaded on demand
   -> .agent/knowledge/*                  skill lifecycle, freshness, MCP policy
-  -> .agent/quarantine/skills/*          retained but inactive skill content
   -> references/scripts/source code      conditional detail and executable checks
   -> .agent/evals/cases/*.json           observable behavior expectations
 ```
@@ -27,22 +26,26 @@ One concept has one owner. Other files link to that owner instead of copying it.
 ## Runtime Agent Registry
 
 The machine-readable source for available runtime agents is
-`.agent/contracts/agent-registry.json`. A role mentioned in a workflow is not an
-agent unless it is registered there and has a profile (except the control-plane
-`orchestrator`, which is the current coordinator).
+`.agent/contracts/agent-registry.json`. There are 6 standard worker/gate roles
+(`backend-specialist`, `frontend-specialist`, `test-author`, `verifier`, `researcher`,
+`reviewer`) coordinated by the control-plane `orchestrator`. A role mentioned in a
+workflow is not an agent unless it is registered there and has a profile.
 
 | Agent | Kind | Write boundary |
 | ----- | ---- | -------------- |
 | `orchestrator` | control | none |
-| `backend-specialist` | worker | `backend/**` (excludes tests) |
+| `backend-specialist` | worker | `backend/**` (excludes tests and Migrations) |
 | `frontend-specialist` | worker | `frontend/**` (excludes tests) |
-| `test-author` | worker | `backend/tests/**`, `frontend/**/__tests__/**`, `frontend/**/*.{test,spec}.{ts,tsx}` |
+| `test-author` | worker | `backend/tests/**`, `frontend/**/__tests__/**`, `frontend/**/*.{test,spec}.{ts,tsx}` (tạm khóa tự động viết test theo `AI_RULES.md` §6) |
 | `verifier` | gate | none (read-only tools) |
+| `researcher` | gate | none (read-only + web tools; no shell) |
 | `reviewer` | gate | none (read-only tools; opt-in on explicit user request) |
 
 Test authorship is strictly separated from production code: workers writing production
 source never modify test files (rule R2). Test suites are restricted to `test-author` and
-`verifier` (rule R1).
+`verifier` (rule R1). Per `AI_RULES.md` §6, automatic `test-author` spawning is currently
+paused (`tạm khóa tự động`), and business behavior verification is performed via user manual
+testing unless explicitly requested.
 
 Security, database, performance, documentation, and release are conditional
 capabilities. They become separate agents only when a distinct permission boundary
@@ -54,12 +57,15 @@ Classify work before loading broad context or adding coordination:
 
 | Tier | Default context and gate |
 | --- | --- |
-| `fast` | Source + nearest test/pattern; self-validation |
-| `standard` | Selective rule/skill/context; self-validation with evidence |
-| `governed` | Task Manifest, explicit ownership, independent verifier |
+| `fast` | Source + nearest test/pattern; static LSP diagnostics; validation `ON-DEMAND ONLY` |
+| `standard` | Selective rule/skill/context; static LSP diagnostics; validation `ON-DEMAND ONLY` |
+| `governed` | Task Manifest, explicit ownership; independent `verifier` only on explicit user request |
 
 Fast and standard lanes are preserved for routine, low-risk work without manifest
-overhead. Validation commands run only on explicit user request.
+overhead. **All validation commands** (`dotnet build/test`, `vitest`, `playwright test`,
+`eslint`, `fast-check.sh`, `ci-parity.sh`) are **ON-DEMAND ONLY** (`AI_RULES.md` §2):
+they run only when the user explicitly requests the action by name. Without an explicit
+request, hand off with `Validation: not run - not requested`.
 
 Only governed work follows the manifest contract in
 `.agent/contracts/task-manifest.schema.json`:
@@ -97,8 +103,9 @@ Routing maps evidence to specialists without unconditional skill preloading:
 | ------------------------------------------------------ | ---------------------- | ---------------------------------------------------------- |
 | `backend/**`, C#, EF Core, API, DB, gRPC, broker       | `backend-specialist`   | `backend-development`; decision skills on demand           |
 | `frontend/**`, React, route, query, form, Tailwind, UI | `frontend-specialist`  | `frontend-development`; decision skills on demand          |
-| Test authoring, test repair, regression coverage       | `test-author`          | `testing-patterns`, `tdd-workflow`                         |
-| Governed verification, invariant checks                | `verifier`             | `lint-and-validate`, `testing-patterns`, `requesting-code-review` |
+| Test authoring, test repair (paused per `AI_RULES.md` §6) | `test-author`        | `testing-patterns`, `tdd-workflow` (only when explicitly enabled) |
+| Validation & invariant checks (only on explicit request) | `verifier`           | `lint-and-validate`, `testing-patterns`, `requesting-code-review` |
+| Scoped investigation & evidence synthesis (read-only)  | `researcher`           | `research`                                                 |
 | Opt-in diff review, risk and checklist audit (user request) | `reviewer`         | `code-reviewer`, `clean-code`; diff review on demand       |
 | Cross-service or cross-app decision                    | Primary domain specialist; Main coordinates cross-domain contracts |
 Specialists load minimal context: one baseline router plus one or two decision-changing
@@ -130,7 +137,7 @@ evidence -> proposal -> eval -> human approval -> publish
 
 LinkedIn, Facebook, forum, and feed content are discovery leads only. They must be corroborated against Cogain source/rules or official documentation before any skill change.
 
-Quarantined skills live under `.agent/quarantine/skills`. They are kept for review/mining, but they are not part of active discovery.
+Quarantined skills are tracked in `.agent/knowledge/skill-governance.json` (with `reason` and `ownerAfterCleanup`); dead skill files under `.agent/quarantine/skills/` are cleaned up from disk and excluded from active auto-discovery.
 
 ## Multi-Harness Layout
 

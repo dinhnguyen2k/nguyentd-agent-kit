@@ -3,6 +3,7 @@ trigger: glob
 glob: "frontend/**/*"
 description: "Router FE: đọc reference phù hợp trước lần sửa đầu tiên của từng file."
 condition: ["frontend/**/*"]
+paths: ["frontend/**/*"]
 interruptMode: never
 ---
 

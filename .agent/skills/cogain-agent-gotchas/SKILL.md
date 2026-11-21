@@ -1,57 +1,42 @@
 ---
 name: cogain-agent-gotchas
-description: Prevents recurring Cogain-specific mistakes learned from .planning/errors/ERRORS.md. Use during debugging, review, or implementation near AutoFilter, API integration, EF reflection/child relations, React Hook Form, Radix controls, and shared tables.
+description: Prevents recurring Cogain-specific semantic mistakes learned from .planning/errors/ERRORS.md. Use during debugging, review, or implementation near AutoFilter, API integration, EF reflection/child relations, React Hook Form, Radix controls, and shared tables.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   layer: project-skill
 ---
 
 # Cogain Agent Gotchas
 
-Read the relevant category before editing code near a previously failed boundary. The source incident log is `.planning/errors/ERRORS.md`.
+Đọc nhóm liên quan trước khi sửa code ở các ranh giới dễ sai ngữ nghĩa; nhật ký sự cố gốc lưu tại `.planning/errors/ERRORS.md`.
 
-## API and AutoFilter
+## Kiểm Tra Tĩnh Đã Chuyển Xuống Guard
 
-- Verify a backend endpoint exists before adding a frontend query. Search controller routes and existing service clients.
-- Parameters not declared on an AutoFilter request model can be silently ignored. Put supported dynamic predicates in the `Filters` expression unless the endpoint explicitly binds a property.
+- Đã cưỡng chế tự động tại `R10` (`.agent/contracts/agent-registry.json`): cấm barrel `@shared/components|hooks|services`, `.uuid()` của Zod 4, `.catch('')` trên `SearchSchema`, `<input type="number">`, gán tay header `X-Employee-Id`, import chéo `_components`/`-components` giữa route, `eslint-disable react-hooks/exhaustive-deps`, `as unknown as`, `catch` rỗng C#, `NotImplementedException`, `using` chéo `Data`/`Repositories` giữa service, sửa tay file sinh tự động và import asset tĩnh không tồn tại.
 
-## API-to-Form Hydration & Zod 4
+## API & AutoFilter
 
-- Nullable backend IDs and arrays must be mapped into schema-safe form values.
-- `value ?? []` does not normalize a non-null string into an array. Use an explicit type guard/normalizer.
-- Zod 4: dùng `z.guid()` cho ID `.NET` thay vì `z.string().uuid()` vì GUID không chuẩn RFC sẽ bị reject im lặng trên phần tử mảng.
-- Form dùng `CreatorSelector`/`useRefDocSelector` bắt buộc giữ `createdById` và `createdOrganizationId` xuyên suốt schema -> defaults -> submit payload -> `CreateWorkItemRequest`.
-- Route `SearchSchema` dùng `.optional()` và đặt default khi đọc; cấm `.catch('')` hoặc default cứng làm bẩn URL.
+- Xác minh endpoint thật trên controller backend trước khi thêm query phía frontend.
+- Tham số không khai báo trên request model AutoFilter sẽ bị bỏ qua âm thầm; đưa predicate động vào biểu thức `Filters` trừ khi endpoint bind tường minh property đó.
 
-## EF Core Reflection, Excel Import & Children
+## API-to-Form Hydration & Luồng Nghiệp Vụ
 
-- Reflection-based navigation discovery must exclude `[NotMapped]` properties.
-- Removing a child from a tracked required-FK navigation can sever the association and try to set the FK to null. Use aggregate-owned soft-delete sync via [skill:cogain-child-sync].
-- Non-null DB snapshot columns require complete resolver/mapping coverage and a business-valid fallback; `?? string.Empty` only prevents null and does not prove semantic validity.
+- ID và mảng nullable từ backend phải được chuẩn hóa về giá trị khớp schema trước khi `form.reset`; `value ?? []` không chuẩn hóa được chuỗi khác null thành mảng nên cần type guard rõ ràng.
+- Form dùng `CreatorSelector` hoặc `useRefDocSelector` bắt buộc giữ `createdById` và `createdOrganizationId` xuyên suốt schema -> giá trị mặc định -> payload submit -> `CreateWorkItemRequest`.
+
+## EF Core Reflection, Excel Import & Bảng Con
+
+- Quét navigation bằng reflection bắt buộc loại trừ property có `[NotMapped]`.
+- Gỡ phần tử khỏi collection con đang được EF Core track với FK bắt buộc sẽ làm đứt quan hệ và cố set FK về null; phải dùng đồng bộ xóa mềm do aggregate sở hữu theo `[skill:cogain-child-sync]`.
+- Cột snapshot non-null trong DB đòi hỏi phủ đủ resolver/mapping và fallback hợp lệ về nghiệp vụ; `?? string.Empty` chỉ tránh null chứ không chứng minh đúng nghiệp vụ.
 - Batch Excel import không kích hoạt tra cứu snapshot gRPC khi cột mã tham chiếu để trống: giữ `Guid.Empty` ở provisional graph và bảo lưu nguyên trạng ID/snapshot cũ khi update.
 
-## Screen Archetypes & Shared UI
+## Screen Archetypes & Giao Diện Dùng Chung
 
-- Dùng [skill:cogain-screen-archetypes] làm chuẩn duy nhất cho báo cáo kỳ lương (`PayrollReportQueryHelper`, `ReportExecution`, `ReportLayout`) và thao tác dòng `CustomTable` `rowActions` (`RowActionsConfig`).
-- Cấm import chéo `_components`/`-components` giữa các route; helper tiền/ngày lấy từ `@shared/lib`.
+- Dùng `[skill:cogain-screen-archetypes]` và `.agent/contracts/archetype-exemplars.json` làm chuẩn duy nhất cho CRUD list, bảng con, báo cáo kỳ lương (`PayrollReportQueryHelper`, `ReportExecution`, `ReportLayout`) và luồng HR Confirm.
 
-## React Feedback Loops
+## React Feedback Loops & Radix UI
 
-- Effects that call parent state or `form.setValue` must be idempotent.
-- Do not depend on unstable inline callbacks or freshly created table instances when the effect calls parent `setState`.
-- Radix Select may emit the current empty value during mount; suppress identical emissions and use `undefined` when empty is not an option.
-- Radix Checkbox inside a form dispatches a bubbling native click through its hidden input. Do not add a wrapping click-toggle; use a label.
-
-## Turn an Incident Into a Guardrail
-
-When the same failure family recurs:
-
-1. Add a regression test or deterministic architecture/static check where possible.
-2. Update the owning project skill with the smallest decision-changing rule.
-3. Keep the incident details in `ERRORS.md`; do not copy the narrative into every prompt.
-
-## Verification
-
-- The root cause, not only the symptom, is covered.
-- A test or static check fails on the old behavior when practical.
-- New guidance has one clear owner and is linked rather than duplicated.
+- `useEffect` gọi `setState` của cha hoặc `form.setValue` bắt buộc phải idempotent và không phụ thuộc callback inline hoặc instance table vừa tạo mới mỗi render.
+- Radix `Select` có thể phát lại giá trị rỗng hiện tại lúc mount; chặn phát trùng và dùng `undefined` khi rỗng không phải là một option hợp lệ.
+- Radix `Checkbox` trong form phát sự kiện click nổi bọt qua hidden input gốc; không bọc thêm handler click-toggle bên ngoài, chỉ dùng `<label>`.

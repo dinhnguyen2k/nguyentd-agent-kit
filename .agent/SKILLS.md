@@ -9,10 +9,9 @@
 - Source code and `AI_RULES.md` remain higher-priority truth sources.
 - Quarantined skills live under `.agent/quarantine/skills` and are not part of active auto-discovery.
 
-
 ## Project-Native (8)
 
-- `cogain-agent-gotchas`: Prevents recurring Cogain-specific mistakes learned from .planning/errors/ERRORS.md. Use during debugging, review, or implementation near AutoFilter, API integration, EF reflection/child relations, React Hook Form, Radix controls, and shared tables.
+- `cogain-agent-gotchas`: Prevents recurring Cogain-specific semantic mistakes learned from .planning/errors/ERRORS.md. Use during debugging, review, or implementation near AutoFilter, API integration, EF reflection/child relations, React Hook Form, Radix controls, and shared tables.
 - `cogain-baseservice-hooks`: Extends Cogain BaseService through supported hooks without replacing shared CRUD orchestration. Use when changing CRUD, AutoFilter, create/update/delete lifecycles, dropdowns, or shared service behavior in backend/**.
 - `cogain-child-sync`: Implements aggregate-owned soft-delete synchronization for Cogain EF Core child collections. Use when adding or changing nested update DTOs, ISyncsChildren, BuildIncomingGraph, SyncChildCollection, or legacy ReconcileCollections behavior.
 - `cogain-excel-import-export`: Extends Cogain BaseService Excel import/export through supported hooks, ClosedXML conventions, validation, batch lookup, and compensation rules. Use for ImportFromExcel, ExportTemplateAsync, ExportDataAsync, templates, or spreadsheet mappings.

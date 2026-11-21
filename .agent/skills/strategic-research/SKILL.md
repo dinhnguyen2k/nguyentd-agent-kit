@@ -4,7 +4,6 @@ description: Analyzes complex technical or business decisions through evidence, 
 metadata:
   version: "4.1.0-fractal"
   domain: "Strategy & Wisdom"
-  dna_ref: ".shared/ai-master/RESEARCH_PROTOCOL.md"
   rule_ref: "rules/GEMINI.md"
   scale_impact: "Strict (Enterprise only)"
 ---

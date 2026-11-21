@@ -3,6 +3,7 @@ trigger: glob
 glob: "**/*.{cs,csproj,sql,ts,tsx,proto}"
 description: "Cogain business invariants: money, inventory, permission, legal records, error handling, forbidden shortcuts."
 condition: ["**/*.cs", "**/*.csproj", "**/*.sql", "**/*.ts", "**/*.tsx", "**/*.proto"]
+paths: ["**/*.cs", "**/*.csproj", "**/*.sql", "**/*.ts", "**/*.tsx", "**/*.proto"]
 interruptMode: never
 ---
 

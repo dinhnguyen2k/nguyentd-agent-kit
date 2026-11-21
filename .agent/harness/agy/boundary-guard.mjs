@@ -8,9 +8,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluateBoundaryChecks } from "../../scripts/agent-boundary-guard.mjs";
+import { prepareDispatchAssignment } from "../../scripts/dispatch-contract.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GUARD_REL = join(".agent", "scripts", "agent-boundary-guard.mjs");
+const SESSIONS_REL = join(".agent", "scratch", ".runtime", "agy-sessions.json");
+const CODING_SPECIALISTS = new Set(["backend-specialist", "frontend-specialist", "test-author"]);
+const SWARM_SPECIALIST_RE = /\.agents?\/agents\/(backend-specialist|frontend-specialist|test-author)\.md/i;
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 const WRITE_TOOLS = new Set([
   "write_file",
@@ -31,7 +35,7 @@ const MCP_FS_WRITE_TOOLS = new Set([
   "move_file",
   "create_directory",
 ]);
-const MCP_FS_TOOL_RE = /^mcp_+filesystem_(write_file|append_file|edit_file|move_file|create_directory)$/;
+const MCP_FS_TOOL_RE = /^mcp_+filesystem_+(write_file|append_file|edit_file|move_file|create_directory)$/;
 const EVAL_WRITE_PATTERNS = [
   /\bwrite\(\s*["'`]([^"'`]+)["'`]/g,
   /\bBun\.write\(\s*["'`]([^"'`]+)["'`]/g,
@@ -156,6 +160,69 @@ function toChecks(toolName, args, baseCwd) {
   return [];
 }
 
+function lookupSessionAgentName(root, conversationId) {
+  if (!conversationId) return null;
+  try {
+    const file = join(root, SESSIONS_REL);
+    if (!existsSync(file)) return null;
+    const data = JSON.parse(readFileSync(file, "utf8"));
+    return str(data?.conversations?.[conversationId]?.role);
+  } catch {
+    return null;
+  }
+}
+
+function handleDispatchGate(toolName, args, root) {
+  const isSubagent = toolName === "invoke_subagent";
+  const isSwarmAdd = toolName === "swarm" && String(args.action || "").toLowerCase() === "add";
+  if (!isSubagent && !isSwarmAdd) return null;
+
+  let textKey;
+  let text;
+  if (isSubagent) {
+    const typeName = (
+      str(args.TypeName) ??
+      str(args.typeName) ??
+      str(args.subagent_type) ??
+      str(args.agent_type) ??
+      ""
+    ).toLowerCase();
+    if (!CODING_SPECIALISTS.has(typeName)) return null;
+    textKey = str(args.Prompt) !== null ? "Prompt" : "prompt";
+    text = str(args[textKey]) ?? "";
+  } else {
+    textKey = "brief";
+    text = str(args.brief) ?? "";
+    const swarmName = (str(args.name) ?? "").toLowerCase();
+    if (!SWARM_SPECIALIST_RE.test(text) && !CODING_SPECIALISTS.has(swarmName)) return null;
+  }
+
+  const lines = text
+    .trim()
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 2 && lines.every((line) => /^contract_(?:ref|version):/.test(line))) {
+    try {
+      const hydrated = prepareDispatchAssignment(root, text);
+      return { decision: "allow", overwrite: { [textKey]: hydrated } };
+    } catch (err) {
+      return { decision: "deny", reason: `[dispatch-gate] ${err.message}` };
+    }
+  }
+
+  const hasScope = /\ballowed_paths\b|\bcontract_ref:/i.test(text);
+  const hasAcceptance = /\bacceptance\b|tiêu\s+chí\s+nghiệm\s+thu/i.test(text);
+  if (!hasScope || !hasAcceptance) {
+    return {
+      decision: "deny",
+      reason:
+        "Giao việc cho specialist viết code bắt buộc phải ghi rõ phạm vi đường dẫn (`allowed_paths` hoặc `contract_ref:`) VÀ tiêu chí nghiệm thu (`acceptance` hoặc `Tiêu chí nghiệm thu`).",
+    };
+  }
+  return { decision: "allow" };
+}
+
 try {
   const raw = readFileSync(0, "utf8");
   if (!raw.trim()) allow();
@@ -169,6 +236,17 @@ try {
   if (!root) allow();
 
   const args = parseJsonObject(toolCall.args);
+
+  const dispatchResult = handleDispatchGate(toolName, args, root);
+  if (dispatchResult) {
+    if (dispatchResult.decision === "deny") deny(dispatchResult.reason);
+    if (dispatchResult.overwrite) {
+      process.stdout.write(`${JSON.stringify(dispatchResult)}\n`);
+      process.exit(0);
+    }
+    allow();
+  }
+
   const baseCwd = str(event.cwd) ?? workspaceFirst ?? root;
   const rawChecks = toChecks(toolName, args, baseCwd);
   if (rawChecks.length === 0) allow();
@@ -187,11 +265,13 @@ try {
 
   if (checks.length === 0) allow();
 
+  const convId = str(event.conversationId);
   const agentName =
     str(event.agentName) ??
     str(event.agentType) ??
     str(event.subagentType) ??
-    str(parseJsonObject(event.agent).name);
+    str(parseJsonObject(event.agent).name) ??
+    lookupSessionAgentName(root, convId);
 
   const reason = evaluateBoundaryChecks(checks, { root, agentName });
   if (reason) deny(reason);

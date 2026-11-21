@@ -5,7 +5,7 @@ condition:
   - '\b(Unauthorized|Forbid|Conflict)\s{0,3}\('
   - 'StatusCode\(\s{0,3}(401|403|409)\b'
   - '(?i)(password|secret|api_?key|access_?token)\s{0,3}=\s{0,3}"[^"\s]{8,}"'
-scope: "tool:edit(backend/**/*.cs), tool:write(backend/**/*.cs)"
+scope: "tool:edit(backend/**/*.cs), tool:write(backend/**/*.cs), tool:apply_patch(backend/**/*.cs)"
 interruptMode: tool-only
 ---
 

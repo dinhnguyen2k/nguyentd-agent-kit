@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { evaluateBoundaryChecks } from "../../../../scripts/agent-boundary-guard.mjs";
+import { splitApplyPatchIntoFileChecks } from "../../../../scripts/agent-lifecycle-core.mjs";
 
 type GuardCheck = {
 	tool_name: "Bash" | "Write";
@@ -31,7 +32,7 @@ const EVAL_WRITE_PATTERNS = [
 	/\bPath\(\s*["']([^"']+)["']\s*\)\.write_(?:text|bytes)\(/g,
 ];
 const EVAL_SPAWNS_PROCESS = /\bsubprocess\b|\bos\.system\b|\bBun\.\$|\$`|\bspawn(?:Sync)?\(|\bexec(?:Sync)?\(|\btool\.bash\b/;
-const MCP_FS_WRITE = /^mcp__filesystem_(write_file|edit_file|move_file|create_directory)$/;
+const MCP_FS_WRITE = /^mcp_+filesystem_+(write_file|append_file|edit_file|move_file|create_directory)$/;
 
 function findRepoRoot(start: string): string | null {
 	for (let dir = resolve(start); ; dir = dirname(dir)) {
@@ -89,6 +90,12 @@ function toChecks(toolName: string, input: Record<string, unknown>): GuardCheck[
 	}
 	if (toolName === "edit" || toolName === "apply_patch") {
 		const text = Object.values(input).filter((v): v is string => typeof v === "string").join("\n");
+		const patchChecks = splitApplyPatchIntoFileChecks(text) as GuardCheck[];
+		if (patchChecks.length > 0) {
+			const covered = new Set(patchChecks.map(c => c.tool_input.file_path).filter((p): p is string => Boolean(p)));
+			const extraPaths = argPaths(input).filter(p => !covered.has(p));
+			return [...patchChecks, ...writes(extraPaths)];
+		}
 		const found = EDIT_PATH_PATTERNS.flatMap(p => [...text.matchAll(p)].map(m => m[1].trim()));
 		const newContent = extractPatchAddedContent(input, text);
 		return writes([...found, ...argPaths(input)], newContent);

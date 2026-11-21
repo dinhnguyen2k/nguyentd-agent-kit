@@ -3,6 +3,7 @@ trigger: glob
 glob: 'backend/**/*'
 description: "Cogain backend domain rules: BaseService hooks, Result<T> error contract, permissions, EF Core/gRPC performance, logging."
 condition: ["backend/**/*"]
+paths: ["backend/**/*"]
 interruptMode: never
 ---
 
@@ -25,7 +26,7 @@ interruptMode: never
 2. **Shared logic**: Dùng `backend/src/BuildingBlocks/*` (`Contracts`, `Infrastructure`, `Shared`).
 3. **Gateway**: Định cấu hình thông qua `OcelotApiGw`.
 4. **BaseService Hooks**: Cấm override phương thức gốc của `BaseService`. Bắt buộc tùy biến qua các hook (`BeforeCreateAsync`, `AfterMapperAsync`, `BeforeUpdateAsync`...).
-5. **Excel Import/Export**: Xem quy tắc chi tiết tại [.agent/rules/backend-excel-import.md](file:///home/nguyentd/cogain/cogain-core/.agent/rules/backend-excel-import.md).
+5. **Excel Import/Export**: Xem quy tắc chi tiết tại [.agent/rules/backend-excel-import.md](backend-excel-import.md).
 6. **Cơ chế Snapshot cho chức năng mới**: Triển khai chức năng mới bắt buộc làm theo cơ chế snapshot chuẩn (`[SnapshotReference]`, `ISnapshotPolicy`, `ISnapshotLifecycleService`) khi tham chiếu dữ liệu liên service. Cấm fetch hoặc gán code/name thủ công trong luồng ghi.
 
 ---
@@ -59,7 +60,7 @@ interruptMode: never
    - Cấm hardcode secrets/tokens/API keys.
    - Cấm bypass auth/authz trong code.
 4. **Edit-guard parity**: Mọi đường ghi thay thế cho CRUD chuẩn (bulk update, endpoint update từng tab, job nền) phải chạy đúng guard nghiệp vụ như luồng `BaseService.Update` — `ValidateCanEditAsync`, khoá sau duyệt (`ApprovedDate`), trạng thái WorkItem. Guard chỉ đặt trong `BeforeUpdateAsync` là chưa đủ; endpoint nào không đi qua đó phải gọi guard tường minh.
-   - **Ngoại lệ có chủ đích**: luồng import Excel. Mỗi service tự quyết định và ghi rõ; không tự thêm guard vào luồng import đang chạy. Xem [backend-excel-import.md §11.1](file:///home/nguyentd/cogain/cogain-core/.agent/rules/backend-excel-import.md).
+   - **Ngoại lệ có chủ đích**: luồng import Excel. Mỗi service tự quyết định và ghi rõ; không tự thêm guard vào luồng import đang chạy. Xem [backend-excel-import.md §11.1](backend-excel-import.md).
 
 ---
 

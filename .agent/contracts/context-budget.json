@@ -4,8 +4,7 @@
   "base_files": [
     "AGENTS.md",
     "AI_RULES.md",
-    ".agent/rules/GEMINI.md",
-    ".agent/START_HERE.md"
+    ".agent/rules/GEMINI.md"
   ],
   "profiles": {
     "backend-specialist": {

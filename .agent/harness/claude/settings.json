@@ -3,13 +3,47 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent|mcp__filesystem__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/scripts/agent-boundary-guard.mjs\"",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
             "timeout": 10,
-            "statusMessage": "Kiểm tra ranh giới agent..."
+            "statusMessage": "Kiểm tra ranh giới & contract..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|Task|Agent|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
+            "timeout": 5
           }
         ]
       }

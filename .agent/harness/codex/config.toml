@@ -1,0 +1,12 @@
+# Cấu hình mặc định OpenAI Codex CLI cho dự án Cogain.
+# Giữ các khóa chuẩn TOML tối giản để tương thích cả bản Codex CLI mới và cũ.
+
+# Giới hạn ghi mặc định trong workspace hiện tại (không tự ghi ra ngoài repo).
+sandbox_mode = "workspace-write"
+
+[features]
+# Bật hệ thống hooks của Codex CLI (PreToolUse qua .codex/hooks.json).
+# Lưu ý: các phiên bản Codex CLI cũ chưa hỗ trợ khóa này có thể bỏ qua hoặc cần nâng cấp CLI;
+# khi chạy không có hook, luôn đối chiếu staged diff bằng:
+#   node .agent/scripts/agent-lifecycle-core.mjs --check-staged --sandbox
+hooks = true

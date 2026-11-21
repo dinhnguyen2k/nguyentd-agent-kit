@@ -99,10 +99,63 @@ render_agents_dir() {
   done
 }
 
+# has_paths_frontmatter <file.md>
+# Trả về 0 nếu YAML frontmatter đầu tệp có khai báo trường `paths:`.
+has_paths_frontmatter() {
+  awk '
+    BEGIN { in_fm=0; closed=0; found=0 }
+    NR==1 && $0 ~ /^---[[:space:]]*$/ { in_fm=1; next }
+    in_fm && !closed && $0 ~ /^---[[:space:]]*$/ { closed=1; exit }
+    in_fm && !closed && $0 ~ /^paths:/ { found=1 }
+    END { exit (closed && found) ? 0 : 1 }
+  ' "$1"
+}
+
 echo "== claude =="
 link ".claude/settings.json"        "../.agent/harness/claude/settings.json"
 link ".claude/skills"               "../.agent/skills"
-link ".claude/rules"                "../.agent/rules"
+if [[ -L ".claude/rules" ]]; then
+  if (( CHECK_ONLY )); then
+    echo "  LINK    .claude/rules là symlink cả thư mục (gây bơm tràn rules), mong đợi thư mục chứa symlink theo từng file có paths:"
+    fail=1
+  else
+    rm -f ".claude/rules"
+    mkdir -p ".claude/rules"
+    echo "  replaced symlink .claude/rules -> thư mục chứa symlink có paths:"
+  fi
+elif [[ -e ".claude/rules" && ! -d ".claude/rules" ]]; then
+  echo "  FILE    .claude/rules tồn tại nhưng không phải thư mục"
+  fail=1
+elif [[ ! -e ".claude/rules" ]]; then
+  if (( CHECK_ONLY )); then
+    echo "  MISSING .claude/rules"
+    fail=1
+  else
+    mkdir -p ".claude/rules"
+  fi
+fi
+if [[ -d ".claude/rules" && ! -L ".claude/rules" ]]; then
+  for rule_file in .agent/rules/*.md; do
+    [[ -f "$rule_file" ]] || continue
+    if has_paths_frontmatter "$rule_file"; then
+      name="$(basename "$rule_file")"
+      link ".claude/rules/$name" "../../.agent/rules/$name"
+    fi
+  done
+  for existing_rule in .claude/rules/*; do
+    [[ -e "$existing_rule" || -L "$existing_rule" ]] || continue
+    name="$(basename "$existing_rule")"
+    if [[ ! -f ".agent/rules/$name" ]] || ! has_paths_frontmatter ".agent/rules/$name"; then
+      if (( CHECK_ONLY )); then
+        echo "  STALE   $existing_rule (không có paths: hoặc không còn trong .agent/rules)"
+        fail=1
+      else
+        rm -f "$existing_rule"
+        echo "  removed $existing_rule"
+      fi
+    fi
+  done
+fi
 if [[ -d ".claude/commands" && ! -L ".claude/commands" ]] && (( ! CHECK_ONLY )); then
   rm -rf ".claude/commands"
   echo "  removed directory .claude/commands -> thay bằng symlink"
@@ -124,9 +177,11 @@ for stale in tech-lead orchestrator command-agent-creator; do
   fi
 done
 echo "== codex =="
-link ".codex/agents"    "../.agent/agents"
-link ".codex/skills"    "../.agent/skills"
-link ".codex/workflows" "../.agent/workflows"
+link ".codex/config.toml" "../.agent/harness/codex/config.toml"
+link ".codex/hooks.json"  "../.agent/harness/codex/hooks.json"
+link ".codex/agents"      "../.agent/agents"
+link ".codex/skills"      "../.agent/skills"
+link ".codex/workflows"   "../.agent/workflows"
 
 echo "== antigravity / generic (.agents) =="
 link ".agents/hooks.json" "../.agent/harness/agy/hooks.json"
@@ -171,11 +226,11 @@ link ".agent/GEMINI.md" "../AGENTS.md"
 
 echo
 echo "Cưỡng chế ranh giới theo harness:"
-echo "  claude      : hook thật (.agent/harness/claude/settings.json -> PreToolUse)"
+echo "  claude      : hook thật (.agent/harness/claude/settings.json -> hook-entry.mjs: PreToolUse/PostToolUse/PreCompact/SubagentStop)"
+echo "  codex       : hook thật (.agent/harness/codex/hooks.json -> hook-entry.mjs: PreToolUse) + config.toml"
 echo "  omp         : hook thật (.agent/harness/omp/hooks/pre/boundary-guard.ts -> tool_call)"
-echo "  agy         : hook thật (.agent/harness/agy/hooks.json -> PreToolUse)"
-echo "  codex       : chưa có hook, dùng CLI mode:"
-echo "                node .agent/scripts/agent-boundary-guard.mjs --check-command \"<cmd>\""
+echo "  agy         : hook thật (.agent/harness/agy/hooks.json -> PreToolUse/PostToolUse/PreInvocation/Stop)"
+echo "  git/cli     : node .agent/scripts/agent-lifecycle-core.mjs --check-staged [--sandbox]"
 echo
 if (( fail )); then
   echo "KHÔNG ĐỒNG BỘ. Chạy lại không kèm --check để sửa."

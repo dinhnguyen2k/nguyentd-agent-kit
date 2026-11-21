@@ -1,66 +1,63 @@
 ---
 trigger: glob
-glob: "**/*.{test,spec}.{js,ts,jsx,tsx,py,rs,go,java}"
-description: "Testing standard for test/spec files: pyramid, structure, and assertions."
-condition: ["**/*.test.js", "**/*.test.ts", "**/*.test.jsx", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.ts", "**/*.spec.jsx", "**/*.spec.tsx", "**/*.test.py", "**/*.spec.py", "**/*.test.rs", "**/*.spec.rs", "**/*.test.go", "**/*.spec.go", "**/*.test.java", "**/*.spec.java"]
+glob: "**/*.{test,spec}.{js,ts,jsx,tsx,cs}"
+description: "Testing standard for test/spec files: boundaries (AI_RULES.md §2, §4, §6, R1/R2), xUnit/Vitest/Playwright structure, and mocking."
+condition: ["**/*.test.js", "**/*.test.ts", "**/*.test.jsx", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.ts", "**/*.spec.jsx", "**/*.spec.tsx", "**/*Tests.cs", "**/*Test.cs"]
+paths: ["**/*.test.js", "**/*.test.ts", "**/*.test.jsx", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.ts", "**/*.spec.jsx", "**/*.spec.tsx", "**/*Tests.cs", "**/*Test.cs"]
 interruptMode: never
 ---
 
 # TESTING-STANDARD.MD - Quality Assurance Protocol
 
-> **Mục tiêu**: "Code không Test là Code chết". Đảm bảo mọi tính năng đều chạy đúng như thiết kế trước khi ra Production.
+> **Nguồn sự thật**: `AI_RULES.md` §2, §4, §6 và `.agent/rules/test-enforcement.md`.
 
 ---
 
-## 📐 1. The Testing Pyramid (Mô hình Kim tự tháp)
+## ⛔ 0. Ranh Giới Vai Trò & Thực Thi (`ON-DEMAND ONLY`, `R1`/`R2`)
 
-Chúng ta tuân thủ tỷ lệ vàng trong kiểm thử:
-
-1.  **Unit Tests (70%)**:
-    *   Test từng hàm function/method nhỏ nhất.
-    *   Yêu cầu: Chạy cực nhanh (< 1ms/test), không gọi IO/Network thật (phải Mock).
-2.  **Integration Tests (20%)**:
-    *   Test sự kết hợp giữa các module (API + DB, Component + Store).
-    *   Yêu cầu: Dùng Docker Testing Db hoặc In-memory DB.
-3.  **E2E Tests (10%)**:
-    *   Test luồng người dùng thật (User Journey).
-    *   Công cụ: Playwright, Cyprus.
+- **CẤM `backend-specialist` / `frontend-specialist` chạy test hoặc sửa test**:
+  - Luật `R1`: `dotnet test`, `vitest`, `jest`, `playwright test`, `pnpm/npm/yarn test` chỉ dành cho `verifier` hoặc `test-author`, và **chỉ chạy khi người dùng yêu cầu rõ ràng (`ON-DEMAND ONLY`)**.
+  - Luật `R2`: chỉ `test-author` được tạo hoặc sửa file trong `backend/tests/**`, `frontend/**/__tests__/**`, `*.test.*`, `*.spec.*`.
+  - Theo `AI_RULES.md` §6, luồng tự động tạo/spawn `test-author` đang **tạm khóa**; kiểm thử nghiệp vụ do người dùng manual test trừ khi được yêu cầu đích danh.
+- **Không tự ý chạy build/lint/test**: không có yêu cầu rõ ràng từ người dùng thì bàn giao kèm `Validation: not run - not requested`.
 
 ---
 
-## 📝 2. Naming Conventions (Quy tắc đặt tên)
+## 📐 1. The Testing Pyramid & Cogain Stack
 
-*   **File Name**: `*.test.ts` hoặc `*.spec.ts`.
-*   **Structure**:
-    ```typescript
-    describe('AuthService', () => {           // Tên Module
-      describe('login()', () => {             // Tên Function
-        it('should return token when creds are valid', () => { // Hành vi mong đợi
-          // ...
-        });
-        
-        it('should throw 401 when password wrong', () => {     // Edge case
-          // ...
-        });
+1. **Unit Tests (70%)**:
+   - Backend: **xUnit** + FluentAssertions + Moq + SQLite in-memory (`CoreDbTestBase`).
+   - Frontend: **Vitest** + `@testing-library/react` + `jsdom` (không gọi IO/Network thật).
+2. **Integration Tests (20%)**:
+   - Backend: **xUnit** + PostgreSQL thật qua `IntegrationTestBase` (bắt buộc cho hành vi phụ thuộc DB như case-sensitivity, JSON column, `EF.Functions`).
+3. **E2E Tests (10%)**:
+   - Frontend: **Playwright** (kịch bản đăng nhập Authentik và luồng người dùng theo `.agent/skills/playwright-skill`), chạy chỉ khi người dùng yêu cầu.
+
+---
+
+## 📝 2. Naming & Structure
+
+- **Frontend**: `*.test.ts(x)` hoặc `*.spec.ts(x)` đặt trong `__tests__/` hoặc `src/test/`.
+- **Backend**: `*Tests.cs` đặt trong `backend/tests/{Service}.{UnitTests|IntegrationTests}/`.
+- **Structure (Vitest)**:
+  ```typescript
+  describe('AuthService', () => {
+    describe('login()', () => {
+      it('should return token when credentials are valid', () => {
+        // Arrange - Act - Assert
+      });
+
+      it('should throw 401 when password is wrong', () => {
+        // Edge case
       });
     });
-    ```
+  });
+  ```
 
 ---
 
 ## 🛠️ 3. Mocking Strategy
 
-*   **External Services**: BẮT BUỘC Mock các 3rd-party API (Stripe, SendGrid, Google Auth). Không được gọi API thật trong test.
-*   **Database**:
-    *   Với Unit Test: Repository Pattern -> Mock Repository.
-    *   Với Integration Test: Dùng Test Database (SQLite/Docker).
-
----
-
-## 📊 4. Coverage Requirements
-
-*   **Core Logic**: > 80% Statement Coverage.
-*   **Utils/Helpers**: > 90% Coverage.
-*   **UI Components**: Test behavior, đừng test implementation detail.
-
-> **Quy tắc vàng:** "Red - Green - Refactor". Viết test fail trước, sau đó viết code để pass, cuối cùng là tối ưu.
+- **External Services**: Mock các 3rd-party API / gRPC / message broker bên ngoài; không gọi API thật trong unit test.
+- **Database**: Unit test có thể mock repository hoặc dùng SQLite (`CoreDbTestBase`); integration test dùng PostgreSQL (`IntegrationTestBase`).
+- **Chống test xanh giả**: Không hardcode fixture vào code production, không nới `catch`, không sửa/xóa assertion hay thêm `Skip` để ép test xanh; mâu thuẫn spec thì báo `test-spec-conflict`.

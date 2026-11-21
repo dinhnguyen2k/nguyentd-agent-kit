@@ -13,7 +13,7 @@
     },
     "omnisharp": { "disabled": true },
     "typescript-language-server": {
-      "warmupTimeoutMs": 120000,
+      "warmupTimeoutMs": 30000,
       "initOptions": {
         "hostInfo": "omp-coding-agent",
         "maxTsServerMemory": 8192,

@@ -7,7 +7,7 @@ condition:
   - 'eslint-disable[^\n]{0,80}react-hooks/exhaustive-deps'
   - 'console\.log\('
   - '["'']X-Employee-Id["'']'
-scope: "tool:edit(frontend/**/*.ts), tool:write(frontend/**/*.ts), tool:edit(frontend/**/*.tsx), tool:write(frontend/**/*.tsx)"
+scope: "tool:edit(frontend/**/*.ts), tool:write(frontend/**/*.ts), tool:edit(frontend/**/*.tsx), tool:write(frontend/**/*.tsx), tool:apply_patch(frontend/**/*.ts), tool:apply_patch(frontend/**/*.tsx)"
 interruptMode: tool-only
 ---
 

@@ -47,11 +47,11 @@ $ARGUMENTS
     - *Kiểm tra*: Scope check nhanh; đọc build/lint evidence hiện có hoặc chạy đúng action/scope được cấp.
   - 🟡 **Medium Risk** (Thêm feature mới nội bộ, sửa service logic, schema DB không breaking):
     - *Mode*: Specialist Audit
-    - *Skills*: `code-reviewer`, `agent-backend-patterns` / `agent-frontend-patterns`
+    - *Skills*: `code-reviewer`, `agent-backend-patterns` / `cogain-react-state-effects`
     - *Kiểm tra*: Clean Architecture, Security inspection cơ bản, đọc unit test evidence vùng bị tác động; scan/test execution cần quyền riêng.
   - 🔴 **High Risk** (Core auth, payment, data migration, breaking API, security patch, shared modules):
     - *Mode*: Full Audit
-    - *Skills*: `vulnerability-scanner`, `architecture-patterns`
+    - *Skills*: `security`, `dotnet-architect`
     - *Kiểm tra*: Deep security inspection và evidence regression/edge/failure cases; vulnerability scan, full regression và stress test chỉ chạy khi được cấp đúng scope.
 
 ---
@@ -60,18 +60,18 @@ $ARGUMENTS
 - **Execution role**: `backend-specialist` / `frontend-specialist`
 - **Nguyên tắc**: Không load tràn lan codebase. Chỉ Lazy Load context khi có **Finding** (Lỗi/Nghi vấn).
 - **Skills Nạp Theo Loại Finding**:
-  - 🐞 *Nghi vấn Logic / Code quality*: Nạp `debugging-master`, `clean-code`.
-  - 🔒 *Nghi vấn Bảo mật (Security)*: Nạp `vulnerability-scanner`, `determine_threat_model`.
+  - 🐞 *Nghi vấn Logic / Code quality*: Nạp `debug`, `clean-code`.
+  - 🔒 *Nghi vấn Bảo mật (Security)*: Nạp `security`, `determine_threat_model`.
   - 🗄️ *Nghi vấn Database / Migration*: Nạp `postgresql`, `database-optimizer`.
-  - ⚡ *Nghi vấn Hiệu năng (Performance)*: Nạp `performance-profiling`, `performance-engineer`.
+  - ⚡ *Nghi vấn Hiệu năng (Performance)*: Nạp `performance-profiling`.
 
 ---
 
 ## 🟣 STEP 4: Target-Focused Testing
 **Execution role**: `verifier` (đọc/chạy evidence được phép), `test-author` (viết test nếu được yêu cầu riêng)
 - **Skills**:
-  - *Backend Testing*: `tdd-workflow`, `unit-testing-test-generate`
-  - *Frontend & E2E Testing*: `e2e-testing-patterns`, `playwright-skill`, `webapp-testing`
+  - *Backend Testing*: `tdd-workflow`, `testing-patterns`
+  - *Frontend & E2E Testing*: `playwright-skill`, `webapp-testing`
 - **Thực hiện**: Đối chiếu test/evidence khoanh vùng tác động cho 3 kịch bản (**Happy Path**, **Edge Cases**, **Failure Cases**).
 - Chỉ chạy test khi user yêu cầu rõ; audit không cấp quyền specialist sửa test hoặc tự chạy validation.
 

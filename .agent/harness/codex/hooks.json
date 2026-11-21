@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|shell|exec_command|.*apply_patch.*|Edit|Write|mcp__filesystem__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".agent/harness/codex/hook-entry.mjs\"",
+            "timeout": 10,
+            "statusMessage": "Kiểm tra ranh giới Codex..."
+          }
+        ]
+      }
+    ]
+  }
+}

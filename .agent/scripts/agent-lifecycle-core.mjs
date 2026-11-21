@@ -1,0 +1,636 @@
+#!/usr/bin/env node
+/**
+ * Lõi chuẩn hóa đa-harness & đa-LLM (Node ESM thuần, 0 dependency ngoài).
+ * - Tách bản vá `apply_patch` (V4A) và unified diff theo từng tệp độc lập.
+ * - Chuẩn hóa tool call của Claude Code, Codex CLI, OMP, AGY sang check của `evaluateBoundaryChecks`.
+ * - Quản lý workflow-state nhẹ theo phiên và hỗ trợ CLI `--check-staged`.
+ */
+import { execFileSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { evaluateBoundaryChecks } from "./agent-boundary-guard.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const GUARD_REL = join(".agent", "scripts", "agent-boundary-guard.mjs");
+const WORKFLOW_STATE_REL = join(".agent", "scratch", ".runtime", "workflow-state");
+const STATE_TTL_MS = 24 * 60 * 60 * 1000;
+const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
+const CODE_FILE_RE = /\.(?:cs|ts|tsx)$/i;
+const SHELL_TOOLS = new Set(["Bash", "bash", "run_command", "shell", "exec_command"]);
+const FILE_TOOLS = new Set([
+  "Edit",
+  "Write",
+  "MultiEdit",
+  "NotebookEdit",
+  "edit",
+  "write",
+  "apply_patch",
+  "functions.apply_patch",
+  "write_file",
+  "edit_file",
+  "replace_file_content",
+  "multi_replace_file_content",
+  "write_to_file",
+  "create_file",
+  "delete_file",
+  "notebook_edit",
+  "ast_edit",
+]);
+const PATCH_TOOLS = new Set(["apply_patch", "functions.apply_patch", "edit", "Edit"]);
+const MCP_FS_WRITE_RE = /^mcp_+filesystem_+(write_file|append_file|edit_file|move_file|create_directory)$/;
+const MCP_FS_WRITE_METHODS = new Set(["write_file", "append_file", "edit_file", "move_file", "create_directory"]);
+const EVAL_WRITE_PATTERNS = [
+  /\bwrite\(\s*["'`]([^"'`]+)["'`]/g,
+  /\bBun\.write\(\s*["'`]([^"'`]+)["'`]/g,
+  /\bwriteFileSync\(\s*["'`]([^"'`]+)["'`]/g,
+  /\bopen\(\s*["']([^"']+)["']\s*,\s*["'][wax]/g,
+  /\bPath\(\s*["']([^"']+)["']\s*\)\.write_(?:text|bytes)\(/g,
+];
+const EVAL_SPAWNS_PROCESS = /\bsubprocess\b|\bos\.system\b|\bBun\.\$|\$`|\bspawn(?:Sync)?\(|\bexec(?:Sync)?\(|\btool\.bash\b/;
+
+function str(value) {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function cleanPathToken(raw) {
+  if (!raw) return null;
+  let cleaned = String(raw).trim();
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1);
+  }
+  cleaned = cleaned.replace(/\t.*$/, "").trim();
+  if (!cleaned || cleaned === "/dev/null") return null;
+  return cleaned;
+}
+
+function stripDiffPrefix(raw, prefix) {
+  const cleaned = cleanPathToken(raw);
+  if (!cleaned) return null;
+  if (cleaned.startsWith(prefix)) return cleaned.slice(prefix.length);
+  return cleaned;
+}
+
+function parseJsonObject(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value !== "string" || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function findRepoRoot(start) {
+  if (!start || typeof start !== "string") return null;
+  try {
+    for (let dir = resolve(start); ; dir = dirname(dir)) {
+      if (existsSync(join(dir, GUARD_REL))) return dir;
+      if (dirname(dir) === dir) return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tách bản vá `apply_patch` V4A (`*** Add/Update/Delete File`, `*** Move to`) hoặc unified diff (`+++ b/<p>`)
+ * thành danh sách check độc lập theo từng tệp; mỗi tệp chỉ giữ đúng dòng `+` của chính nó.
+ */
+export function splitApplyPatchIntoFileChecks(patchText) {
+  if (typeof patchText !== "string" || !patchText.trim()) return [];
+  const lines = patchText.replace(/\r\n/g, "\n").split("\n");
+  const checks = [];
+
+  const hasV4A = lines.some((l) => /^\*\*\* (?:Add|Update|Delete) File:\s*\S/.test(l));
+  if (hasV4A) {
+    let current = null;
+    const flushV4A = () => {
+      if (!current) return;
+      if (current.moveTo && current.moveTo !== current.path) {
+        checks.push({ tool_name: "Write", tool_input: { file_path: current.path, new_content: "" } });
+        checks.push({
+          tool_name: "Write",
+          tool_input: { file_path: current.moveTo, new_content: current.added.join("\n") },
+        });
+      } else {
+        checks.push({
+          tool_name: "Write",
+          tool_input: { file_path: current.path, new_content: current.added.join("\n") },
+        });
+      }
+      current = null;
+    };
+
+    for (const line of lines) {
+      const fileMatch = line.match(/^\*\*\* (Add|Update|Delete) File:\s*(.+)$/);
+      if (fileMatch) {
+        flushV4A();
+        const filePath = cleanPathToken(fileMatch[2]);
+        if (filePath && !URL_SCHEME.test(filePath)) {
+          current = { path: filePath, moveTo: null, added: [] };
+        }
+        continue;
+      }
+      const moveMatch = line.match(/^\*\*\* Move to:\s*(.+)$/);
+      if (moveMatch && current) {
+        const dest = cleanPathToken(moveMatch[1]);
+        if (dest && !URL_SCHEME.test(dest)) current.moveTo = dest;
+        continue;
+      }
+      if (line === "*** End Patch") {
+        flushV4A();
+        continue;
+      }
+      if (line === "*** End of File" || line === "*** Begin Patch") continue;
+      if (current && line.startsWith("+") && !/^\+\+\+\s/.test(line)) {
+        current.added.push(line.slice(1));
+      }
+    }
+    flushV4A();
+    return checks;
+  }
+
+  let current = null;
+  let inHunk = false;
+  const flushDiff = () => {
+    if (!current) return;
+    if (current.oldPath && current.oldPath !== current.path) {
+      checks.push({ tool_name: "Write", tool_input: { file_path: current.oldPath, new_content: "" } });
+    }
+    if (current.path) {
+      checks.push({
+        tool_name: "Write",
+        tool_input: { file_path: current.path, new_content: current.added.join("\n") },
+      });
+    }
+    current = null;
+    inHunk = false;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith("diff --git ")) {
+      flushDiff();
+      const gitMatch = line.match(/^diff --git\s+(?:"a\/([^"]+)"|a\/(\S+))\s+(?:"b\/([^"]+)"|b\/(\S+))/);
+      if (gitMatch) {
+        const oldPath = cleanPathToken(gitMatch[1] ?? gitMatch[2]);
+        const newPath = cleanPathToken(gitMatch[3] ?? gitMatch[4]);
+        current = {
+          path: newPath || oldPath,
+          oldPath: oldPath && newPath && oldPath !== newPath ? oldPath : null,
+          added: [],
+          hasHeaderPair: false,
+        };
+      }
+      inHunk = false;
+      continue;
+    }
+    if (current && !inHunk && line.startsWith("rename from ")) {
+      const fromPath = cleanPathToken(line.slice("rename from ".length));
+      if (fromPath) current.oldPath = fromPath;
+      continue;
+    }
+    if (current && !inHunk && line.startsWith("rename to ")) {
+      const toPath = cleanPathToken(line.slice("rename to ".length));
+      if (toPath) current.path = toPath;
+      continue;
+    }
+    if (line.startsWith("--- ") && i + 1 < lines.length && lines[i + 1].startsWith("+++ ")) {
+      const oldPath = stripDiffPrefix(line.slice(4), "a/");
+      const newPath = stripDiffPrefix(lines[i + 1].slice(4), "b/");
+      if (!current || current.hasHeaderPair) {
+        flushDiff();
+        current = { path: null, oldPath: null, added: [], hasHeaderPair: true };
+      } else {
+        current.hasHeaderPair = true;
+      }
+      current.path = newPath ?? oldPath;
+      current.oldPath = oldPath && newPath && oldPath !== newPath ? oldPath : current.oldPath;
+      inHunk = false;
+      i++;
+      continue;
+    }
+    if (!current && /^\+\+\+\s+b\/(.+)$/.test(line)) {
+      const p = stripDiffPrefix(line.slice(4), "b/");
+      if (p) current = { path: p, oldPath: null, added: [], hasHeaderPair: true };
+      inHunk = false;
+      continue;
+    }
+    if (current && line.startsWith("@@ ")) {
+      inHunk = true;
+      continue;
+    }
+    if (current) {
+      if (inHunk && line.startsWith("+")) {
+        current.added.push(line.slice(1));
+      } else if (!inHunk && line.startsWith("+") && !/^\+\+\+\s/.test(line)) {
+        current.added.push(line.slice(1));
+      }
+    }
+  }
+  flushDiff();
+
+  return checks.filter((c) => c.tool_input.file_path && !URL_SCHEME.test(c.tool_input.file_path));
+}
+
+function argPaths(args) {
+  const single = [
+    "file_path",
+    "path",
+    "notebook_path",
+    "Path",
+    "TargetFile",
+    "filePath",
+    "target_file",
+    "source",
+    "destination",
+    "uri",
+  ].map((k) => str(args[k]));
+  const many = Array.isArray(args.paths) ? args.paths.map(str) : [];
+  return [...new Set([...single, ...many].filter((p) => p !== null))];
+}
+
+function extractWrittenContent(args) {
+  return (
+    str(args.new_content) ??
+    str(args.new_string) ??
+    str(args.newText) ??
+    str(args.Content) ??
+    str(args.Replacement) ??
+    str(args.ReplacementContent) ??
+    (Array.isArray(args.edits)
+      ? args.edits.map((e) => str(e?.new_string) ?? str(e?.newText) ?? str(e?.new_content) ?? "").join("\n") || null
+      : null) ??
+    (Array.isArray(args.ReplacementChunks)
+      ? args.ReplacementChunks.map((c) => str(c?.ReplacementContent) ?? "").join("\n") || null
+      : null) ??
+    str(args.content)
+  );
+}
+
+function extractShellCommand(args) {
+  if (typeof args === "string") return args.trim() || null;
+  for (const key of ["command", "CommandLine", "cmd"]) {
+    const val = args[key];
+    if (typeof val === "string" && val.trim()) return val.trim();
+    if (Array.isArray(val) && val.length > 0) {
+      const joined = val.map((item) => String(item ?? "")).join(" ").trim();
+      if (joined) return joined;
+    }
+  }
+  return null;
+}
+
+function toWriteChecks(paths, newContent = null) {
+  return [...new Set(paths)]
+    .filter((p) => !URL_SCHEME.test(p))
+    .map((p) => ({
+      tool_name: "Write",
+      tool_input: { file_path: p, ...(newContent ? { new_content: newContent } : {}) },
+    }));
+}
+
+function resolveChecksBaseCwd(checks, baseCwd) {
+  if (!baseCwd) return checks;
+  return checks.map((check) => {
+    const p = check.tool_input?.file_path;
+    if (!p || isAbsolute(p)) return check;
+    const cleaned = p.startsWith("file://") ? p.slice(7) : p;
+    const abs = isAbsolute(cleaned) ? resolve(cleaned) : resolve(baseCwd, cleaned);
+    return { ...check, tool_input: { ...check.tool_input, file_path: abs } };
+  });
+}
+
+function readWorkflowScript(args, baseCwd) {
+  const inline = str(args.Script) ?? str(args.code) ?? "";
+  const scriptPath = str(args.ScriptPath);
+  if (!scriptPath) return inline;
+  try {
+    const resolved = isAbsolute(scriptPath) ? scriptPath : resolve(baseCwd || process.cwd(), scriptPath);
+    if (existsSync(resolved)) return `${inline}\n${readFileSync(resolved, "utf8")}`;
+  } catch {
+    /* bỏ qua nếu không đọc được file script */
+  }
+  return inline;
+}
+
+/**
+ * Chuẩn hóa payload tool call của mọi harness/LLM sang check của `evaluateBoundaryChecks`.
+ */
+export function normalizeToolChecks(toolName, input, baseCwd = null) {
+  const name = String(toolName || "").trim();
+  if (!name) return [];
+  const args = typeof input === "string" ? { patch: input, input } : parseJsonObject(input);
+
+  if (SHELL_TOOLS.has(name)) {
+    const command = extractShellCommand(typeof input === "string" ? input : args);
+    return command ? [{ tool_name: "Bash", tool_input: { command } }] : [];
+  }
+
+  if (PATCH_TOOLS.has(name)) {
+    const patchCandidate =
+      str(args.patch) ??
+      str(args.diff) ??
+      str(args.input) ??
+      str(args.raw_input) ??
+      Object.values(args).filter((v) => typeof v === "string").join("\n");
+    const split = splitApplyPatchIntoFileChecks(patchCandidate);
+    if (split.length > 0) {
+      const covered = new Set(split.map((c) => c.tool_input.file_path));
+      const extraPaths = argPaths(args).filter((p) => !covered.has(p));
+      return resolveChecksBaseCwd([...split, ...toWriteChecks(extraPaths)], baseCwd);
+    }
+  }
+
+  if (name === "write" && str(args.path)?.startsWith("xd://")) {
+    const device = args.path.match(/^xd:\/\/([\w-]+)/)?.[1] || "";
+    if (device === "ast_edit" || MCP_FS_WRITE_RE.test(device)) {
+      const mcpArgs = parseJsonObject(args.content);
+      return resolveChecksBaseCwd(toWriteChecks(argPaths(mcpArgs), extractWrittenContent(mcpArgs)), baseCwd);
+    }
+    return [];
+  }
+
+  if (FILE_TOOLS.has(name) || MCP_FS_WRITE_RE.test(name)) {
+    const checks = toWriteChecks(argPaths(args), extractWrittenContent(args));
+    return resolveChecksBaseCwd(checks, baseCwd);
+  }
+
+  if (name === "call_mcp_tool") {
+    const server = str(args.ServerName) ?? str(args.serverName) ?? str(args.server_name);
+    const mcpTool = str(args.ToolName) ?? str(args.toolName) ?? str(args.tool_name);
+    if (server === "filesystem" && mcpTool && MCP_FS_WRITE_METHODS.has(mcpTool)) {
+      const mcpArgs = parseJsonObject(args.Arguments ?? args.arguments);
+      return resolveChecksBaseCwd(toWriteChecks(argPaths(mcpArgs), extractWrittenContent(mcpArgs)), baseCwd);
+    }
+    return [];
+  }
+
+  if (name === "eval" || name === "run_workflow") {
+    const code = readWorkflowScript(args, baseCwd);
+    if (!code) return [];
+    const foundPaths = EVAL_WRITE_PATTERNS.flatMap((p) => [...code.matchAll(p)].map((m) => m[1].trim()));
+    const checks = resolveChecksBaseCwd(toWriteChecks(foundPaths), baseCwd);
+    if (EVAL_SPAWNS_PROCESS.test(code)) {
+      checks.push({ tool_name: "Bash", tool_input: { command: code.replace(/["'`]/g, " ") } });
+    }
+    return checks;
+  }
+
+  return [];
+}
+
+function stateFilePath(root, sessionId) {
+  const safeId = String(sessionId || "default").replace(/[^a-zA-Z0-9._-]/g, "_") || "default";
+  return join(root, WORKFLOW_STATE_REL, `${safeId}.json`);
+}
+
+function pruneExpiredStateFiles(stateDir, now) {
+  try {
+    if (!existsSync(stateDir)) return;
+    for (const entry of readdirSync(stateDir)) {
+      if (!entry.endsWith(".json")) continue;
+      const fullPath = join(stateDir, entry);
+      try {
+        if (now - statSync(fullPath).mtimeMs > STATE_TTL_MS) unlinkSync(fullPath);
+      } catch {
+        /* bỏ qua lỗi từng file */
+      }
+    }
+  } catch {
+    /* fail-open */
+  }
+}
+
+function loadSessionState(root, sessionId, now = Date.now()) {
+  const empty = {
+    version: 1,
+    sessionId: String(sessionId || "default"),
+    updatedAt: now,
+    editedFiles: [],
+    uncheckedFiles: [],
+    dispatches: [],
+    stopReminded: false,
+  };
+  try {
+    const file = stateFilePath(root, sessionId);
+    if (!existsSync(file)) return empty;
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    if (!parsed || typeof parsed !== "object") return empty;
+    if (now - (parsed.updatedAt || 0) > STATE_TTL_MS) return empty;
+    return {
+      version: 1,
+      sessionId: String(parsed.sessionId || sessionId || "default"),
+      updatedAt: Number(parsed.updatedAt) || now,
+      editedFiles: Array.isArray(parsed.editedFiles) ? parsed.editedFiles.filter((x) => typeof x === "string") : [],
+      uncheckedFiles: Array.isArray(parsed.uncheckedFiles) ? parsed.uncheckedFiles.filter((x) => typeof x === "string") : [],
+      dispatches: Array.isArray(parsed.dispatches) ? parsed.dispatches : [],
+      stopReminded: Boolean(parsed.stopReminded),
+    };
+  } catch {
+    return empty;
+  }
+}
+
+function saveSessionState(root, sessionId, state, now = Date.now()) {
+  try {
+    const file = stateFilePath(root, sessionId);
+    const dir = dirname(file);
+    mkdirSync(dir, { recursive: true });
+    pruneExpiredStateFiles(dir, now);
+    state.updatedAt = now;
+    writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`);
+  } catch {
+    /* fail-open tuyệt đối */
+  }
+}
+
+function toRepoRel(root, rawPath) {
+  if (!rawPath || typeof rawPath !== "string") return null;
+  const cleaned = rawPath.startsWith("file://") ? rawPath.slice(7) : rawPath;
+  const abs = isAbsolute(cleaned) ? resolve(cleaned) : resolve(root, cleaned);
+  const rel = relative(resolve(root), abs).replace(/\\/g, "/");
+  if (!rel || rel.startsWith("..") || isAbsolute(rel)) return null;
+  return rel;
+}
+
+export function recordSessionEdit(root, sessionId, filePaths) {
+  try {
+    if (!root || !sessionId) return;
+    const list = Array.isArray(filePaths) ? filePaths : [filePaths];
+    const codeFiles = list.map((p) => toRepoRel(root, p)).filter((p) => p && CODE_FILE_RE.test(p));
+    if (codeFiles.length === 0) return;
+
+    const now = Date.now();
+    const state = loadSessionState(root, sessionId, now);
+    for (const rel of codeFiles) {
+      if (!state.editedFiles.includes(rel)) state.editedFiles.push(rel);
+      if (!state.uncheckedFiles.includes(rel)) state.uncheckedFiles.push(rel);
+    }
+    state.editedFiles = state.editedFiles.slice(-60);
+    state.uncheckedFiles = state.uncheckedFiles.slice(-60);
+    state.stopReminded = false;
+    saveSessionState(root, sessionId, state, now);
+  } catch {
+    /* fail-open */
+  }
+}
+
+export function markSessionFilesChecked(root, sessionId, filePaths = null) {
+  try {
+    if (!root || !sessionId) return;
+    const now = Date.now();
+    const state = loadSessionState(root, sessionId, now);
+    if (state.uncheckedFiles.length === 0) return;
+    if (!filePaths) {
+      state.uncheckedFiles = [];
+    } else {
+      const checked = (Array.isArray(filePaths) ? filePaths : [filePaths])
+        .map((p) => toRepoRel(root, p))
+        .filter(Boolean);
+      if (checked.length === 0) return;
+      state.uncheckedFiles = state.uncheckedFiles.filter(
+        (f) => !checked.some((c) => f === c || f.startsWith(c.endsWith("/") ? c : `${c}/`))
+      );
+    }
+    saveSessionState(root, sessionId, state, now);
+  } catch {
+    /* fail-open */
+  }
+}
+
+export function recordSessionDispatch(root, sessionId, dispatchInfo) {
+  try {
+    if (!root || !sessionId || !dispatchInfo) return;
+    const now = Date.now();
+    const state = loadSessionState(root, sessionId, now);
+    const entry =
+      typeof dispatchInfo === "string"
+        ? { summary: dispatchInfo.slice(0, 160), at: now }
+        : {
+            agentType: str(dispatchInfo.agentType),
+            contractRef: str(dispatchInfo.contractRef),
+            summary: str(dispatchInfo.summary)?.slice(0, 160) ?? null,
+            at: now,
+          };
+    state.dispatches.push(entry);
+    state.dispatches = state.dispatches.slice(-20);
+    saveSessionState(root, sessionId, state, now);
+  } catch {
+    /* fail-open */
+  }
+}
+
+export function getCompactionSummary(root, sessionId) {
+  try {
+    if (!root || !sessionId) return null;
+    const state = loadSessionState(root, sessionId);
+    if (state.editedFiles.length === 0 && state.dispatches.length === 0) return null;
+    const parts = [];
+    if (state.editedFiles.length > 0) {
+      parts.push(`Tệp code đã sửa trong phiên: ${state.editedFiles.join(", ")}`);
+    }
+    if (state.uncheckedFiles.length > 0) {
+      parts.push(`Chưa kiểm tra tĩnh: ${state.uncheckedFiles.join(", ")}`);
+    }
+    if (state.dispatches.length > 0) {
+      const latest = state.dispatches
+        .slice(-5)
+        .map((d) => [d.agentType, d.contractRef || d.summary].filter(Boolean).join(": "))
+        .filter(Boolean);
+      if (latest.length > 0) parts.push(`Dispatch gần nhất: ${latest.join(" | ")}`);
+    }
+    return parts.length > 0 ? `[workflow-state] ${parts.join(". ")}.` : null;
+  } catch {
+    return null;
+  }
+}
+
+export function checkSubagentStopGate(root, sessionId, payload = {}) {
+  try {
+    if (payload?.stop_hook_active) return { decision: "allow" };
+    if (!root || !sessionId) return { decision: "allow" };
+    const now = Date.now();
+    const state = loadSessionState(root, sessionId, now);
+    if (state.stopReminded || state.uncheckedFiles.length === 0) {
+      return { decision: "allow" };
+    }
+    const list = state.uncheckedFiles.join(", ");
+    state.stopReminded = true;
+    saveSessionState(root, sessionId, state, now);
+    return {
+      decision: "block",
+      reason:
+        `[pre-handoff-gate] Bạn vừa sửa tệp code (${list}). ` +
+        `Trước khi kết thúc, kiểm tra lỗi cú pháp/type trên các tệp vừa sửa (nếu môi trường có công cụ) ` +
+        `và ghi rõ tệp đã đổi, lý do, và trạng thái kiểm tra (` +
+        `\`Validation: not run - not requested\` nếu chưa chạy build/test theo yêu cầu).`,
+    };
+  } catch {
+    return { decision: "allow" };
+  }
+}
+
+export function evaluateStagedDiff(root, options = {}) {
+  const resolvedRoot = resolve(root);
+  let diff = "";
+  try {
+    diff = execFileSync("git", ["diff", "--cached", "-U0", "--no-color"], {
+      cwd: resolvedRoot,
+      encoding: "utf8",
+      timeout: 15000,
+      maxBuffer: 32 * 1024 * 1024,
+    });
+  } catch {
+    return null;
+  }
+  if (!diff || !diff.trim()) return null;
+  const rawChecks = splitApplyPatchIntoFileChecks(diff);
+  if (rawChecks.length === 0) return null;
+  const checks = resolveChecksBaseCwd(rawChecks, resolvedRoot);
+  return evaluateBoundaryChecks(checks, {
+    root: resolvedRoot,
+    ...(options.sandbox ? { sandbox: true } : {}),
+  });
+}
+
+function runMain() {
+  const argv = process.argv.slice(2);
+  if (!argv.includes("--check-staged")) {
+    process.stderr.write("usage: agent-lifecycle-core.mjs --check-staged [--sandbox]\n");
+    process.exit(1);
+  }
+  const sandbox = argv.includes("--sandbox");
+  const root = findRepoRoot(process.cwd()) ?? findRepoRoot(HERE);
+  if (!root) process.exit(0);
+
+  const reason = evaluateStagedDiff(root, { sandbox });
+  if (reason) {
+    process.stderr.write(`[lifecycle-core --check-staged] ${reason}\n`);
+    process.exit(2);
+  }
+  process.exit(0);
+}
+
+let isMain = false;
+if (process.argv[1]) {
+  try {
+    isMain = realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    isMain = resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  }
+}
+if (isMain) {
+  runMain();
+}

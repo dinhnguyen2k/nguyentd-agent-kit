@@ -46,6 +46,7 @@ Tương đương slash command:
 | `security`        | Sợ bị hack? Quét lỗ hổng và bảo mật ngay theo chuẩn Security Senior.                                  |
 | `test`            | Sợ bug khi sửa code? Viết test tự động theo chuẩn TDD Master.                                         |
 | `update-docs`     | Tự động cập nhật tài liệu khi có tính năng mới hoặc thay đổi hệ thống.                                |
+| `upgrade-agent`   | Quy trình 6 bước bảo trì hệ thống agent, kết tinh ma sát thành luật tĩnh/mẫu chuẩn và tỉa tài liệu.   |
 
 ## Maintenance Note
 
