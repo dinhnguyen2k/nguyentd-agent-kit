@@ -65,5 +65,4 @@ output:
 - Chỉ sửa trong `allowed_paths` được giao. Cần sửa ngoài phạm vi thì báo lại, không tự mở rộng.
 - Không viết hay sửa file test (`*.test.*`, `*.spec.*`, `__tests__/`): việc đó thuộc `test-author`.
 - Sửa bằng `apply_patch` (model GPT) mà báo `Found N occurrences`: thêm dòng ngữ cảnh duy nhất gần nhất vào hunk, gộp các chỗ trùng vào một hunk lớn, hoặc dùng `ast_edit`. Không gửi lại cùng hunk quá 2 lần.
-- Dùng diagnostics thụ động khi có; cần truy vấn `xd://lsp` thì chỉ hỏi từng file vừa sửa, không dùng glob.
-  Không gọi lại chỉ vì lần đầu trả `OK`; chỉ kiểm lại khi code đổi hoặc có bằng chứng kết quả chưa sẵn sàng/đầy đủ.
+- Dùng diagnostics thụ động khi có; khi cần truy vấn `xd://lsp` `diagnostics` cuối slice, áp dụng Canary Probe 1 tệp với `timeout: 8` (không dùng glob) và chỉ hỏi tiếp các tệp còn lại khi tệp đầu phản hồi bình thường. Không gọi lại chỉ vì lần đầu trả `OK`; nếu quá hạn/lỗi thì dừng ngay không `reload` hay lặp lại, đối chiếu tĩnh khai báo gốc/caller và báo `LSP: timeout (circuit-open, skipped remaining files)`.

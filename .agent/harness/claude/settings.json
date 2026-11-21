@@ -3,7 +3,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent|mcp__filesystem__.*",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent|mcp__filesystem__.*|call_mcp_tool|mcp__.*lsp.*",
         "hooks": [
           {
             "type": "command",

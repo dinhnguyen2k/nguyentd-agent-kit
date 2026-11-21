@@ -65,4 +65,4 @@ output:
 - Chỉ sửa trong `allowed_paths` được giao. Cần sửa ngoài phạm vi thì báo lại, không tự mở rộng.
 - Bàn giao: danh sách file đã đổi, lý do từng thay đổi, `Validation: not run - not requested` (trừ khi user yêu cầu chạy), rủi ro còn lại.
 - Sửa bằng `apply_patch` (model GPT) mà báo `Found N occurrences`: thêm dòng ngữ cảnh duy nhất gần nhất vào hunk, gộp các chỗ trùng vào một hunk lớn, hoặc dùng `ast_edit`. Không gửi lại cùng hunk quá 2 lần.
-- Kiểm lỗi compile file vừa sửa bằng `xd://lsp` `diagnostics` từng file (không dùng glob).
+- Kiểm lỗi compile cuối slice bằng Canary Probe 1 tệp `xd://lsp` `diagnostics` với `timeout: 8` (không dùng glob); chỉ hỏi các tệp còn lại khi tệp đầu phản hồi bình thường. Nếu quá hạn/lỗi thì dừng ngay không `reload` hay lặp lại, đối chiếu tĩnh khai báo gốc/caller và báo `LSP: timeout (circuit-open, skipped remaining files)`.

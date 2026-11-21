@@ -130,6 +130,16 @@
       "ownerAfterCleanup": "skill-governance"
     },
     {
+      "name": "agent-frontend-patterns",
+      "reason": "Overlaps cogain-react-state-effects and Cogain frontend-development routing; includes Next.js-oriented examples outside the Vite stack.",
+      "ownerAfterCleanup": "cogain-react-state-effects"
+    },
+    {
+      "name": "agent-orchestration",
+      "reason": "External AutoGen/LangGraph multi-agent orchestration and continuous workspace scanning conflicts with Cogain orchestrator boundaries.",
+      "ownerAfterCleanup": "orchestrate"
+    },
+    {
       "name": "agent-project-guidelines-example",
       "reason": "Example stack conflicts with Cogain React/Vite and .NET architecture.",
       "ownerAfterCleanup": "none"
@@ -140,6 +150,11 @@
       "ownerAfterCleanup": "AI_RULES.md"
     },
     {
+      "name": "api",
+      "reason": "Duplicate API design skill already consolidated under api-patterns in ownerConsolidation.",
+      "ownerAfterCleanup": "api-patterns"
+    },
+    {
       "name": "api-design-principles",
       "reason": "Broad principles overlapping api-patterns.",
       "ownerAfterCleanup": "api-patterns"
@@ -148,6 +163,16 @@
       "name": "api-documentation-generator",
       "reason": "Overlaps api-documenter.",
       "ownerAfterCleanup": "api-documenter"
+    },
+    {
+      "name": "api-documenter",
+      "reason": "Generic OpenAPI documentation wrapper overlapping api-patterns.",
+      "ownerAfterCleanup": "api-patterns"
+    },
+    {
+      "name": "architecture-patterns",
+      "reason": "Generic multi-language architecture theory overlapping dotnet-architect and backend-development.",
+      "ownerAfterCleanup": "dotnet-architect"
     },
     {
       "name": "bash-linux",
@@ -185,6 +210,11 @@
       "ownerAfterCleanup": "security"
     },
     {
+      "name": "core-components",
+      "reason": "Generic Chakra/React Native Box/HStack component guidance conflicts with Cogain shared components and Tailwind/Radix primitives.",
+      "ownerAfterCleanup": "cogain-screen-archetypes"
+    },
+    {
       "name": "create",
       "reason": "Generic end-to-end app scaffold conflicts with Cogain monorepo and /plan workflow.",
       "ownerAfterCleanup": "plan"
@@ -193,6 +223,11 @@
       "name": "cro-expert-kit",
       "reason": "Marketing/conversion content unrelated to the product surface.",
       "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "csharp-pro",
+      "reason": "Duplicates csharp-latest-standards, which owns Cogain .NET 8 C# conventions.",
+      "ownerAfterCleanup": "csharp-latest-standards"
     },
     {
       "name": "database-admin",
@@ -215,6 +250,11 @@
       "ownerAfterCleanup": "database-migrations-sql-migrations"
     },
     {
+      "name": "debugging-master",
+      "reason": "Duplicates the active debug skill and /debug workflow.",
+      "ownerAfterCleanup": "debug"
+    },
+    {
       "name": "deploy",
       "reason": "Generic Vercel/server deployment flow outside Cogain self-hosted setup.",
       "ownerAfterCleanup": "none"
@@ -228,6 +268,21 @@
       "name": "document",
       "reason": "Generic document-writing wrapper overlapping docs-architect and update-docs.",
       "ownerAfterCleanup": "docs-architect"
+    },
+    {
+      "name": "documentation-templates",
+      "reason": "Generic documentation templates overlapping docs-architect and update-docs.",
+      "ownerAfterCleanup": "docs-architect"
+    },
+    {
+      "name": "dotnet-backend-patterns",
+      "reason": "Generic .NET guidance superseded by project-native agent-backend-patterns and backend-development.",
+      "ownerAfterCleanup": "agent-backend-patterns"
+    },
+    {
+      "name": "e2e-testing-patterns",
+      "reason": "Generic Playwright/Cypress E2E patterns superseded by playwright-skill and webapp-testing.",
+      "ownerAfterCleanup": "playwright-skill"
     },
     {
       "name": "enhance",
@@ -248,6 +303,16 @@
       "name": "git-collaboration-master",
       "reason": "Overlaps git-advanced-workflows.",
       "ownerAfterCleanup": "git-advanced-workflows"
+    },
+    {
+      "name": "grill-with-docs",
+      "reason": "Duplicates grilling for design stress-testing.",
+      "ownerAfterCleanup": "grilling"
+    },
+    {
+      "name": "implement",
+      "reason": "Generic implementation loop superseded by /plan workflow and Cogain specialist routing.",
+      "ownerAfterCleanup": "plan"
     },
     {
       "name": "incident-response-incident-response",
@@ -305,6 +370,11 @@
       "ownerAfterCleanup": "orchestrate"
     },
     {
+      "name": "performance-engineer",
+      "reason": "Broad performance persona overlapping performance-profiling and performance-decision-rules.",
+      "ownerAfterCleanup": "performance-profiling"
+    },
+    {
       "name": "performance-testing-review-multi-agent-review",
       "reason": "Generated multi-agent review workflow overlaps review and performance skills.",
       "ownerAfterCleanup": "performance-profiling"
@@ -355,6 +425,11 @@
       "ownerAfterCleanup": "cogain-react-state-effects"
     },
     {
+      "name": "realtime",
+      "reason": "Socket.io, WebRTC, and SSE patterns conflict with Cogain SignalR architecture.",
+      "ownerAfterCleanup": "backend-development"
+    },
+    {
       "name": "senior-architect",
       "reason": "Too broad, multi-stack persona overlaps architecture and project-native routing.",
       "ownerAfterCleanup": "architecture"
@@ -390,6 +465,11 @@
       "ownerAfterCleanup": "playwright-skill"
     },
     {
+      "name": "to-spec",
+      "reason": "Generic spec-to-plan wrapper superseded by Cogain /plan workflow and task contracts.",
+      "ownerAfterCleanup": "plan"
+    },
+    {
       "name": "typescript-advanced-types",
       "reason": "Type-level tutorial overlapping typescript-pro.",
       "ownerAfterCleanup": "typescript-pro"
@@ -405,6 +485,11 @@
       "ownerAfterCleanup": "cogain-screen-archetypes"
     },
     {
+      "name": "unit-testing-test-generate",
+      "reason": "Generic test generation prose overlapping testing-patterns.",
+      "ownerAfterCleanup": "testing-patterns"
+    },
+    {
       "name": "update",
       "reason": "IDE version update helper is unrelated to Cogain app development.",
       "ownerAfterCleanup": "none"
@@ -413,6 +498,11 @@
       "name": "visually",
       "reason": "Generic diagramming wrapper outside core Cogain engineering workflows.",
       "ownerAfterCleanup": "none"
+    },
+    {
+      "name": "vulnerability-scanner",
+      "reason": "Generic scanning checklist overlapping security skill and /security workflow.",
+      "ownerAfterCleanup": "security"
     },
     {
       "name": "writing-plans",

@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluateBoundaryChecks } from "../../scripts/agent-boundary-guard.mjs";
+import { checkLspCircuit, inferLspLanguage, isLspToolCall } from "../../scripts/agent-lifecycle-core.mjs";
 import { prepareDispatchAssignment } from "../../scripts/dispatch-contract.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -236,6 +237,12 @@ try {
   if (!root) allow();
 
   const args = parseJsonObject(toolCall.args);
+
+  if (isLspToolCall(toolName, args)) {
+    const circuit = checkLspCircuit(root, inferLspLanguage(args));
+    if (!circuit.allowed) deny(circuit.reason);
+    allow();
+  }
 
   const dispatchResult = handleDispatchGate(toolName, args, root);
   if (dispatchResult) {

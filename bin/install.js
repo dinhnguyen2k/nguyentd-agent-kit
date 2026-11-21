@@ -1,12 +1,18 @@
 #!/usr/bin/env node
 
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 const sourceDir = path.resolve(__dirname, '..');
 const targetDir = process.cwd();
-const coreMode = process.argv.length === 3 && process.argv[2] === '--core';
-const hasInvalidArguments = process.argv.length > 2 && !coreMode;
+const rawArgs = process.argv.slice(2);
+const allowedFlags = new Set(['--core', '--update', '--dry-run']);
+const hasInvalidArguments = rawArgs.some((arg) => !allowedFlags.has(arg));
+const coreMode = rawArgs.includes('--core');
+const updateMode = rawArgs.includes('--update');
+const dryRun = rawArgs.includes('--dry-run');
+
 const legacyItems = [
   'AI_RULES.md',
   'OPINION.md',
@@ -17,12 +23,15 @@ const legacyItems = [
   '.agent',
 ];
 const privateDirectoryNames = new Set([
+  '.config',
+  'archive',
   'scratch',
   'reports',
   'planning',
   'artifacts',
   'task-manifests',
   '__pycache__',
+  'node_modules',
 ]);
 const researchFiles = [
   'SKILL.md',
@@ -37,6 +46,8 @@ const projectEntryFiles = new Set([
   'ANTIGRAVITY.md',
 ]);
 
+let activeBackupDir = null;
+
 function isWithin(parent, child) {
   return child === parent || child.startsWith(`${parent}${path.sep}`);
 }
@@ -50,6 +61,27 @@ function ensureTargetOutsideKit() {
   const realTarget = fs.realpathSync(targetDir);
   if (isWithin(realSource, realTarget)) {
     throw new Error('Thư mục cài đặt không được là thư mục kit hoặc nằm bên trong kit.');
+  }
+}
+
+function getBackupRoot() {
+  if (activeBackupDir) return activeBackupDir;
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const base = coreMode && !fs.existsSync(path.join(targetDir, '.agent'))
+    ? path.join(targetDir, '.agent-core', '.backups')
+    : path.join(targetDir, '.agent', 'scratch', 'kit-backups');
+  activeBackupDir = path.join(base, stamp);
+  return activeBackupDir;
+}
+
+function backupExistingEntry(destination, relativePath, existingKind) {
+  if (dryRun) return;
+  const backupPath = path.join(getBackupRoot(), relativePath);
+  fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+  if (existingKind === 'link') {
+    fs.symlinkSync(fs.readlinkSync(destination), backupPath);
+  } else if (existingKind === 'file') {
+    fs.copyFileSync(destination, backupPath);
   }
 }
 
@@ -79,7 +111,7 @@ function sourceKind(source) {
     return { kind: 'link', linkTarget };
   }
   if (stats.isDirectory()) return { kind: 'directory' };
-  if (stats.isFile()) return { kind: 'file' };
+  if (stats.isFile()) return { kind: 'file', mode: stats.mode };
   throw new Error(`Loại mục nguồn không được hỗ trợ: ${source}`);
 }
 
@@ -105,7 +137,7 @@ function ensureSafeDestinationAncestors(destination) {
     if (state && state.kind !== 'directory') {
       throw new Error(`Bị chặn vì không phải thư mục hoặc là liên kết: ${path.relative(targetDir, current)}`);
     }
-    if (!state) fs.mkdirSync(current);
+    if (!state && !dryRun) fs.mkdirSync(current);
   }
 }
 
@@ -126,15 +158,23 @@ function installEntry(source, destination, relativePath, skipsPrivate) {
   const existing = destinationState(destination);
   if (kind === 'link') {
     if (!existing) {
-      fs.symlinkSync(sourceEntry.linkTarget, destination);
+      if (!dryRun) fs.symlinkSync(sourceEntry.linkTarget, destination);
       return new Set(['installed']);
     }
     if (existing.kind === 'link' && existing.linkTarget === sourceEntry.linkTarget) return new Set(['identical']);
+    if (updateMode && existing.kind !== 'directory' && !(coreMode && projectEntryFiles.has(relativePath))) {
+      backupExistingEntry(destination, relativePath, existing.kind);
+      if (!dryRun) {
+        fs.unlinkSync(destination);
+        fs.symlinkSync(sourceEntry.linkTarget, destination);
+      }
+      return new Set(['updated']);
+    }
     throw new Error(`Mục đã tồn tại nhưng khác nguồn: ${relativePath}`);
   }
   if (kind === 'directory') {
     if (existing && existing.kind !== 'directory') throw new Error(`Bị chặn vì không phải thư mục: ${relativePath}`);
-    if (!existing) fs.mkdirSync(destination);
+    if (!existing && !dryRun) fs.mkdirSync(destination);
     const result = new Set(existing ? ['identical'] : ['installed']);
     for (const child of fs.readdirSync(source)) {
       const childPath = path.join(relativePath, child);
@@ -155,9 +195,21 @@ function installEntry(source, destination, relativePath, skipsPrivate) {
   }
   if (existing) {
     if (existing.kind === 'file' && filesEqual(source, destination)) return new Set(['identical']);
+    // Ở chế độ --core, không ghi đè AGENTS.md riêng của dự án khác để bảo toàn hướng dẫn nội bộ dự án đó.
+    if (updateMode && existing.kind === 'file' && !(coreMode && projectEntryFiles.has(relativePath))) {
+      backupExistingEntry(destination, relativePath, existing.kind);
+      if (!dryRun) {
+        fs.copyFileSync(source, destination);
+        fs.chmodSync(destination, sourceEntry.mode);
+      }
+      return new Set(['updated']);
+    }
     throw new Error(`Tệp đã tồn tại nhưng khác nguồn: ${relativePath}`);
   }
-  fs.copyFileSync(source, destination, fs.constants.COPYFILE_EXCL);
+  if (!dryRun) {
+    fs.copyFileSync(source, destination, fs.constants.COPYFILE_EXCL);
+    fs.chmodSync(destination, sourceEntry.mode);
+  }
   return new Set(['installed']);
 }
 
@@ -171,12 +223,16 @@ function installItems(items, skipsPrivate) {
       if (result.has('failed')) {
         hasErrors = true;
         console.error(`⚠ Có mục không cài được trong ${item.destination}; xem lỗi ở trên.`);
+      } else if (result.has('updated') && result.has('installed')) {
+        console.log(`✔ ${dryRun ? '[Xem trước] Sẽ thêm và cập nhật' : 'Đã thêm và cập nhật'} các mục trong ${item.destination}`);
+      } else if (result.has('updated')) {
+        console.log(`✔ ${dryRun ? '[Xem trước] Sẽ cập nhật' : 'Đã cập nhật'} các mục trong ${item.destination}`);
       } else if (result.has('installed')) {
-        console.log(`✔ Đã thêm hoặc xác nhận các mục trong ${item.destination}`);
+        console.log(`✔ ${dryRun ? '[Xem trước] Sẽ thêm' : 'Đã thêm hoặc xác nhận'} các mục trong ${item.destination}`);
       } else if (result.has('skipped')) {
         console.log(`↷ Đã bỏ qua một số thư mục trạng thái riêng trong ${item.destination}`);
       } else {
-        console.log(`✔ Đã có sẵn: ${item.destination}`);
+        console.log(`✔ Đã đồng bộ sẵn: ${item.destination}`);
       }
     } catch (error) {
       hasErrors = true;
@@ -186,6 +242,13 @@ function installItems(items, skipsPrivate) {
         console.error('  Đọc `.agent-core/team.md` để biết khi nào giao việc cho Researcher.');
       }
     }
+  }
+  if (activeBackupDir && !dryRun) {
+    console.log(`↺ Đã sao lưu các tệp cũ trước khi ghi đè tại: ${path.relative(targetDir, activeBackupDir)}`);
+  }
+  const wiringScript = path.join(targetDir, '.agent', 'scripts', 'install-harness-wiring.sh');
+  if (updateMode && !coreMode && !dryRun && !hasErrors && fs.existsSync(wiringScript)) {
+    execFileSync('bash', [wiringScript], { cwd: targetDir, stdio: 'inherit' });
   }
   return hasErrors;
 }
@@ -216,7 +279,7 @@ function coreItems() {
 }
 
 if (hasInvalidArguments) {
-  reportError('Cách dùng: node bin/install.js [--core]');
+  reportError('Cách dùng: node bin/install.js [--core] [--update] [--dry-run]');
   process.exitCode = 1;
 } else {
   try {

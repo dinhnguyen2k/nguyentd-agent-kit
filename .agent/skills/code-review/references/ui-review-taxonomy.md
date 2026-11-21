@@ -1,1 +1,1 @@
-../../frontend-development/references/ui-ux-evondev/review-taxonomy.md
+../../frontend-development/references/ui-review-taxonomy.md

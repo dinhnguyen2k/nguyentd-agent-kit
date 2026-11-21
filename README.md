@@ -66,8 +66,21 @@ bash .agent/scripts/install-harness-wiring.sh
 
 Khai báo tài khoản OpenAI của bạn trong `auth.accountPolicies` tại `~/.omp/agent/config.yml`; bộ kit công khai không chứa thông tin tài khoản cá nhân. Chẩn đoán C# cần `csharp-ls` tại `~/.dotnet10/tools/csharp-ls` và .NET tại `/usr/lib/dotnet`, như khai báo trong `.agent/harness/omp/lsp.json`; nếu đường dẫn trên máy khác, hãy chỉnh tệp đó. Cuối cùng, mở một phiên OMP mới. Bộ cài không ghi đè các tệp đã có, vì vậy trên máy có bản cũ, hãy tự so sánh và thay các tệp xung đột.
 
-## Khi cập nhật hoặc đổi công cụ
+## Khi cập nhật hoặc đồng bộ hai chiều
 
-- **Cập nhật bản đã cài:** Lấy bản kit mới rồi chạy lại lệnh `--core` từ dự án. Bộ cài chỉ thêm tệp còn thiếu và bỏ qua tệp giống hệt. Nếu tệp đã có nội dung khác hoặc liên kết trỏ tới nơi khác, bộ cài báo lỗi và vẫn xử lý các mục độc lập còn lại. Hãy so sánh rồi chọn phần muốn giữ; chạy lại lệnh không tự ghi đè bản cũ.
+- **Chiều kéo bản mới từ kit về dự án / máy khác (`--update`):** Lấy bản kit mới rồi chạy kèm cờ `--update` (có thể thêm `--dry-run` để xem trước mà chưa ghi đĩa):
+  ```bash
+  git -C ~/nguyentd-agent-kit pull
+  node ~/nguyentd-agent-kit/bin/install.js --update
+  # Hoặc cho dự án chỉ cài bản rút gọn:
+  node ~/nguyentd-agent-kit/bin/install.js --core --update
+  ```
+  Khi không có `--update`, bộ cài giữ chế độ an toàn chỉ thêm tệp còn thiếu và báo xung đột nếu tệp đã khác. Khi bật `--update`, bộ cài tự động sao lưu các tệp cũ bị thay đổi vào `.agent/scratch/kit-backups/<timestamp>/` (hoặc `.agent-core/.backups/<timestamp>/`), bảo toàn nguyên vẹn các thư mục/kỹ năng riêng của dự án và tự chạy lại `install-harness-wiring.sh`.
+- **Chiều đẩy cải tiến từ dự án ngược lên kho kit (`sync-agent-kit.mjs`):** Từ thư mục gốc dự án, chạy:
+  ```bash
+  node .agent/scripts/sync-agent-kit.mjs --check
+  node .agent/scripts/sync-agent-kit.mjs --commit "Mô tả ngắn gọn thay đổi" --push
+  ```
+  Kịch bản tự động lọc bỏ các thư mục trạng thái/bí mật và công cụ nội bộ dự án, chuẩn hóa liên kết cục bộ về tương đối, quét chặn rò rỉ khóa bí mật/tên miền nội bộ và chạy bộ kiểm định `validate-agent-system.mjs` đạt `0 error(s)` trước khi cho phép lưu lịch sử.
 - **Quyền truy cập:** Kit không tự cấp quyền đọc máy, chạy lệnh hay lên mạng. Claude Code và OMP dùng công cụ được cấp; AGY phụ thuộc quyền đọc của phiên; Codex dùng công cụ từ phiên cha. Với Gemini CLI, đừng mặc định rằng công cụ sẽ tự nhận cấu hình Researcher.
 - **Quy tắc riêng:** Giữ dữ liệu, cấu hình máy và chính sách nội bộ trong dự án. Nếu muốn xem hoặc đề xuất sửa phần dùng chung, bắt đầu từ [cách phối hợp](core/.agent-core/team.md) và [cách nghiên cứu](.agent/skills/research/SKILL.md).

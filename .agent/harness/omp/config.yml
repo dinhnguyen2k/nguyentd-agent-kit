@@ -7,8 +7,8 @@ modelRoles:
   plan: anthropic/claude-opus-5-5:high
   slow: "@plan"
 lsp:
-  # Worker sửa code chủ yếu bằng `edit`; mặc định OMP chỉ chẩn đoán sau `write`.
-  diagnosticsOnEdit: true
+  # Tắt chờ LSP ở từng thao tác sửa lẻ để tránh cộng dồn độ trễ khi LSP lạnh; chỉ kiểm tra 1 lượt cuối slice.
+  diagnosticsOnEdit: false
   formatOnWrite: false
 skills:
   # Skill không thuộc phạm vi ERP; vẫn nằm ở .agent/skills cho harness khác.

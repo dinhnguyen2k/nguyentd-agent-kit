@@ -7,6 +7,7 @@
  */
 import { execFileSync } from "node:child_process";
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -23,9 +24,17 @@ import { evaluateBoundaryChecks } from "./agent-boundary-guard.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GUARD_REL = join(".agent", "scripts", "agent-boundary-guard.mjs");
 const WORKFLOW_STATE_REL = join(".agent", "scratch", ".runtime", "workflow-state");
+const LSP_CIRCUIT_REL = join(".agent", "scratch", ".runtime", "lsp-circuit.json");
+const LSP_FRICTION_REL = join(".agent", "reports", "agent-friction.jsonl");
+export const LSP_CIRCUIT_TTL_MS = 4 * 60 * 1000;
+const LSP_PROBE_TIMEOUT_MS = 30 * 1000;
 const STATE_TTL_MS = 24 * 60 * 60 * 1000;
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 const CODE_FILE_RE = /\.(?:cs|ts|tsx)$/i;
+const CSHARP_PATH_RE = /\.(?:cs|sln|csproj)$/i;
+const TS_PATH_RE = /\.(?:ts|tsx|js|jsx)$/i;
+const LSP_FAILURE_RE =
+  /\b(timed?\s*out|timeout|deadline\s*exceeded|connection\s*closed|eof|server\s*not\s*initialized|not\s*ready|transport\s*error|broken\s*pipe)\b/i;
 const SHELL_TOOLS = new Set(["Bash", "bash", "run_command", "shell", "exec_command"]);
 const FILE_TOOLS = new Set([
   "Edit",
@@ -557,16 +566,254 @@ export function getCompactionSummary(root, sessionId) {
   }
 }
 
-export function checkSubagentStopGate(root, sessionId, payload = {}) {
+function collectPathCandidates(input) {
+  if (typeof input === "string") return input.trim() ? [input.trim()] : [];
+  if (!input || typeof input !== "object") return [];
+  const keys = ["file_path", "Path", "path", "uri", "filePath", "TargetFile"];
+  const direct = keys.map((k) => str(input[k])).filter(Boolean);
+  const many = Array.isArray(input.paths) ? input.paths.map(str).filter(Boolean) : [];
+  const nestedRaw = input.Arguments ?? input.arguments;
+  const nested = nestedRaw ? collectPathCandidates(parseJsonObject(nestedRaw)) : [];
+  return [...direct, ...many, ...nested];
+}
+
+export function inferLspLanguage(argsOrPath) {
+  for (const raw of collectPathCandidates(argsOrPath)) {
+    const clean = raw.replace(/^file:\/\//i, "").split(/[?#]/)[0];
+    if (CSHARP_PATH_RE.test(clean)) return "csharp";
+    if (TS_PATH_RE.test(clean)) return "typescript";
+  }
+  return "general";
+}
+
+export function isLspToolCall(toolName, args = {}) {
+  const name = String(toolName || "").trim();
+  if (!name) return false;
+  if (name.toLowerCase() === "call_mcp_tool") {
+    const parsed = parseJsonObject(args);
+    const server = (str(parsed.ServerName) ?? str(parsed.serverName) ?? str(parsed.server_name) ?? "").toLowerCase();
+    return server === "lsp";
+  }
+  return /^mcp_+.*lsp.*__/i.test(name) || /^mcp_+lsp_+/i.test(name);
+}
+
+export function isLspFailureOrTimeout(eventOrPayload) {
+  if (!eventOrPayload || typeof eventOrPayload !== "object") return false;
+  if (eventOrPayload.error) return true;
+  for (const key of ["toolResult", "output", "result", "response", "tool_response"]) {
+    const candidate = eventOrPayload[key];
+    if (candidate == null) continue;
+    const text = typeof candidate === "string" ? candidate : JSON.stringify(candidate);
+    if (LSP_FAILURE_RE.test(text)) return true;
+  }
+  return false;
+}
+
+function normalizeLspLang(lang) {
+  return lang === "csharp" || lang === "typescript" ? lang : "general";
+}
+
+function resolveCircuitFile(root, opts = {}) {
+  if (str(opts?.circuitFile)) return opts.circuitFile;
+  if (!root) return null;
+  return join(root, LSP_CIRCUIT_REL);
+}
+
+function loadCircuitState(circuitFile) {
+  const empty = { version: 1, circuits: {} };
+  if (!circuitFile || !existsSync(circuitFile)) return empty;
+  try {
+    const parsed = JSON.parse(readFileSync(circuitFile, "utf8"));
+    if (!parsed || typeof parsed !== "object") return empty;
+    return {
+      version: 1,
+      circuits:
+        parsed.circuits && typeof parsed.circuits === "object" && !Array.isArray(parsed.circuits)
+          ? parsed.circuits
+          : {},
+    };
+  } catch {
+    return empty;
+  }
+}
+
+function saveCircuitState(circuitFile, state) {
+  if (!circuitFile) return;
+  try {
+    mkdirSync(dirname(circuitFile), { recursive: true });
+    writeFileSync(circuitFile, `${JSON.stringify(state, null, 2)}\n`);
+  } catch {
+    /* fail-open */
+  }
+}
+
+function buildCircuitOpenReason(lang, remainingSec) {
+  return (
+    `[lsp-circuit-open] Máy chủ LSP (${lang}) đang ngắt cầu chì do timeout/quá tải trước đó (còn ${remainingSec}s). ` +
+    `CẤM gọi lại hay đứng chờ; chuyển ngay sang kiểm tra tĩnh dự phòng (R10 + đọc đối chiếu chữ ký khai báo gốc/caller) ` +
+    `và ghi 'LSP: circuit-open (skipped to prevent session hang)' trong báo cáo.`
+  );
+}
+
+export function checkLspCircuit(root, lang = "general", opts = {}) {
+  try {
+    const targetLang = normalizeLspLang(lang);
+    const circuitFile = resolveCircuitFile(root, opts);
+    if (!circuitFile || !existsSync(circuitFile)) {
+      return { allowed: true, state: "CLOSED" };
+    }
+    const state = loadCircuitState(circuitFile);
+    const entry = state.circuits[targetLang];
+    if (!entry || entry.state === "CLOSED") {
+      return { allowed: true, state: "CLOSED" };
+    }
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const ttlMs = Number.isFinite(entry.ttlMs) && entry.ttlMs > 0 ? entry.ttlMs : LSP_CIRCUIT_TTL_MS;
+
+    if (entry.state === "OPEN") {
+      const openedAt = Number(entry.openedAt) || 0;
+      const elapsed = now - openedAt;
+      if (elapsed < ttlMs) {
+        const remainingSec = Math.max(1, Math.ceil((ttlMs - elapsed) / 1000));
+        return {
+          allowed: false,
+          state: "OPEN",
+          remainingSec,
+          reason: buildCircuitOpenReason(targetLang, remainingSec),
+        };
+      }
+      if (!opts.peek) {
+        state.circuits[targetLang] = {
+          ...entry,
+          state: "HALF_OPEN",
+          probeStartedAt: now,
+        };
+        saveCircuitState(circuitFile, state);
+      }
+      return { allowed: true, state: "HALF_OPEN" };
+    }
+
+    if (entry.state === "HALF_OPEN") {
+      if (opts.peek) {
+        return { allowed: true, state: "HALF_OPEN" };
+      }
+      const probeStartedAt = Number(entry.probeStartedAt) || 0;
+      const probeElapsed = now - probeStartedAt;
+      if (probeElapsed < LSP_PROBE_TIMEOUT_MS) {
+        const remainingSec = Math.max(1, Math.ceil((LSP_PROBE_TIMEOUT_MS - probeElapsed) / 1000));
+        return {
+          allowed: false,
+          state: "HALF_OPEN",
+          remainingSec,
+          reason: buildCircuitOpenReason(targetLang, remainingSec),
+        };
+      }
+      state.circuits[targetLang] = {
+        ...entry,
+        state: "HALF_OPEN",
+        probeStartedAt: now,
+      };
+      saveCircuitState(circuitFile, state);
+      return { allowed: true, state: "HALF_OPEN" };
+    }
+
+    return { allowed: true, state: "CLOSED" };
+  } catch {
+    return { allowed: true, state: "CLOSED" };
+  }
+}
+
+export function recordLspOutcome(root, lang = "general", outcome = {}, opts = {}) {
+  try {
+    const targetLang = normalizeLspLang(lang);
+    const circuitFile = resolveCircuitFile(root, opts);
+    if (!circuitFile) return;
+
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const ttlMs = Number.isFinite(opts.ttlMs) && opts.ttlMs > 0 ? opts.ttlMs : LSP_CIRCUIT_TTL_MS;
+    const state = loadCircuitState(circuitFile);
+    const prev = state.circuits[targetLang];
+    const prevState = prev?.state || "CLOSED";
+    const prevStillOpen =
+      prevState === "OPEN" && now - (Number(prev?.openedAt) || 0) < (Number(prev?.ttlMs) || ttlMs);
+
+    if (outcome?.failed === true) {
+      const errorText = String(outcome.errorText ?? "");
+      state.circuits[targetLang] = {
+        state: "OPEN",
+        openedAt: now,
+        ttlMs,
+        lastError: errorText.slice(0, 240),
+      };
+      saveCircuitState(circuitFile, state);
+
+      if (!opts?.sandbox && !prevStillOpen && root) {
+        try {
+          const frictionFile = join(root, LSP_FRICTION_REL);
+          mkdirSync(dirname(frictionFile), { recursive: true });
+          appendFileSync(
+            frictionFile,
+            `${JSON.stringify({
+              ts: new Date(now).toISOString(),
+              kind: "lsp-circuit-open",
+              target: targetLang,
+              evidence: errorText.slice(0, 160),
+              suggested_fix: "Check csharp-ls/tsserver load or Cogain.Lsp.slnf",
+            })}\n`
+          );
+        } catch {
+          /* fail-open */
+        }
+      }
+      return;
+    }
+
+    if (outcome?.failed === false && prevState !== "CLOSED") {
+      state.circuits[targetLang] = { state: "CLOSED", closedAt: now };
+      saveCircuitState(circuitFile, state);
+    }
+  } catch {
+    /* fail-open */
+  }
+}
+
+export function clearSessionFilesForLanguage(root, sessionId, lang = "general", opts = {}) {
+  try {
+    if (!root || !sessionId) return;
+    const targetLang = normalizeLspLang(lang);
+    if (targetLang === "general") {
+      markSessionFilesChecked(root, sessionId, null);
+      return;
+    }
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const state = loadSessionState(root, sessionId, now);
+    if (state.uncheckedFiles.length === 0) return;
+    const next = state.uncheckedFiles.filter((f) => inferLspLanguage(f) !== targetLang);
+    if (next.length !== state.uncheckedFiles.length) {
+      state.uncheckedFiles = next;
+      saveSessionState(root, sessionId, state, now);
+    }
+  } catch {
+    /* fail-open */
+  }
+}
+
+export function checkSubagentStopGate(root, sessionId, payload = {}, opts = {}) {
   try {
     if (payload?.stop_hook_active) return { decision: "allow" };
     if (!root || !sessionId) return { decision: "allow" };
-    const now = Date.now();
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
     const state = loadSessionState(root, sessionId, now);
     if (state.stopReminded || state.uncheckedFiles.length === 0) {
       return { decision: "allow" };
     }
-    const list = state.uncheckedFiles.join(", ");
+    const activeUnchecked = state.uncheckedFiles.filter(
+      (f) => checkLspCircuit(root, inferLspLanguage(f), { ...opts, peek: true, now }).allowed
+    );
+    if (activeUnchecked.length === 0) {
+      return { decision: "allow" };
+    }
+    const list = activeUnchecked.join(", ");
     state.stopReminded = true;
     saveSessionState(root, sessionId, state, now);
     return {

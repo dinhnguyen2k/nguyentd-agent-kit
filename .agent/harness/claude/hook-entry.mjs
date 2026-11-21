@@ -10,11 +10,17 @@ import { fileURLToPath } from "node:url";
 import { evaluateBoundaryChecks } from "../../scripts/agent-boundary-guard.mjs";
 import { prepareDispatchAssignment } from "../../scripts/dispatch-contract.mjs";
 import {
+  checkLspCircuit,
   checkSubagentStopGate,
+  clearSessionFilesForLanguage,
   findRepoRoot,
   getCompactionSummary,
+  inferLspLanguage,
+  isLspFailureOrTimeout,
+  isLspToolCall,
   markSessionFilesChecked,
   normalizeToolChecks,
+  recordLspOutcome,
   recordSessionDispatch,
   recordSessionEdit,
 } from "../../scripts/agent-lifecycle-core.mjs";
@@ -41,6 +47,27 @@ function denyPreToolUse(reason, updatedInput = null) {
 
 function str(value) {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function parseJsonObject(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value !== "string" || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function extractLspErrorText(payload) {
+  if (payload?.error) return typeof payload.error === "string" ? payload.error : JSON.stringify(payload.error);
+  for (const candidate of [payload?.tool_response, payload?.toolResult, payload?.output, payload?.result, payload?.response]) {
+    if (candidate != null) {
+      return typeof candidate === "string" ? candidate : JSON.stringify(candidate);
+    }
+  }
+  return "";
 }
 
 function handleDispatchPreToolUse(toolInput, root) {
@@ -97,6 +124,11 @@ try {
       handleDispatchPreToolUse(toolInput, root);
       process.exit(0);
     }
+    if (isLspToolCall(toolName, toolInput)) {
+      const circuit = checkLspCircuit(root, inferLspLanguage(toolInput));
+      if (!circuit.allowed) denyPreToolUse(circuit.reason);
+      process.exit(0);
+    }
     const checks = normalizeToolChecks(toolName, toolInput, baseCwd);
     if (checks.length === 0) process.exit(0);
     const agentName = str(payload.agent_type) ?? str(payload.subagent_type) ?? undefined;
@@ -117,9 +149,26 @@ try {
       process.exit(0);
     }
 
-    if (/^mcp_+.*lsp.*get_diagnostics$/i.test(toolName)) {
-      const lspPaths = [str(toolInput.file_path), str(toolInput.path), str(toolInput.Path)].filter(Boolean);
-      markSessionFilesChecked(root, sessionId, lspPaths.length > 0 ? lspPaths : null);
+    if (isLspToolCall(toolName, toolInput)) {
+      const lang = inferLspLanguage(toolInput);
+      const failed = isLspFailureOrTimeout(payload);
+      const errorText = failed ? extractLspErrorText(payload) : "";
+      recordLspOutcome(root, lang, { failed, errorText });
+      if (failed) {
+        clearSessionFilesForLanguage(root, sessionId, lang);
+      } else {
+        const mcpTool = str(toolInput.ToolName) ?? str(toolInput.toolName) ?? str(toolInput.tool_name);
+        const isDiagnostics =
+          /get_diagnostics$/i.test(toolName) || (toolName === "call_mcp_tool" && mcpTool === "get_diagnostics");
+        if (isDiagnostics) {
+          const lspArgs =
+            toolName === "call_mcp_tool" ? parseJsonObject(toolInput.Arguments ?? toolInput.arguments) : toolInput;
+          const lspPaths = [str(lspArgs.file_path), str(lspArgs.path), str(lspArgs.Path), str(lspArgs.uri)].filter(
+            Boolean
+          );
+          markSessionFilesChecked(root, sessionId, lspPaths.length > 0 ? lspPaths : null);
+        }
+      }
       process.exit(0);
     }
 

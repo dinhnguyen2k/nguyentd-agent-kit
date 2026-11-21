@@ -9,6 +9,13 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  checkLspCircuit,
+  inferLspLanguage,
+  isLspFailureOrTimeout,
+  isLspToolCall,
+  recordLspOutcome,
+} from "../../scripts/agent-lifecycle-core.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GUARD_REL = join(".agent", "scripts", "agent-boundary-guard.mjs");
@@ -144,16 +151,63 @@ function extractChildConversationId(event) {
   return null;
 }
 
-function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
-  if (event.error) return {};
-  const convId = str(event.conversationId);
-  if (!convId) return {};
+function extractLspErrorText(event) {
+  if (event.error) return typeof event.error === "string" ? event.error : JSON.stringify(event.error);
+  for (const candidate of [event.toolResult, event.output, event.result, event.response, event.tool_response]) {
+    if (candidate != null) {
+      return typeof candidate === "string" ? candidate : JSON.stringify(candidate);
+    }
+  }
+  return "";
+}
 
+function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
+  const convId = str(event.conversationId);
   const toolCall = parseJsonObject(event.toolCall);
   const toolName = (str(toolCall.name) ?? "").toLowerCase();
   if (!toolName) return {};
 
   const args = parseJsonObject(toolCall.args);
+
+  if (isLspToolCall(toolName, args)) {
+    const lang = inferLspLanguage(args);
+    const failed = isLspFailureOrTimeout(event);
+    const errorText = failed ? extractLspErrorText(event) : "";
+    recordLspOutcome(root, lang, { failed, errorText }, { now });
+
+    if (convId) {
+      const state = loadSessions(sessionFile, now);
+      if (state.conversations[convId]) {
+        const conv = ensureConv(state, convId, now);
+        const before = conv.dirtyFiles.length;
+        if (failed) {
+          conv.dirtyFiles = lang === "general" ? [] : conv.dirtyFiles.filter((f) => inferLspLanguage(f) !== lang);
+        } else {
+          let lspArgs = null;
+          if (toolName === "call_mcp_tool") {
+            const mcpTool = str(args.ToolName) ?? str(args.toolName) ?? str(args.tool_name);
+            if (mcpTool === "get_diagnostics") lspArgs = parseJsonObject(args.Arguments ?? args.arguments);
+          } else if (/^mcp_+.*lsp.*get_diagnostics$/i.test(toolName)) {
+            lspArgs = args;
+          }
+          if (lspArgs) {
+            const checked = argPaths(lspArgs).map((p) => toRepoRelative(p, baseCwd, root)).filter(Boolean);
+            if (checked.length > 0) {
+              conv.dirtyFiles = conv.dirtyFiles.filter(
+                (f) => !checked.some((c) => f === c || f.startsWith(c.endsWith("/") ? c : `${c}/`))
+              );
+            }
+          }
+        }
+        if (conv.dirtyFiles.length !== before) saveSessions(sessionFile, state, now);
+      }
+    }
+    return {};
+  }
+
+  if (event.error) return {};
+  if (!convId) return {};
+
   const state = loadSessions(sessionFile, now);
   let dirty = false;
 
@@ -174,27 +228,6 @@ function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
     const mcpTool = str(args.ToolName) ?? str(args.toolName) ?? str(args.tool_name);
     if (server === "filesystem" && mcpTool && MCP_FS_WRITE_TOOLS.has(mcpTool)) {
       writePaths = argPaths(parseJsonObject(args.Arguments ?? args.arguments));
-    } else if (server === "lsp" && mcpTool === "get_diagnostics") {
-      const lspArgs = parseJsonObject(args.Arguments ?? args.arguments);
-      const checked = argPaths(lspArgs).map((p) => toRepoRelative(p, baseCwd, root)).filter(Boolean);
-      if (checked.length > 0 && state.conversations[convId]) {
-        const conv = ensureConv(state, convId, now);
-        const before = conv.dirtyFiles.length;
-        conv.dirtyFiles = conv.dirtyFiles.filter(
-          (f) => !checked.some((c) => f === c || f.startsWith(c.endsWith("/") ? c : `${c}/`))
-        );
-        if (conv.dirtyFiles.length !== before) dirty = true;
-      }
-    }
-  } else if (/^mcp_+lsp_+get_diagnostics$/.test(toolName)) {
-    const checked = argPaths(args).map((p) => toRepoRelative(p, baseCwd, root)).filter(Boolean);
-    if (checked.length > 0 && state.conversations[convId]) {
-      const conv = ensureConv(state, convId, now);
-      const before = conv.dirtyFiles.length;
-      conv.dirtyFiles = conv.dirtyFiles.filter(
-        (f) => !checked.some((c) => f === c || f.startsWith(c.endsWith("/") ? c : `${c}/`))
-      );
-      if (conv.dirtyFiles.length !== before) dirty = true;
     }
   } else if (toolName === "invoke_subagent") {
     const typeName = (
@@ -319,8 +352,11 @@ function handleStop(event, root, sessionFile, now) {
   const conv = state.conversations[convId];
   if (!conv) return { decision: "allow" };
 
-  if (conv.dirtyFiles.length > 0) {
-    const dirtyList = conv.dirtyFiles.join(", ");
+  const remainingDirty = conv.dirtyFiles.filter(
+    (f) => checkLspCircuit(root, inferLspLanguage({ path: f }), { peek: true, now }).allowed
+  );
+  if (remainingDirty.length > 0) {
+    const dirtyList = remainingDirty.join(", ");
     appendFriction(root, {
       type: "pre-handoff-unchecked-lsp",
       role: conv.role || "main",

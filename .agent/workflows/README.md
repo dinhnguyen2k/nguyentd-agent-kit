@@ -24,13 +24,12 @@ Code review chỉ chạy khi user yêu cầu rõ ràng qua skill `code-reviewer`
 Tương đương slash command:
 
 - `workflow plan` == `/plan`
-- `run workflow api` == `run /api`
+- `run workflow audit` == `run /audit`
 
 ## Available Workflows
 
 | Command           | Description                                                                                           |
 | ----------------- | ----------------------------------------------------------------------------------------------------- |
-| `api`             | Master API Design & Documentation following OpenAPI 3.1 standards.                                    |
 | `audit`           | Sắp bàn giao khách? Kiểm tra lại toàn diện cho chắc theo chuẩn Auditor.                               |
 | `brainstorm`      | Bí ý tưởng? Dùng cái này để AI gợi ý theo chuẩn Senior.                                               |
 | `debug`           | Gặp lỗi khó sửa? Để AI soi log và sửa giúp bạn theo quy trình chuyên nghiệp.                          |
@@ -41,12 +40,12 @@ Tương đương slash command:
 | `orchestrate`     | Route task theo AI_RULES sang backend-specialist, frontend-specialist, hoặc dual-domain flow khi cần. |
 | `performance`     | Muốn web chạy mượt? Tối ưu tốc độ và hiệu năng theo chuẩn Performance Expert.                         |
 | `plan`            | Chưa biết bắt đầu từ đâu? Lập kế hoạch theo chuẩn Senior Personnel.                                   |
-| `realtime`        | Realtime communication integration with Socket.io, WebRTC, or SSE.                                    |
 | `release-version` | Tự động cập nhật phiên bản và đồng bộ toàn bộ tài liệu hệ thống                                       |
 | `security`        | Sợ bị hack? Quét lỗ hổng và bảo mật ngay theo chuẩn Security Senior.                                  |
 | `test`            | Sợ bug khi sửa code? Viết test tự động theo chuẩn TDD Master.                                         |
 | `update-docs`     | Tự động cập nhật tài liệu khi có tính năng mới hoặc thay đổi hệ thống.                                |
 | `upgrade-agent`   | Quy trình 6 bước bảo trì hệ thống agent, kết tinh ma sát thành luật tĩnh/mẫu chuẩn và tỉa tài liệu.   |
+| `upgrade-agent`   | Nâng cấp hệ thống agent trong phiên bảo trì riêng (chẩn đoán ma sát, đẩy xuống guard, validate & sync). |
 
 ## Maintenance Note
 

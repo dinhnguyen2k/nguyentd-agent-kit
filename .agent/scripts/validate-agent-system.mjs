@@ -1,9 +1,18 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { evaluateBoundaryPayload } from './agent-boundary-guard.mjs';
+import {
+  checkLspCircuit,
+  inferLspLanguage,
+  isLspFailureOrTimeout,
+  isLspToolCall,
+  LSP_CIRCUIT_TTL_MS,
+  recordLspOutcome,
+} from './agent-lifecycle-core.mjs';
 import { deriveTaskManifest, readLegacyEvidence, readTaskContract, readTaskLifecycle, validateContractSchema } from './task-contract.mjs';
 
 const repoRoot = process.cwd();
@@ -605,8 +614,107 @@ function validateDocHygieneAndExemplars() {
   }
 }
 
+function validateLspCircuitAndSlnf() {
+  const tmpDir = mkdtempSync(join(tmpdir(), 'cogain-lsp-circuit-'));
+  const circuitFile = join(tmpDir, 'lsp-circuit.json');
+  try {
+    if (inferLspLanguage({ file_path: 'backend/src/Sample.cs' }) !== 'csharp') {
+      errors.push('lsp-circuit: inferLspLanguage failed to detect csharp from .cs');
+    }
+    if (inferLspLanguage({ Arguments: { path: 'frontend/web/src/App.tsx' } }) !== 'typescript') {
+      errors.push('lsp-circuit: inferLspLanguage failed to detect typescript from nested Arguments');
+    }
+    if (inferLspLanguage({}) !== 'general') {
+      errors.push('lsp-circuit: inferLspLanguage should fallback to general');
+    }
+    if (
+      !isLspToolCall('call_mcp_tool', { ServerName: 'lsp', ToolName: 'get_diagnostics' }) ||
+      !isLspToolCall('mcp__lsp__get_diagnostics', {}) ||
+      isLspToolCall('mcp_filesystem_read_file', {})
+    ) {
+      errors.push('lsp-circuit: isLspToolCall matching failed');
+    }
+    if (
+      !isLspFailureOrTimeout({ error: 'Request timed out' }) ||
+      !isLspFailureOrTimeout({ tool_response: 'deadline exceeded' }) ||
+      isLspFailureOrTimeout({ toolResult: 'No diagnostics' })
+    ) {
+      errors.push('lsp-circuit: isLspFailureOrTimeout detection failed');
+    }
+
+    const t0 = 1_700_000_000_000;
+    const initial = checkLspCircuit(repoRoot, 'csharp', { circuitFile, now: t0 });
+    if (!initial.allowed || initial.state !== 'CLOSED') {
+      errors.push(`lsp-circuit: expected initial CLOSED/allowed, got ${JSON.stringify(initial)}`);
+    }
+
+    recordLspOutcome(repoRoot, 'csharp', { failed: true, errorText: 'timed out' }, { circuitFile, now: t0, sandbox: true });
+
+    const startMs = performance.now();
+    const blocked = checkLspCircuit(repoRoot, 'csharp', { circuitFile, now: t0 + 1000 });
+    const elapsedMs = performance.now() - startMs;
+    if (blocked.allowed || blocked.state !== 'OPEN' || !blocked.reason?.includes('[lsp-circuit-open]')) {
+      errors.push(`lsp-circuit: expected OPEN block for csharp, got ${JSON.stringify(blocked)}`);
+    }
+    if (elapsedMs >= 50) {
+      errors.push(`lsp-circuit: OPEN check too slow (${elapsedMs.toFixed(2)}ms)`);
+    }
+
+    const tsCheck = checkLspCircuit(repoRoot, 'typescript', { circuitFile, now: t0 + 1000 });
+    if (!tsCheck.allowed || tsCheck.state !== 'CLOSED') {
+      errors.push(`lsp-circuit: csharp OPEN must not block typescript, got ${JSON.stringify(tsCheck)}`);
+    }
+
+    const halfOpen = checkLspCircuit(repoRoot, 'csharp', { circuitFile, now: t0 + LSP_CIRCUIT_TTL_MS + 1 });
+    if (!halfOpen.allowed || halfOpen.state !== 'HALF_OPEN') {
+      errors.push(`lsp-circuit: expected HALF_OPEN probe after TTL expiry, got ${JSON.stringify(halfOpen)}`);
+    }
+
+    const parallelDuringProbe = checkLspCircuit(repoRoot, 'csharp', { circuitFile, now: t0 + LSP_CIRCUIT_TTL_MS + 10 });
+    if (parallelDuringProbe.allowed) {
+      errors.push('lsp-circuit: parallel call during HALF_OPEN probe must be blocked');
+    }
+
+    recordLspOutcome(repoRoot, 'csharp', { failed: false }, { circuitFile, now: t0 + LSP_CIRCUIT_TTL_MS + 50, sandbox: true });
+    const recovered = checkLspCircuit(repoRoot, 'csharp', { circuitFile, now: t0 + LSP_CIRCUIT_TTL_MS + 100 });
+    if (!recovered.allowed || recovered.state !== 'CLOSED') {
+      errors.push(`lsp-circuit: expected CLOSED after successful probe, got ${JSON.stringify(recovered)}`);
+    }
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+
+  const slnfPath = join(repoRoot, 'backend', 'Cogain.Lsp.slnf');
+  if (existsSync(slnfPath)) {
+    const slnf = readJson(slnfPath);
+    if (slnf) {
+      if (slnf.solution?.path !== 'CogainSolution.sln') {
+        errors.push(`backend/Cogain.Lsp.slnf: solution.path must be 'CogainSolution.sln' (got '${slnf.solution?.path}')`);
+      }
+      if (!Array.isArray(slnf.solution?.projects) || slnf.solution.projects.length === 0) {
+        errors.push('backend/Cogain.Lsp.slnf: solution.projects must be a non-empty array');
+      } else {
+        for (const proj of slnf.solution.projects) {
+          if (typeof proj !== 'string' || !proj.trim()) {
+            errors.push('backend/Cogain.Lsp.slnf: empty or non-string project entry');
+            continue;
+          }
+          if (/\.Migrations\.csproj$/i.test(proj)) {
+            errors.push(`backend/Cogain.Lsp.slnf: must exclude migration project '${proj}'`);
+          }
+          const normalized = proj.replace(/\\/g, '/');
+          if (!existsSync(join(repoRoot, 'backend', normalized))) {
+            errors.push(`backend/Cogain.Lsp.slnf: missing project path 'backend/${normalized}'`);
+          }
+        }
+      }
+    }
+  }
+}
+
 validateGuardFixturesAndAllowlist();
 validateDocHygieneAndExemplars();
+validateLspCircuitAndSlnf();
 
 function writeCatalog() {
   const entries = [...skills.entries()].sort(([a], [b]) => a.localeCompare(b));
