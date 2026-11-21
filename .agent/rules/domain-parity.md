@@ -1,9 +1,6 @@
 ---
-trigger: glob
-glob: "backend/**/*,frontend/**/*"
-description: "BE-FE parity for enums, nullable IDs, validation, and public contracts when touching backend or frontend."
-condition: ["backend/**/*", "frontend/**/*"]
-interruptMode: never
+trigger: model_decision
+description: "When changing shared enums, nullable IDs, validation rules, or public DTO/API contracts across Backend and Frontend."
 ---
 
 # DOMAIN-PARITY.MD - Nhất Quán BE ↔ FE

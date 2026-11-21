@@ -22,11 +22,11 @@ $ARGUMENTS
 1. Chốt yêu cầu, invariant và ngoài scope từ user/source/luật; lấy hành vi và contract hiện hữu làm baseline. Main được tư vấn phương án tốt hơn có evidence/tradeoff; tách bạch requirement của user, proposal của Main và approved scope, không tự mở scope.
    Không coi phần user chưa mô tả là quyền tự thêm dữ liệu bắt buộc, đổi default, định dạng, thao tác hoặc public contract.
    Chỉ hỏi nghiệp vụ hoặc đánh đổi repo không giải đáp được; nếu source mâu thuẫn luật/doc thì báo mâu thuẫn, không tự chọn baseline.
-2. Trace flow thật tới điểm sở hữu hành vi; trước dispatch trace owner thực sự, đọc source, nearest test/pattern và caller/consumer theo risk, không quét workspace hoặc load lại context đã có.
-   Gom các vùng source độc lập vào cùng lượt đọc; khi nội dung còn trong context, không đọc lại cùng vùng chỉ để xác nhận lần nữa.
-   Chỉ mở lại vùng đó khi source đổi, nội dung không còn trong context hoặc có mâu thuẫn/failure mode mới; worker xác nhận các điểm sửa và dependency trực tiếp, không chạy lại khảo sát toàn module.
-3. Xác minh file/symbol, signature và semantics của reuse tại khai báo gốc bằng `path:line` trước dispatch; dùng LSP cho definition/type/reference khi có.
-   Kiểm kiểu input/output, tham số, field thực tế và điều kiện gọi cần cho điểm sửa; chỉ đọc caller/implementation trực tiếp khi declaration chưa chứng minh semantics.
+2. Trace flow thật tới điểm sở hữu hành vi; trước dispatch xác định đúng owner và ranh giới caller/consumer theo mức độ rủi ro, không quét workspace hoặc load lại context đã có.
+   Gom các vùng khai báo độc lập vào cùng lượt đọc; khi nội dung còn trong context, không đọc lại cùng vùng chỉ để xác nhận lần nữa.
+   Chỉ mở lại vùng đó khi source đổi, nội dung không còn trong context hoặc có mâu thuẫn/failure mode mới; worker đọc chi tiết thân hàm tại điểm sửa và dependency trực tiếp, không chạy lại khảo sát toàn module.
+3. **Khám phá theo ranh giới (Boundary-First Discovery)**: khi giao specialist thực thi, Main chỉ đọc khai báo gốc (signature/DTO/interface/props) ở ranh giới bằng `path:line` (dùng LSP cho definition/type/reference khi có) để khóa recipe và gói giao việc, không đọc sâu toàn bộ thân cài đặt nội bộ thay phần của worker nhằm tránh đọc trùng hai đầu.
+   Kiểm kiểu input/output, tham số, field thực tế và điều kiện gọi cần cho điểm sửa; chỉ đọc thân cài đặt hoặc caller trực tiếp khi khai báo gốc chưa chứng minh được semantics hoặc nhánh lỗi.
    Không suy khả năng của helper từ tên, shape từ lời kể hoặc giao trước rồi mới kiểm chứng seam đã khẳng định trong contract.
 4. Chốt input/output, business key/default/enum/nullability, thứ tự và nhánh lỗi liên quan.
    Rà soát các caller cùng quy tắc và nhánh lỗi; chỉ chốt khi khả thi.
@@ -259,6 +259,12 @@ Giữ cổng advisor blocker và giới hạn hai vòng sửa theo `.omp/RULES.m
 - Fast/standard hoặc một slice: contract gọn trong assignment; chỉ persist canonical contract/checkpoint khi handoff/resume cần, không tạo thư mục/manifest cho đủ mẫu.
 - Nhiều slice, cross-domain hoặc public contract được phép persist: `.agent/planning/YYYY-MM-DD-<slug>/00-OVERVIEW.md` và canonical `TASK-<NN>-<slug>.md`; không tạo thêm PLAN/walkthrough/handoff trùng nội dung.
 - Checkpoint giữ requirement, contract version, decisions, unresolved, source evidence và unverified ngay trong overview hoặc TASK hiện có; dùng artifact hiện có chỉ khi cần resume, không tạo state store hoặc template mới.
+- **Bản chụp chuyển chặng (Phase Snapshot)**: khi chuyển từ nghiên cứu/plan sang triển khai hoặc trước khi `/compact` / đổi sang yêu cầu mới, Main ghi gọn 5 trường cố định ngay trong chat hoặc overview/TASK hiện có để không mang theo lịch sử phình to mà vẫn giữ nguyên ràng buộc phủ định:
+  1. `Quyết định đã khóa`: phương án, contract và tọa độ `path:line` đã chốt.
+  2. `Phương án đã loại & lý do`: các hướng đã bác bỏ kèm lý do cụ thể để không đề xuất lặp lại.
+  3. `Bất biến nghiệp vụ`: trạng thái, mốc hiệu lực và quy tắc bắt buộc bảo toàn.
+  4. `File đã đổi & trạng thái kiểm tra`: danh sách tệp đã sửa kèm trạng thái LSP/Validation thực tế.
+  5. `Việc còn mở`: các bước, blocker hoặc quyết định còn lại cần xử lý tiếp.
 - Folder plan mới BẮT BUỘC bắt đầu bằng ngày tạo theo định dạng `YYYY-MM-DD-<slug>`, lấy ngày hiện tại của môi trường làm việc để dễ lọc và sắp xếp theo ngày.
   Giữ nguyên tiền tố ngày khi cập nhật hoặc resume; không tự đổi tên folder plan cũ.
 - Tiền tố ngày chỉ áp dụng cho tên folder; giữ nguyên tên file bên trong như `00-OVERVIEW.md` và `TASK-<NN>-<slug>.md`.

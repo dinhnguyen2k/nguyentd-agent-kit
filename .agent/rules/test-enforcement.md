@@ -1,9 +1,6 @@
 ---
-trigger: glob
-glob: "backend/**/*,frontend/**/*"
-description: "Test obligations and role boundaries: who writes and runs tests, invariants that require tests, test-spec-conflict."
-condition: ["backend/**/*", "frontend/**/*"]
-interruptMode: never
+trigger: model_decision
+description: "When the user explicitly requests running tests, authoring tests via test-author, or resolving a test-spec-conflict."
 ---
 
 # TEST-ENFORCEMENT.MD - Bắt Buộc Có Test

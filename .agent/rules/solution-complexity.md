@@ -1,8 +1,6 @@
 ---
-trigger: glob
-glob: "**/*"
-description: "Solution selection and complexity budget: understand deeply, reuse aggressively, change minimally."
-alwaysApply: true
+trigger: model_decision
+description: "When comparing multiple design options, introducing new abstractions/interfaces/files, or reviewing code complexity."
 ---
 
 # SOLUTION-COMPLEXITY.MD - Chọn Giải Pháp & Ngân Sách Độ Phức Tạp

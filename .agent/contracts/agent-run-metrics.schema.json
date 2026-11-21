@@ -8,12 +8,28 @@
   "properties": {
     "task_id": { "type": "string", "minLength": 1 },
     "tier": { "enum": ["fast", "standard", "governed"] },
-    "owner": { "enum": ["backend-specialist", "frontend-specialist", "verifier", "orchestrator"] },
+    "owner": {
+      "enum": [
+        "main",
+        "backend-specialist",
+        "frontend-specialist",
+        "test-author",
+        "verifier",
+        "researcher",
+        "reviewer",
+        "advisor",
+        "orchestrator"
+      ]
+    },
     "files_read": { "type": "integer", "minimum": 0 },
+    "duplicate_files_read": { "type": "integer", "minimum": 0 },
     "context_bytes": { "type": "integer", "minimum": 0 },
     "input_tokens": { "type": "integer", "minimum": 0 },
     "output_tokens": { "type": "integer", "minimum": 0 },
     "cache_read_tokens": { "type": "integer", "minimum": 0 },
+    "turns": { "type": "integer", "minimum": 0 },
+    "discovery_turns": { "type": "integer", "minimum": 0 },
+    "rework_loops": { "type": "integer", "minimum": 0 },
     "tool_calls": { "type": "integer", "minimum": 0 },
     "duration_ms": { "type": "integer", "minimum": 0 },
     "validation_status": { "enum": ["pass", "fail", "blocked", "not-run"] },

@@ -3,38 +3,20 @@ trigger: model_decision
 description: "When the user asks to fix bugs, analyze errors, investigate issues, run tests, or troubleshoot code."
 ---
 
-# DEBUG.MD - Systematic QA & Fix Protocol
+# DEBUG.MD - Quy Trình Điều Tra & Sửa Lỗi Theo Bằng Chứng
 
-> **Mục tiêu**: Điều tra, Sửa lỗi và Kiểm thử trong một luồng thống nhất.
+## 1. Điều tra từ bằng chứng hiện có (`AI_RULES.md` §2, §9)
+- Bắt đầu từ stack trace, thông báo lỗi, log hiện có, luồng code thực tế và chẩn đoán LSP thụ động.
+- Bắt buộc đọc và đối chiếu `.planning/errors/ERRORS.md` ngay khi điều tra để kiểm tra lỗi hoặc mẫu lỗi tương tự đã từng xảy ra, kế thừa nguyên nhân gốc và tránh lặp lại sai lầm cũ.
+- CẤM tự khởi động ứng dụng, tự viết script/test reproduce hay tự chạy lệnh build/lint/test trừ khi người dùng yêu cầu đích danh (`AI_RULES.md` §2).
+- Với yêu cầu chỉ đọc (`inspect`, `analyze`, `xem`, `phân tích`), giữ nguyên mã nguồn và báo cáo nguyên nhân kèm tọa độ `path:line`.
 
----
+## 2. Sửa đúng nguyên nhân gốc & Dọn dẹp
+- Lần theo luồng gọi thực tế tới đúng nơi sở hữu hành vi để sửa nguyên nhân gốc, không chèn nhánh vá triệu chứng hoặc nuốt lỗi ở tầng ngoài.
+- Kiểm tra các caller và nhánh biên dùng chung quy tắc bị lỗi để đảm bảo tính nhất quán.
+- Xóa toàn bộ log tạm hoặc mã gỡ lỗi chỉ phục vụ điều tra trước khi bàn giao, nhưng giữ nguyên log nghiệp vụ/vận hành của hệ thống.
 
-## 🕵️ 1. INVESTIGATION (Sherlock Mode)
-
-1. **Stack Trace**: Đừng đoán. Đọc log dòng đầu tiên.
-2. **Reproduce**: Viết một script/test nhỏ để tái hiện lỗi.
-3. **Isolate**: Tắt sác module xung quanh để khoanh vùng nghi phạm.
-4. **Error Log Review (Rà soát file lỗi)**: Trước và trong khi điều tra, BẮT BUỘC đọc và rà soát file `.planning/errors/ERRORS.md` để kiểm tra lỗi hoặc pattern tương tự đã từng xảy ra chưa, đối chiếu Root Cause và Fix Applied trước đó để kế thừa hoặc tránh lặp lại lỗi.
-
----
-
-## 🧪 2. TESTING STRATEGY (The Guard)
-
-1. **TDD Lite**: Viết test case đỏ (fail) trước khi sửa code.
-2. **Unit Test**: Test logic hàm lẻ.
-3. **Integration**: Test luồng API -> DB.
-
----
-
-## 🛠️ 3. FIXING PROTOCOL (Surgeon Mode)
-
-1. **Root Cause**: Sửa nguyên nhân, không sửa triệu chứng.
-2. **Regression Check**: Chạy lại bộ test cũ để đảm bảo không phá hỏng cái khác.
-3. **Cleanup**: Xóa mọi log debug sau khi xong.
-4. **Update Error Log**: Sau khi xử lý xong lỗi hoặc phát hiện lỗi có tính hệ thống/lặp lại, ghi nhận ngay vào `.planning/errors/ERRORS.md` theo format chuẩn của `.agent/rules/error-logging.md`.
-
----
-
-## 📝 4. REPORTING
-
-- Format: `[Lỗi] -> [Nguyên nhân] -> [Giải pháp] -> [Phòng ngừa]`.
+## 3. Regression Test & Nhật ký lỗi (`AI_RULES.md` §6, §9)
+- Agent triển khai không tự viết hoặc sửa cây test; khi cần khóa hành vi bằng regression test, báo rõ nhu cầu trong báo cáo bàn giao để Main điều phối `test-author` khi được người dùng mở quyền.
+- Nếu phát hiện test hiện hữu mâu thuẫn với đặc tả nghiệp vụ, dừng phần liên quan và báo `test-spec-conflict` để người dùng quyết định.
+- Khi xử lý xong lỗi có tính hệ thống hoặc lặp lại, cập nhật `.planning/errors/ERRORS.md` theo định dạng chuẩn tại `.agent/rules/error-logging.md`.

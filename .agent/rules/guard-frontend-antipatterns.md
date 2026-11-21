@@ -1,6 +1,4 @@
 ---
-trigger: glob
-glob: "frontend/**/*.{ts,tsx}"
 description: "Machine-checkable frontend anti-patterns (native number input, any, disabled exhaustive-deps, console.log, manual X-Employee-Id). Interrupts the edit and injects the fix."
 condition:
   - '<input[^>]{0,200}type=["'']number["'']'

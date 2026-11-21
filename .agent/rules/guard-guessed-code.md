@@ -1,6 +1,4 @@
 ---
-trigger: glob
-glob: "**/*.{cs,ts,tsx}"
 description: "Machine-checkable guessed code (literal || fallbacks, chained ??, as unknown as, non-null !., catch returning defaults, FirstOrDefault ?? new, placeholders). Interrupts the edit for every agent."
 condition:
   - '\|\|\s{0,3}(0|''''|""|``|\[\]|\{\}|null|undefined|false|''[^''\n]{1,30}''|"[^"\n]{1,30}")(?:\s|$|[;,)\]}])'

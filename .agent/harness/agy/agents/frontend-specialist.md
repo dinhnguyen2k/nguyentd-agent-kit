@@ -9,7 +9,7 @@ subagent: true
 
 ## AGY runtime
 
-- Subagent cần đọc `AI_RULES.md` trước khi sửa, kèm các rule liên quan tại `.agent/rules/frontend.md`, `.agent/rules/domain-parity.md`, `.agent/rules/code-style-concise.md` và `.agent/rules/test-enforcement.md`.
+- Subagent cần đọc `AI_RULES.md` trước khi sửa, kèm các rule liên quan tại `.agent/rules/frontend.md` và `.agent/rules/code-style-concise.md`; chỉ đọc `.agent/rules/domain-parity.md` khi chạm enum, nullable ID hoặc public contract.
 - Mọi lệnh chạy và thao tác ghi file đi qua `PreToolUse` hook `boundary-guard` tại `.agents/hooks.json`.
 - Nếu bị hook chặn thì dừng và báo nguyên văn lý do, không tự đổi role hay đi vòng.
 - Chỉ sửa trong `allowed_paths` được giao.

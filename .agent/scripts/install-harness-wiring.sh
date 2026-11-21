@@ -102,11 +102,17 @@ render_agents_dir() {
 echo "== claude =="
 link ".claude/settings.json"        "../.agent/harness/claude/settings.json"
 link ".claude/skills"               "../.agent/skills"
-link ".claude/agents/verifier.md"   "../../.agent/agents/verifier.md"
-link ".claude/agents/test-author.md" "../../.agent/agents/test-author.md"
-link ".claude/agents/researcher.md" "../../.agent/agents/researcher.md"
+link ".claude/rules"                "../.agent/rules"
+if [[ -d ".claude/commands" && ! -L ".claude/commands" ]] && (( ! CHECK_ONLY )); then
+  rm -rf ".claude/commands"
+  echo "  removed directory .claude/commands -> thay bằng symlink"
+fi
+link ".claude/commands"             "../.agent/workflows"
+for agent in verifier test-author researcher reviewer backend-specialist frontend-specialist; do
+  link ".claude/agents/$agent.md" "../../.agent/agents/$agent.md"
+done
 
-for stale in backend-specialist frontend-specialist tech-lead orchestrator; do
+for stale in tech-lead orchestrator command-agent-creator; do
   if [[ -e ".claude/agents/$stale.md" || -L ".claude/agents/$stale.md" ]]; then
     if (( CHECK_ONLY )); then
       echo "  STALE   .claude/agents/$stale.md"
@@ -141,19 +147,27 @@ if [[ ! -L ".agents/agents" ]]; then
 fi
 
 echo "== omp =="
-link ".omp/RULES.md"     "../.agent/harness/omp/RULES.md"
-link ".omp/WATCHDOG.md"  "../.agent/harness/omp/WATCHDOG.md"
-link ".omp/WATCHDOG.yml" "../.agent/harness/omp/WATCHDOG.yml"
-link ".omp/config.yml"   "../.agent/harness/omp/config.yml"
-link ".omp/lsp.json"     "../.agent/harness/omp/lsp.json"
-link ".omp/rules"        "../.agent/harness/omp/rules"
-link ".omp/hooks"        "../.agent/harness/omp/hooks"
+if [[ -e ".agent/harness/omp/RULES.md" && ! -L ".agent/harness/omp/RULES.md" ]] && (( ! CHECK_ONLY )); then
+  rm -f ".agent/harness/omp/RULES.md"
+fi
+link ".agent/harness/omp/RULES.md" "../../../AI_RULES.md"
+link ".omp/RULES.md"               "../AI_RULES.md"
+link ".omp/WATCHDOG.md"            "../.agent/harness/omp/WATCHDOG.md"
+link ".omp/WATCHDOG.yml"           "../.agent/harness/omp/WATCHDOG.yml"
+link ".omp/config.yml"             "../.agent/harness/omp/config.yml"
+link ".omp/lsp.json"               "../.agent/harness/omp/lsp.json"
+link ".omp/rules"                  "../.agent/harness/omp/rules"
+link ".omp/hooks"                  "../.agent/harness/omp/hooks"
 render_agents_dir ".agent/harness/omp/agents" ".omp/agents"
 
 echo "== entry files =="
 for f in CLAUDE.md GEMINI.md ANTIGRAVITY.md; do
   link "$f" "AGENTS.md"
 done
+if [[ -e ".agent/GEMINI.md" && ! -L ".agent/GEMINI.md" ]] && (( ! CHECK_ONLY )); then
+  rm -f ".agent/GEMINI.md"
+fi
+link ".agent/GEMINI.md" "../AGENTS.md"
 
 echo
 echo "Cưỡng chế ranh giới theo harness:"

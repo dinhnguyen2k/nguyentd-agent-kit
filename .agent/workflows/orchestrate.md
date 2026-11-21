@@ -21,11 +21,17 @@ If a task can be handled as `fast` or `standard`, stop tier escalation here and
 use the routed specialist. A formal plan, manifest, or extra agent is not a quality signal by
 itself.
 Fast/standard are intentional standalone, user-owned lanes, not implicitly governed.
-Main coordinates specialists directly with concise `allowed_paths`, `Reuse`, and `Acceptance`, accepting source evidence without a mandatory review gate.
 Do not add a governed manifest, independent verifier, or multi-slice plan merely to satisfy writer dispatch boundaries.
 
-Main áp dụng discovery, brief và Điều kiện dispatch tại `.agent/workflows/plan.md` trước mọi lane viết code.
-Fast/standard dùng assignment gọn, không tự nâng tier hoặc tạo artifact; worker nhận quyết định đã chốt, không lịch sử suy luận hay discovery còn mở.
+Ở bậc `fast`/`standard` (một nhánh cục bộ), Main không nạp toàn bộ `.agent/workflows/plan.md` mà giao trực tiếp gói 6 mục gọn cho specialist và nghiệm thu trên bằng chứng mã nguồn mà không cần cổng review bắt buộc:
+1. `Mục tiêu & Acceptance`: kết quả quan sát được cần đạt cho luồng chính và nhánh biên/lỗi.
+2. `Contract/bất biến đã khóa`: signature, DTO, enum/nullability và hành vi phải giữ nguyên.
+3. `Tọa độ path:line & allowed_paths`: danh sách tệp được phép ghi kèm tọa độ khai báo/điểm sửa.
+4. `Bằng chứng đã xác minh`: các seam tái sử dụng và điều kiện gọi Main đã kiểm tại ranh giới.
+5. `Ngoài phạm vi & skill cần nạp`: phần cấm chạm, giới hạn lệnh kiểm tra và skill miền cần đọc.
+6. `Mẫu bàn giao`: tệp đã sửa, chẩn đoán LSP lượt cuối, trạng thái Validation và rủi ro còn lại.
+
+Main chỉ mở `.agent/workflows/plan.md` khi tạo mới/mở rộng màn hình, luồng duyệt, báo cáo (để khóa 5 bất biến nghiệp vụ theo `[skill:cogain-screen-archetypes]`), hoặc khi bước sang bậc `governed` / nhiều slice; worker nhận quyết định đã chốt, không nhận lịch sử suy luận hay discovery còn mở.
 
 Read-only returns answer and source citations only, no files absent explicit write permission.
 Single-slice persistence is a compact canonical contract/checkpoint only when handoff/resume or writer dispatch needs it; multi-slice uses overview + TASK.

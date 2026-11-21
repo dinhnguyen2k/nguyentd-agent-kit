@@ -4,23 +4,46 @@
   "base_files": [
     "AGENTS.md",
     "AI_RULES.md",
-    "OPINION.md",
     ".agent/rules/GEMINI.md",
-    ".agent/GEMINI.md",
     ".agent/START_HERE.md"
   ],
   "profiles": {
     "backend-specialist": {
       "file": ".agent/agents/backend-specialist.md",
-      "domain_rule": ".agent/rules/backend.md"
+      "domain_rule": ".agent/rules/backend.md",
+      "auto_glob_rules": [
+        ".agent/rules/backend.md",
+        ".agent/rules/business.md",
+        ".agent/rules/backend-pragmatic-solid.md",
+        ".agent/rules/code-style-concise.md"
+      ]
     },
     "frontend-specialist": {
       "file": ".agent/agents/frontend-specialist.md",
-      "domain_rule": ".agent/rules/frontend.md"
+      "domain_rule": ".agent/rules/frontend.md",
+      "auto_glob_rules": [
+        ".agent/rules/frontend.md",
+        ".agent/rules/business.md",
+        ".agent/rules/code-style-concise.md"
+      ]
     },
     "verifier": {
       "file": ".agent/agents/verifier.md",
-      "domain_rule": null
+      "domain_rule": null,
+      "auto_glob_rules": []
+    },
+    "test-author": {
+      "file": ".agent/agents/test-author.md",
+      "domain_rule": ".agent/rules/testing-standard.md",
+      "auto_glob_rules": [
+        ".agent/rules/testing-standard.md",
+        ".agent/rules/code-style-concise.md"
+      ]
+    },
+    "researcher": {
+      "file": ".agent/agents/researcher.md",
+      "domain_rule": null,
+      "auto_glob_rules": []
     }
   },
   "core_codebase_files": [

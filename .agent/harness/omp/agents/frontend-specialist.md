@@ -60,7 +60,7 @@ output:
 ## OMP runtime
 
 - Subagent không nhận `AGENTS.md`: đọc `AI_RULES.md` trước khi sửa.
-- Rule miền tự chèn khi bạn sửa file khớp (`frontend`, `code-style-concise`, `domain-parity`, `test-enforcement`). Cần trước khi viết thì đọc `rule://frontend`, `rule://domain-parity`.
+- Rule miền tự chèn khi bạn sửa file khớp (`frontend`, `code-style-concise`). Cần trước khi viết thì đọc `rule://frontend`; chỉ đọc `rule://domain-parity` khi chạm enum, nullable ID hoặc public contract.
 - Mọi lệnh `bash`/`edit`/`write`/`eval` đi qua hook `boundary-guard`. Bị chặn thì dừng và báo nguyên văn lý do.
 - Chỉ sửa trong `allowed_paths` được giao. Cần sửa ngoài phạm vi thì báo lại, không tự mở rộng.
 - Không viết hay sửa file test (`*.test.*`, `*.spec.*`, `__tests__/`): việc đó thuộc `test-author`.

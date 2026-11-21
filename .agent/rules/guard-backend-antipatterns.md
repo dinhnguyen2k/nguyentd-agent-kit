@@ -1,6 +1,4 @@
 ---
-trigger: glob
-glob: "backend/**/*.cs"
 description: "Machine-checkable backend anti-patterns (empty catch, ad-hoc 401/403/409, hardcoded secrets). Interrupts the edit and injects the fix."
 condition:
   - 'catch\s{0,5}(\([^)]{0,200}\))?\s{0,5}\{\s{0,5}\}'
