@@ -9,7 +9,8 @@
 - Source code and `AI_RULES.md` remain higher-priority truth sources.
 - Quarantined skills live under `.agent/quarantine/skills` and are not part of active auto-discovery.
 
-## Project-Native (7)
+
+## Project-Native (8)
 
 - `cogain-agent-gotchas`: Prevents recurring Cogain-specific mistakes learned from .planning/errors/ERRORS.md. Use during debugging, review, or implementation near AutoFilter, API integration, EF reflection/child relations, React Hook Form, Radix controls, and shared tables.
 - `cogain-baseservice-hooks`: Extends Cogain BaseService through supported hooks without replacing shared CRUD orchestration. Use when changing CRUD, AutoFilter, create/update/delete lifecycles, dropdowns, or shared service behavior in backend/**.
@@ -17,9 +18,10 @@
 - `cogain-excel-import-export`: Extends Cogain BaseService Excel import/export through supported hooks, ClosedXML conventions, validation, batch lookup, and compensation rules. Use for ImportFromExcel, ExportTemplateAsync, ExportDataAsync, templates, or spreadsheet mappings.
 - `cogain-form-rhf-zod`: Implements Cogain React Hook Form and Zod forms with safe API hydration, empty-value normalization, watched-field effects, and backend validation parity. Use when changing frontend forms, schemas, zodResolver, reset, setValue, or nullable IDs.
 - `cogain-query-cache`: Maintains Cogain TanStack Query keys, mutations, invalidation, and cache consistency. Use when adding or changing frontend query hooks, mutation success handlers, optimistic updates, or cross-view refresh behavior.
+- `cogain-react-state-effects`: Enforces Cogain React 19.1 + Vite SWC state ownership and eliminates unnecessary useEffect across TanStack Router, TanStack Query, React Hook Form, and Radix UI. Use when adding or changing component state, derived values, useEffect, ref callbacks, URL filters, or form/query synchronization in frontend/**.
 - `cogain-screen-archetypes`: Maps Cogain feature and screen archetypes to mandatory backend helpers and frontend shared components. Use when planning, creating, reviewing, or refactoring CRUD list screens, document forms, HR confirmation flows, or payroll/period reports.
 
-## Generic / Transferable (64)
+## Generic / Transferable (63)
 
 - `agent-backend-patterns`: Backend patterns for the Cogain ASP.NET Core 8 microservices backend (C#). Layered architecture (API -> Services -> Repositories -> Data), Result<T> contract, BaseService hooks, EF Core / PostgreSQL optimization, transactions & compensation, Redis caching, permission-based authorization, Serilog logging. Use when writing, reviewing, or auditing anything under `backend/**`.
 - `agent-frontend-patterns`: Provides generic React component composition, memoization, code-splitting, virtualization, and accessibility techniques. Use when frontend-development routes to a specific technique; do not use Next.js-only examples in Cogain Vite apps.
@@ -68,7 +70,6 @@
 - `plan`: Main nghiên cứu, chốt giải pháp và giao contract thực thi gọn. Use when creating an actionable implementation plan.
 - `playwright-skill`: Use when testing or automating browser behavior with Playwright, including forms, screenshots, responsive checks, login flows, links, and focused web interactions.
 - `postgresql`: Designs and reviews PostgreSQL schemas, data types, indexes, constraints, and query patterns. Use for PostgreSQL-specific data modeling or persistence decisions; not generic database administration.
-- `react-patterns`: Applies React hooks, component composition, effects, and measured rendering patterns. Use for non-trivial component behavior or reusable React APIs; not for routine styling.
 - `realtime`: Realtime communication integration with Socket.io, WebRTC, or SSE. Use when implementing real-time messaging, streaming, or websocket connections.
 - `release-version`: Tự động cập nhật phiên bản và đồng bộ toàn bộ tài liệu hệ thống. Use when releasing a new version, bumping version numbers, and syncing docs.
 - `requesting-code-review`: Use before merging governed work or when an explicit independent review is requested.
@@ -86,7 +87,7 @@
 - `vulnerability-scanner`: Use when reviewing code, configuration, dependencies, or architecture for security vulnerabilities and exploitability.
 - `webapp-testing`: Plans broad browser-based web application audits and E2E coverage. Use for explicit deep webapp testing across routes or flows; use playwright-skill for a focused browser interaction.
 
-## Quarantined (60)
+## Quarantined (61)
 
 - `agent-coding-standards`: Meta guidance already carried by AI_RULES.md and clean-code. Owner after cleanup: `AI_RULES.md`.
 - `agent-continuous-learning`: Stub content without executable procedure or reliable freshness model. Owner after cleanup: `skill-governance`.
@@ -132,8 +133,9 @@
 - `postgres-best-practices`: Supabase and Prisma guidance does not match Cogain PostgreSQL/EF Core ownership. Owner after cleanup: `postgresql`.
 - `preview`: Generic preview wrapper superseded by playwright-skill and explicit user runtime checks. Owner after cleanup: `playwright-skill`.
 - `react-best-practices`: Next.js, RSC, NextAuth, and App Router guidance conflicts with Cogain React/Vite SPAs. Owner after cleanup: `frontend-development`.
-- `react-state-management`: Zustand/Query guidance already owned by cogain-query-cache and react-patterns. Owner after cleanup: `react-patterns`.
-- `react-ui-patterns`: Overlaps react-patterns, the skill frontend-development routes to. Owner after cleanup: `react-patterns`.
+- `react-patterns`: Truncated generic React notes (SWR, Redux, useActionState, assumed React Compiler) conflict with Cogain Vite SWC, RHF, and TanStack Router/Query stack; state ownership and useEffect gate moved to cogain-react-state-effects. Owner after cleanup: `cogain-react-state-effects`.
+- `react-state-management`: Zustand/Query and state-ownership guidance already owned by cogain-query-cache and cogain-react-state-effects. Owner after cleanup: `cogain-react-state-effects`.
+- `react-ui-patterns`: Overlaps cogain-react-state-effects, the skill frontend-development routes to. Owner after cleanup: `cogain-react-state-effects`.
 - `senior-architect`: Too broad, multi-stack persona overlaps architecture and project-native routing. Owner after cleanup: `architecture`.
 - `seo`: SEO/GEO marketing optimization is outside internal Cogain ERP apps. Owner after cleanup: `none`.
 - `status`: Generic status dashboard prompt outside Cogain engineering workflows. Owner after cleanup: `none`.

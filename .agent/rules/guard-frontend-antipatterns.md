@@ -19,10 +19,10 @@ Code vừa viết khớp một mẫu bị cấm. Sửa trước khi viết tiế
 
 | Mẫu | Luật nguồn | Cách sửa |
 | --- | --- | --- |
-| `<input type="number">` | `frontend.md` §5 | Dùng `NumericInput` từ `@shared/ui` |
-| `: any`, `as any` | `frontend.md` mục tự rà lỗi | Khai báo type thật; lấy type từ `@shared/types` |
-| `eslint-disable ... react-hooks/exhaustive-deps` | `frontend.md` mục tự rà lỗi | Sửa dependency array cho đủ và stable (`useCallback`/`useMemo`), không tắt rule |
-| `console.log(` | `code-quality.md` §1 | Xoá trước khi bàn giao |
-| Gán tay header `X-Employee-Id` | `frontend.md` §8 | Để interceptor của `api-client` tự gán |
+| `<input type="number">` | `.agent/rules/references/frontend.md` (mục `Lookup và table`) | Dùng `NumericInput` từ `@shared/ui` |
+| `: any`, `as any` | `.agent/rules/references/frontend.md` (mục `Data flow và shared contracts`) & `.agent/rules/code-quality.md` | Khai báo type thật; lấy type từ `@shared/types` |
+| `eslint-disable ... react-hooks/exhaustive-deps` | `[skill:cogain-react-state-effects]` & `[skill:cogain-agent-gotchas]` | Chuyển về đúng chủ sở hữu state (render derivation / event handler) hoặc sửa dependency array ổn định (`useCallback`/`useMemo`), không tắt rule |
+| `console.log(` | `.agent/rules/code-quality.md` §1 | Xoá trước khi bàn giao |
+| Gán tay header `X-Employee-Id` | `.agent/rules/references/frontend.md` (mục `Chung`) | Để interceptor của `api-client` tự gán |
 
 Nếu đây là trường hợp hợp lệ, ghi rõ lý do trong báo cáo bàn giao.

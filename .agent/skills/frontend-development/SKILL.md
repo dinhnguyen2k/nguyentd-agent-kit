@@ -20,7 +20,7 @@ Use this as a router, not a React textbook. `AI_RULES.md`, `.agent/rules/fronten
 | React Hook Form, Zod, reset/hydration, nullable IDs      | [skill:cogain-form-rhf-zod]                                              |
 | Recurring API, EF-to-UI, Radix, effect, or table failure | [skill:cogain-agent-gotchas]                                             |
 | Triển khai, sửa hoặc chẩn đoán search/filter danh sách | [Search và filter](references/search-and-filter.md), chỉ đọc khi task chạm luồng này |
-| Component composition/effects                            | [skill:react-patterns]                                                   |
+| Component composition, state ownership, or useEffect     | [skill:cogain-react-state-effects]                                       |
 | Reusable TypeScript generics                             | [skill:typescript-pro]                                                   |
 | Tailwind tokens/shared primitives                        | [skill:tailwind-patterns] and, only when shared, [skill:core-components] |
 | Explicit design/visual exploration                       | [skill:frontend-design]                                                  |

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-05",
+  "updatedAt": "2026-11-21",
   "scope": "Shared local agent system for Claude, Codex, and Antigravity in cogain-core",
   "activeSkillRoot": ".agent/skills",
   "quarantineSkillRoot": ".agent/quarantine/skills",
@@ -340,14 +340,19 @@
       "ownerAfterCleanup": "frontend-development"
     },
     {
+      "name": "react-patterns",
+      "reason": "Truncated generic React notes (SWR, Redux, useActionState, assumed React Compiler) conflict with Cogain Vite SWC, RHF, and TanStack Router/Query stack; state ownership and useEffect gate moved to cogain-react-state-effects.",
+      "ownerAfterCleanup": "cogain-react-state-effects"
+    },
+    {
       "name": "react-state-management",
-      "reason": "Zustand/Query guidance already owned by cogain-query-cache and react-patterns.",
-      "ownerAfterCleanup": "react-patterns"
+      "reason": "Zustand/Query and state-ownership guidance already owned by cogain-query-cache and cogain-react-state-effects.",
+      "ownerAfterCleanup": "cogain-react-state-effects"
     },
     {
       "name": "react-ui-patterns",
-      "reason": "Overlaps react-patterns, the skill frontend-development routes to.",
-      "ownerAfterCleanup": "react-patterns"
+      "reason": "Overlaps cogain-react-state-effects, the skill frontend-development routes to.",
+      "ownerAfterCleanup": "cogain-react-state-effects"
     },
     {
       "name": "senior-architect",

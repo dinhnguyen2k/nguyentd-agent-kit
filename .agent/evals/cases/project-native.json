@@ -109,7 +109,7 @@
       "expected_behavior": [
         "Makes the effect idempotent by comparing getValues before setValue",
         "Hoists watched values instead of calling watch in dependency expressions",
-        "Adds regression coverage when practical"
+        "Reports regression coverage need to Main without editing test files directly unless authorized as test-author"
       ],
       "forbidden_behavior": [
         "Uses a changing key prop to force remounts as the primary fix"
@@ -162,6 +162,55 @@
       "forbidden_behavior": [
         "Builds a manual id: 'actions' column or standalone DeleteConfirm state instead of CustomTable rowActions",
         "Uses .catch('') in route SearchSchema or z.string().uuid() for .NET Guid fields"
+      ]
+    },
+    {
+      "id": "state-effect-dependent-form-field",
+      "skills": [
+        "cogain-react-state-effects",
+        "cogain-form-rhf-zod"
+      ],
+      "query": "When the user changes source warehouse or RefDocumentSelector in a Cogain React Hook Form, clear dependent child fields and load source details.",
+      "expected_behavior": [
+        "Clears dependent child fields and triggers source loading directly inside the source field event handler (onValueChange or requestSourceContextChange)",
+        "Guards async responses against stale races after await by checking current form state via form.getValues",
+        "Reports regression coverage need to Main without editing test files directly unless authorized as test-author"
+      ],
+      "forbidden_behavior": [
+        "Chains form.watch + useEffect + form.setValue to reset dependent fields",
+        "Calls form.setValue directly during render",
+        "Wraps form.setValue in queueMicrotask or setTimeout to silence render-phase update errors"
+      ]
+    },
+    {
+      "id": "state-effect-derived-query-data",
+      "skills": [
+        "cogain-react-state-effects"
+      ],
+      "query": "Compute filtered combobox options and total weight from TanStack Query data and watched form values in a Cogain Vite SWC React 19.1 screen.",
+      "expected_behavior": [
+        "Computes derived values directly during render (using useWatch for form values) or via useQuery select",
+        "Uses useMemo selectively to keep columns or options referentially stable for tables/shared controls or for expensive computations in Vite SWC without React Compiler"
+      ],
+      "forbidden_behavior": [
+        "Copies query.data or derived values into useState via useEffect",
+        "Uses useEffectEvent while the workspace targets react@^19.1.1"
+      ]
+    },
+    {
+      "id": "state-effect-safe-edit-hydration",
+      "skills": [
+        "cogain-react-state-effects",
+        "cogain-form-rhf-zod"
+      ],
+      "query": "Fix a Cogain edit Sheet form where background TanStack Query refetches reset the form and wipe unsaved user input.",
+      "expected_behavior": [
+        "Prefers mounting <FormBody key={recordId} defaultValues={mapped} /> only after query data is ready, or uses useForm({ values: mapped, resetOptions: { keepDirtyValues: true } }) or an idempotent hydration session lock (hydratedKeyRef keyed by open + mode + id)",
+        "Normalizes nullable API fields to form-safe values when hydrating"
+      ],
+      "forbidden_behavior": [
+        "Calls unguarded form.reset(query.data) inside useEffect whenever the query.data reference changes",
+        "Weakens the form type to any"
       ]
     }
   ]

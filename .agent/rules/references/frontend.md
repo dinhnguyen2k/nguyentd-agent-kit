@@ -16,28 +16,38 @@ Chỉ đọc mục được router `.agent/rules/frontend.md` chỉ định trư
 - Đổi bất kỳ `package.json` nào thì commit phải kèm `pnpm-lock.yaml` đã cập nhật; agent không ghi lockfile, user chạy `pnpm install` trước. Lockfile chưa khớp thì không push.
 
 ## Quy ước import module từ @shared
-Mục tiêu: import gọn, gom nhiều symbol cùng nguồn trên một dòng; chỉ tách subpath cho module nặng. Chưa refactor `frontend/shared`, nên barrel gốc vẫn là cách viết chuẩn cho module nhẹ.
+CẤM import qua barrel `@shared/components`, `@shared/hooks` (kể cả `@shared/hooks/master-data`), `@shared/services` (kể cả hậu tố `/index`).
+Mọi component, hook và service dùng chung phải import trực tiếp từ subpath file định nghĩa để tối ưu đóng gói Vite và khớp bộ chặn `R10-no-shared-barrel`.
 
-| Loại import | Cách viết |
+| Loại import | Cách viết chuẩn |
 | --- | --- |
-| Component nhẹ (`Container`, `CustomSelect`, `TreeTable`, `DebouncedInput`, `StatusTag`, `deepFilterTree`...) | Gom một dòng qua `@shared/components` |
-| UI primitive (`Button`, `Input`, `Checkbox`, `Dialog`, `Combobox`...) | Gom một dòng qua `@shared/ui` |
+| Component dùng chung (`Container`, `CustomTable`, `CustomSelect`, `TreeTable`, `TableToolbar`, `MasterDetailLayout`, `QueryStateGate`...) | Import trực tiếp từ subpath định nghĩa (ví dụ `@shared/components/container`, `@shared/components/custom-table`, `@shared/components/custom/custom-select`, `@shared/components/custom/tree-table`, `@shared/components/custom/table-toolbar`, `@shared/components/master-detail-layout`, `@shared/components/query-state-gate`) |
+| Component dùng `export default` (`StatusTag`, `DebouncedInput`, `DateRangeInput`, `ModifierInfo`, `DebouncedTextarea`) | Bắt buộc viết default import từ subpath gốc (`import StatusTag from '@shared/components/common/status-tag'`, `import DebouncedInput from '@shared/components/custom/debounce-input'`, `import DateRangeInput from '@shared/components/custom/date-range-input'`, `import ModifierInfo from '@shared/components/modifier-info'`, `import DebouncedTextarea from '@shared/components/custom/debounce-textarea'`); cấm viết named import `{ DebouncedInput }` |
+| 4 symbol đổi tên (import trực tiếp qua subpath, không đi qua `@shared/components`) | `formatAttachmentBytes` từ `@shared/components/attachment-upload-item`; `TreeTableGlobalFilterElementProps`, `TreeTableTitleProps` từ `@shared/components/custom/tree-table`; `BusinessProcessManagement` từ `@shared/components/master-data/business-process` (hoặc `@shared/components/master-data/business-process/business-process-page`) |
+| Hook và service | Import trực tiếp subpath file định nghĩa (ví dụ `@shared/hooks/use-audit-columns`, `@shared/hooks/master-data/use-enum-labels`, `@shared/services/...`) |
+| UI primitive nhẹ (`Button`, `Input`, `Checkbox`, `Dialog`, `NumericInput`, `Combobox`...) | Gom một dòng qua `@shared/ui` (hoặc subpath `@shared/ui/...`) |
 | `ChartContainer`, `ChartTooltip`, `ChartLegend`, `Calendar`, `Sidebar`, `SidebarProvider` | Bắt buộc subpath `@shared/ui/chart`, `@shared/ui/calendar`, `@shared/ui/sidebar` |
 | Editor tiptap (`RichTextEditor`, `NotionEditor`) | Bắt buộc subpath `@shared/components/tiptap/...`, ưu tiên `lazy()` tại route dùng |
-| Hook, service, type, enum | Dùng barrel `@shared/hooks`, `@shared/services`, `@shared/types`, `@shared/enums` hoặc subpath đang có trong file; không ép đổi |
+| Type, enum, helper, permission | Dùng `@shared/types/...` (hoặc `@shared/types`), `@shared/enums/...` (hoặc `@shared/enums`), `@shared/lib/...` (hoặc `@shared/lib`), `@shared/permission` |
 
 Ví dụ chuẩn:
 
 ```ts
-import { Container, CustomSelect, DebouncedInput, StatusTag, TreeTable, deepFilterTree, sortTreeData } from '@shared/components';
-import { Button, Checkbox, Dialog } from '@shared/ui';
+import StatusTag from '@shared/components/common/status-tag';
+import { Container } from '@shared/components/container';
+import { CustomTable } from '@shared/components/custom-table';
+import { CustomSelect } from '@shared/components/custom/custom-select';
+import DebouncedInput from '@shared/components/custom/debounce-input';
+import { deepFilterTree, sortTreeData, TreeTable, type TreeTableTitleProps } from '@shared/components/custom/tree-table';
+import { useAuditColumns } from '@shared/hooks/use-audit-columns';
+import { Button, Checkbox, Dialog, NumericInput } from '@shared/ui';
 import { ChartContainer } from '@shared/ui/chart';
 ```
 
-- Trong một file, mỗi nguồn chỉ một câu import; không tách cùng nguồn ra nhiều dòng, không trộn barrel và subpath cho module nhẹ cùng nhóm.
-- Khi import subpath, đọc kiểu export của file gốc trước: file `export default` (`StatusTag`, `DebouncedInput`, `DateRangeInput`, `ModifierInfo`, `DebouncedTextarea`) phải viết `import DebouncedInput from '@shared/components/custom/debounce-input'`; cấm `{ DebouncedInput }` vì file gốc không có named export đó. Symbol bị barrel đổi tên (`formatAttachmentBytes`, `BusinessProcessManagement`, `TreeTableGlobalFilterElementProps`, `TreeTableTitleProps`) chỉ tồn tại qua `@shared/components`.
-- Không refactor import cũ ngoài phạm vi task; không sửa `index.ts` hay file gốc trong `frontend/shared/**` khi chưa có task kiến trúc riêng.
-- Khi có barrel nhóm (ví dụ `@shared/components/custom`), rule này sẽ chuyển từ barrel gốc sang barrel nhóm; trước thời điểm đó không tự tạo barrel mới.
+- Mỗi nguồn import bắt buộc viết gọn trên một dòng (kể cả `import type` và khi gom nhiều symbol cùng subpath); không tách cùng một nguồn ra nhiều câu import.
+- Khi import subpath, đọc kiểu export của file gốc trước để phân biệt named export và `export default`.
+- Không tự refactor các dòng import cũ ngoài phạm vi task đang chạm.
+- Không sửa `index.ts` hay tự tạo barrel mới trong `frontend/shared/**` khi chưa có task kiến trúc riêng.
 
 ## Index page
 - Index page dạng bảng bắt buộc dùng `TableToolbar` shared; dùng search có sẵn của layout/toolbar, không dựng ô search riêng.

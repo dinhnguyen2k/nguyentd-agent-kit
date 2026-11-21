@@ -66,6 +66,6 @@ const Card = ({ padding = '$4', variant = 'elevated', children }: CardProps) => 
 
 ## Integration with Other Skills
 
-- **react-patterns**: Use core components for UI states
+- **cogain-react-state-effects**: Use core components for UI states
 - **testing-patterns**: Mock core components in tests
 - **storybook**: Document component variants
