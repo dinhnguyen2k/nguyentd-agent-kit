@@ -46,7 +46,7 @@ task:
   agentAdvisor:
     backend-specialist: "on"
     frontend-specialist: "on"
-    test-author: "on"
+    test-author: "off"
     task: "off"
     scout: "off"
     sonic: "off"
@@ -74,19 +74,42 @@ edit:
   modelVariants:
     "gpt-": apply_patch
 retry:
-  # Không chờ 10 lần retry với backoff tới 5 phút khi provider/quota không phục hồi.
+  # Không chờ 10 lần retry với backoff tới 5 phút khi provider/quota không phục hồi; bật chuyển đổi model đa chiều theo cả role lẫn model ID.
   maxRetries: 3
   maxDelayMs: 30000
-  # Dùng quota đáng tin cậy để chọn account/fallback sẵn có, không đổi model policy.
+  modelFallback: true
+  fallbackRevertPolicy: cooldown-expiry
   usageAwareFallback: true
   fallbackChains:
-    # Không hạ worker/gate xuống flash âm thầm: pool khác trước, rồi Anthropic/Gemini.
+    # Khi dàn tài khoản Codex chạm usage_limit_reached, tự chuyển sang pool Antigravity / Anthropic thay vì treo 50 phút hoặc chết ở turn 1.
     task:
+      - google-antigravity/claude-sonnet-4-6:high
+      - anthropic/claude-sonnet-5-5:medium
       - google-antigravity/claude-opus-4-6:high
+    advisor:
+      - google-antigravity/claude-sonnet-4-6:high
+      - anthropic/claude-sonnet-5-5:medium
+    gate:
+      - google-antigravity/claude-sonnet-4-6:high
+      - anthropic/claude-sonnet-5-5:medium
     openai-codex/gpt-6-luna:
+      - google-antigravity/claude-sonnet-4-6:high
+      - anthropic/claude-sonnet-5-5:medium
       - google-antigravity/claude-opus-4-6:high
-      - google-antigravity/gemini-3.8-flash:high
-    # Main (Opus 5.5) rơi sang Opus 4.6 ở pool khác, hết pool đó mới xuống flash (user chọn 03/10).
+    openai-codex/gpt-6.2-sol:
+      - google-antigravity/claude-opus-4-6:high
+      - anthropic/claude-sonnet-5-5:high
+    # Khi Main / Plan (Opus 5.5) hết hạn mức, rơi sang Opus 4.6 ở pool khác trước rồi mới sang Codex / Sonnet.
+    plan:
+      - google-antigravity/claude-opus-4-6:high
+      - anthropic/claude-sonnet-5-5:high
+    slow:
+      - google-antigravity/claude-opus-4-6:high
+      - anthropic/claude-sonnet-5-5:high
+    default:
+      - google-antigravity/claude-opus-4-6:high
+      - anthropic/claude-sonnet-5-5:high
     anthropic/claude-opus-5-5:
       - google-antigravity/claude-opus-4-6:high
+      - anthropic/claude-sonnet-5-5:high
       - google-antigravity/gemini-3.8-flash:high

@@ -99,6 +99,8 @@ type WorkflowHookAPI = {
 
 const CUSTOM_TYPE = "cogain.workflow";
 const MAX_REWORK_CONTINUATIONS_PER_HANDLE = 2;
+const MAX_AUDIT_WAVES_PER_USER_TURN = 1;
+const AUDIT_AGENT_NAMES = new Set(["reviewer", "security-reviewer"]);
 const SHORT_STOP_CONTROL_RE = /^\s*(?:dừng|stop|cancel|abort|hủy|thôi)\b/i;
 const LIFECYCLE_POLICY_MARKER = "<!-- cogain-workflow-lifecycle -->";
 const LIFECYCLE_POLICY_BLOCK = `${LIFECYCLE_POLICY_MARKER}
@@ -185,12 +187,19 @@ type PlanArmedDecision = {
 	planDir: string;
 };
 
+type AuditWaveDecision = {
+	version: 1;
+	type: "audit_wave";
+	agents: string[];
+};
+
 type WorkflowDecisionEntry =
 	| TaskDispatchDecision
 	| ContinuationContractDecision
 	| ContinuationDeltaDecision
 	| TodoSnapshotDecision
-	| PlanArmedDecision;
+	| PlanArmedDecision
+	| AuditWaveDecision;
 
 type MainTaskRecord = {
 	id: string;
@@ -220,6 +229,7 @@ type MainState = {
 	completedTodoCount: number;
 	todoSample: string[];
 	lastUserText: string;
+	auditWaveCountSinceUser: number;
 	progressMarker: number;
 };
 
@@ -328,6 +338,7 @@ function reconstructMainState(branch: SessionEntry[]): MainState {
 	let completedTodoCount = 0;
 	let todoSample: string[] = [];
 	let lastUserText = "";
+	let auditWaveCountSinceUser = 0;
 	let dispatchEvents = 0;
 
 	for (const entry of branch) {
@@ -335,6 +346,7 @@ function reconstructMainState(branch: SessionEntry[]): MainState {
 			const txt = extractMessageText(entry.message.content);
 			if (txt && !txt.startsWith("[Wait interrupted by message]")) {
 				lastUserText = txt;
+				auditWaveCountSinceUser = 0;
 			}
 			continue;
 		}
@@ -424,6 +436,8 @@ function reconstructMainState(branch: SessionEntry[]): MainState {
 				todoSample = data.sample;
 			} else if (data.type === "plan_armed") {
 				planDir = data.planDir;
+			} else if (data.type === "audit_wave") {
+				auditWaveCountSinceUser += 1;
 			}
 		}
 	}
@@ -439,6 +453,7 @@ function reconstructMainState(branch: SessionEntry[]): MainState {
 		completedTodoCount,
 		todoSample,
 		lastUserText,
+		auditWaveCountSinceUser,
 		progressMarker: completedTodoCount * 1000 + dispatchEvents * 100 + completedTaskCount * 10,
 	};
 }
@@ -508,6 +523,24 @@ export default function workflowContext(pi: WorkflowHookAPI): void {
 				return;
 			}
 
+			if (event.toolName === "task") {
+				const rawInput = (event.input ?? {}) as { agent?: unknown; tasks?: Array<{ agent?: unknown }> };
+				const items = Array.isArray(rawInput.tasks) ? rawInput.tasks : [rawInput];
+				const touchesAuditAgent = items.some(it => typeof it?.agent === "string" && AUDIT_AGENT_NAMES.has(it.agent));
+				if (touchesAuditAgent) {
+					const state = reconstructMainState(ctx.sessionManager.getBranch());
+					if (state.auditWaveCountSinceUser >= MAX_AUDIT_WAVES_PER_USER_TURN) {
+						return {
+							block: true,
+							reason:
+								`[audit-loop-cap] Đã chạy đủ trần ${MAX_AUDIT_WAVES_PER_USER_TURN} đợt kiểm toán độc lập (reviewer/security-reviewer) trong lượt yêu cầu hiện tại. ` +
+								`CẤM tự mở thêm vòng kiểm toán mới nối đuôi sau khi đã sửa xong hoặc sau khi cổng kiểm tra đã xanh (tránh đẻ thêm TASK mới vô tận và đốt cạn token). ` +
+								`Hãy hoàn tất dứt điểm các mục đang mở, chạy cổng kiểm tra chốt một lần (nếu được cấp quyền) và bàn giao kết quả cho người dùng.`,
+						};
+					}
+				}
+			}
+
 			if (event.toolName === "write") {
 				const input = event.input as { path?: unknown; content?: unknown } | undefined;
 				const path = typeof input?.path === "string" ? input.path : "";
@@ -568,6 +601,7 @@ export default function workflowContext(pi: WorkflowHookAPI): void {
 			const taskItems = Array.isArray(rawInput.tasks) ? rawInput.tasks : [rawInput];
 			const details = event.details as { progress?: Array<{ index?: number; id?: string; agent?: string }> } | undefined;
 			const progressList = Array.isArray(details?.progress) ? details.progress : [];
+			const auditAgentsInBatch: string[] = [];
 
 			taskItems.forEach((item, index) => {
 				if (!item || typeof item !== "object") return;
@@ -581,6 +615,10 @@ export default function workflowContext(pi: WorkflowHookAPI): void {
 						: typeof item.agent === "string" && item.agent.length > 0
 							? item.agent
 							: undefined;
+
+				if (actualAgent && AUDIT_AGENT_NAMES.has(actualAgent)) {
+					auditAgentsInBatch.push(actualAgent);
+				}
 
 				const contract = parseContractInfo(taskBrief);
 				if (root) {
@@ -609,6 +647,9 @@ export default function workflowContext(pi: WorkflowHookAPI): void {
 				};
 				pi.appendEntry(CUSTOM_TYPE, decision);
 			});
+			if (auditAgentsInBatch.length > 0) {
+				pi.appendEntry(CUSTOM_TYPE, { version: 1, type: "audit_wave", agents: auditAgentsInBatch } satisfies AuditWaveDecision);
+			}
 			return;
 		}
 

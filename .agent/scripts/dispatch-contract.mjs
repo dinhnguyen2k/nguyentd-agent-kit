@@ -39,7 +39,10 @@ function checkEvidence(root, reference, lineCounts, sourcePaths) {
     const source = readFileSync(absolute, 'utf8');
     lineCounts.set(path, source.length === 0 ? 0 : source.split('\n').length - Number(source.endsWith('\n')));
   }
-  if (end > lineCounts.get(path)) fail(`Evidence vượt số dòng source: ${reference}; ${path} có ${lineCounts.get(path)} dòng.`);
+  const lineCount = lineCounts.get(path);
+  if (start > Math.max(lineCount, 1) || end > lineCount + (lineCount > 0 ? 1 : 0)) {
+    fail(`Evidence vượt số dòng source: ${reference}; ${path} có ${lineCount} dòng.`);
+  }
 }
 
 function contractDispatch(contract) {
@@ -63,10 +66,21 @@ export function validateDispatchContract(repoRoot, brief) {
 export function prepareDispatchAssignment(repoRoot, brief) {
   const root = realpathSync(repoRoot);
   const contract = canonicalContract(root, brief);
-  const lines = brief.trim().split(/\r?\n/);
-  if (contract && lines.length === 2 && lines.every((line) => /^contract_(?:ref|version):/.test(line))) {
+  const hasExplicitFence = /^```(?:json[ \t]+)?dispatch-contract[ \t]*\r?$/m.test(brief);
+  if (contract && !hasExplicitFence) {
+    const extraLines = brief
+      .trim()
+      .split(/\r?\n/)
+      .filter((line) => line.trim() !== '' && !/^contract_(?:ref|version):[ \t]*\S+[ \t]*$/.test(line));
+    const extraNote = extraLines.join('\n').trim();
+    if (extraNote.length > 800) {
+      fail('Ghi chú phụ đi kèm contract_ref quá dài (>800 ký tự); mọi yêu cầu thực thi phải nằm trong TASK canonical.');
+    }
     const dispatch = validateDispatch(root, contractDispatch(contract), contract);
-    return `contract_ref: ${contract.contract_ref}\ncontract_version: ${contract.contract_version}\n\n\`\`\`json dispatch-contract\n${JSON.stringify(dispatch, null, 2)}\n\`\`\``;
+    const prefix = extraNote
+      ? `contract_ref: ${contract.contract_ref}\ncontract_version: ${contract.contract_version}\n\n${extraNote}`
+      : `contract_ref: ${contract.contract_ref}\ncontract_version: ${contract.contract_version}`;
+    return `${prefix}\n\n\`\`\`json dispatch-contract\n${JSON.stringify(dispatch, null, 2)}\n\`\`\``;
   }
   validateDispatch(root, dispatchBlock(brief), contract);
   return brief;

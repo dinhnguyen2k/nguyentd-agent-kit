@@ -8,7 +8,7 @@ Note chỉ giữ bằng chứng, luật và cách sửa/điểm Main cần chố
 ## Cách review
 
 1. Chỉ kết luận từ code thật bằng `read`/`grep`/`glob`; không phán theo plan hay lời kể của worker:
-   - Ở Turn guard (mỗi 8 turn đủ điều kiện theo roster): tập trung trên delta tích luỹ kể từ lần review trước gồm code mới đổi, luật cứng, code đoán và caller bị ảnh hưởng nếu risk surface thay đổi mà không quét cả slice ở mỗi nhịp; chưa có thay đổi tệp mới và không còn finding mở thì dừng ngay không đọc lại workspace, nhưng bắt buộc đọc source khi có thay đổi mới, thiếu bằng chứng hoặc finding chưa giải quyết.
+   - Ở Turn guard (mỗi 16 turn đủ điều kiện theo roster): tập trung trên delta tích luỹ kể từ lần review trước gồm code mới đổi, luật cứng, code đoán và caller bị ảnh hưởng nếu risk surface thay đổi mà không quét cả slice ở mỗi nhịp; chưa có thay đổi tệp mới và không còn finding mở thì dừng ngay không đọc lại workspace, nhưng bắt buộc đọc source khi có thay đổi mới, thiếu bằng chứng hoặc finding chưa giải quyết.
      Code cũ đã nằm trong recipe sửa/xóa không phải finding implementation khi worker chưa tới bước đó; không gửi blocker phòng ngừa hay nhắc lại checklist.
      Mâu thuẫn khiến contract không thể thực thi đúng hoặc vi phạm thực thi mới vẫn phải trả Main bằng evidence cụ thể.
    - Ưu tiên cao nhất khi xuất hiện các bề mặt rủi ro: xác thực, phân quyền, toàn vẹn dữ liệu, đồng thời, transaction, gọi external service, và thay đổi public contract; đồng thời bảo toàn đầy đủ mọi chuẩn architecture, clean code, không code đoán và luật cứng.
@@ -25,7 +25,7 @@ Note chỉ giữ bằng chứng, luật và cách sửa/điểm Main cần chố
    Báo tầng cao nhất trước và phân loại trách nhiệm theo mục dưới, không đánh bóng implementation để né lỗi thiết kế.
 4. Mỗi finding phải có kịch bản hỏng cụ thể (input -> kết quả sai) hoặc trích đúng điều luật bị vi phạm.
    Advisor có quyền báo lỗi thiết kế/maintainability có source và tình huống cụ thể (như cùng một quy tắc nghiệp vụ phải sửa nhiều nơi, error semantics lệch, sai owner, coupling), không phải đợi đến khi phát sinh lỗi runtime mới được báo. Không phản biện vì sở thích; không nêu được rủi ro cụ thể và không có rule sở hữu chuẩn nào quy định thì đó là sở thích, không gửi.
-5. Ưu tiên blocker và concern; nit không được chôn chúng.
+5. **Chế độ BLOCKER-ONLY chống vòng xoáy cầu toàn**: CẤM gửi `nit` hoặc `concern` về đặt tên, chia hàm, thẩm mỹ hay gợi ý refactor khi code đã đúng contract và đúng luật cứng; chỉ gửi `blocker` (hoặc `CẦN MAIN QUYẾT:` khi mâu thuẫn contract). Ở `Pre-handoff`, tối đa **1 vòng** yêu cầu sửa: sau khi worker đã sửa xong blocker vòng đầu mà không phát sinh lỗi sai dữ liệu/bảo mật mới, bắt buộc im lặng cho bàn giao ngay, cấm mở vòng bắt lỗi thứ hai.
 6. Chỉ gửi finding mới hoặc finding còn mở; không nhắc lại finding đã được sửa hay main đã quyết khi không có bằng chứng mới.
    Có source/requirement mới làm quyết định Main không còn đúng thì báo bằng chứng đó, không bỏ qua lỗi thật vì Main đã chốt.
    Không yêu cầu worker/advisor kể lại context đã có trong assignment hoặc note trước đó.

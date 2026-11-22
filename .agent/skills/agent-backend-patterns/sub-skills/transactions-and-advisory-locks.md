@@ -1,11 +1,14 @@
 # Transactions & Advisory Locks
 
 Mandatory rule (`.agent/rules/backend.md` §5.1): **every multi-step write inside one service
-must run in a transaction.** `IUnitOfWork` provides both a scoped helper and manual control.
+must run in a transaction.** Every `DbContext` enables `EnableRetryOnFailure`, so transactions go
+through the `IUnitOfWork` execution-strategy helpers only.
 
 ## Preferred: `ExecuteInTransactionAsync`
 
-Commits on success, rolls back on any exception. Use this unless you need finer control.
+Commits on success, rolls back on any exception. The delegate may be replayed on a transient
+failure: from the second run the ChangeTracker is cleared, so load or Add/Update entities inside
+the delegate and reset outer state at its start. A nested call joins the open transaction.
 
 ```csharp
 public async Task<Result<GoodsIssueDto>> PostAsync(CreateGoodsIssueDto dto, CancellationToken ct)
@@ -29,22 +32,25 @@ public async Task<Result<GoodsIssueDto>> PostAsync(CreateGoodsIssueDto dto, Canc
 }
 ```
 
-## Manual control
+## Result-returning: `ExecuteResultInTransactionAsync`
+
+Commits when the `Result` succeeds; rolls back and returns the same `Result` on failure.
+Use it instead of throwing when the failure is a business outcome (example:
+`PackingCodeUsageService`).
 
 ```csharp
-await _unitOfWork.BeginTransactionAsync();
-try
+return await _unitOfWork.ExecuteResultInTransactionAsync(async () =>
 {
-    // ... writes ...
+    if (!await TryClaimAsync(codeId))
+        return Result<TDto>.Failure(AlreadyUsedMessage, HttpStatusCode.BadRequest);   // ✅ rolls back
     await _unitOfWork.SaveChangesAsync(ct);
-    await _unitOfWork.CommitTransactionAsync();
-}
-catch
-{
-    await _unitOfWork.RollbackTransactionAsync();   // ✅ every failure path rolls back
-    throw;                                          // ✅ never swallow
-}
+    return Result<TDto>.Success(dto);
+});
 ```
+
+Manual `BeginTransactionAsync`/`CommitTransactionAsync`/`RollbackTransactionAsync` are
+`[Obsolete]` (`COGAIN_TX001`): `NpgsqlRetryingExecutionStrategy` rejects user-initiated
+transactions at `SaveChangesAsync`. Never add new call sites.
 
 ## ❌ Anti-patterns
 
@@ -134,9 +140,10 @@ That is the correct outcome for optimistic concurrency; do not catch and downgra
 
 ## Audit checkpoints
 
-- Multi-step write is inside `ExecuteInTransactionAsync` or an explicit Begin/Commit/Rollback
-- No early `return` inside a transaction delegate that leaves a partial write committed
-- Every manual `catch` path calls `RollbackTransactionAsync` and rethrows
+- Multi-step write is inside `ExecuteInTransactionAsync` or `ExecuteResultInTransactionAsync`
+- No early `return` inside an `ExecuteInTransactionAsync` delegate that leaves a partial write committed
+- No new `BeginTransactionAsync`/`CommitTransactionAsync`/`RollbackTransactionAsync` call (`COGAIN_TX001`)
+- Delegate is replay-safe: entities loaded or attached inside it, outer state reset at its start
 - No HTTP / gRPC / Kafka call inside a DB transaction (use compensation or outbox)
 - Read-check-write on money / stock / permissions guarded by an advisory lock or a DB constraint
 - Multiple advisory locks acquired in sorted order

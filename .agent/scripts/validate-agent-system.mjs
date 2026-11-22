@@ -20,6 +20,7 @@ import {
   updateSessionTodoState,
 } from './agent-lifecycle-core.mjs';
 import { deriveTaskManifest, readLegacyEvidence, readTaskContract, readTaskLifecycle, validateContractSchema } from './task-contract.mjs';
+import { prepareDispatchAssignment } from './dispatch-contract.mjs';
 
 const repoRoot = process.cwd();
 const isStandaloneKit = existsSync(join(repoRoot, 'bin', 'install.js')) && existsSync(join(repoRoot, 'core', '.agent-core'));
@@ -797,7 +798,7 @@ function validateAutonomousContinuationGate() {
     mkdirSync(planAbs, { recursive: true });
     writeFileSync(
       join(planAbs, '00-OVERVIEW.md'),
-      '# Test Plan\n\n```json task-lifecycle\n{"task_id":"t1","status":"active","archived":false,"superseded_by":null,"contract_versions":{"s1":1,"s2":1}}\n```\n'
+      '# Test Plan\n\n```json task-lifecycle\n{"task_id":"task-01","status":"active","blocker":null,"next_action":"Run s1","owner":"orchestrator","contract_versions":{"TASK-01-a":1,"TASK-02-b":1},"source_snapshot":null,"superseded_by":null,"archived":false}\n```\n'
     );
     writeFileSync(
       join(planAbs, 'TASK-01-a.md'),
@@ -881,14 +882,16 @@ function validateAutonomousContinuationGate() {
       errors.push(`stop-gate: explicit user stop intent must allow stop, got ${JSON.stringify(usrStop)}`);
     }
 
-    // 8. Kiểm tra chốt chặn OMP workflow-context.ts & config.yml (non-blocking ask, handle retirement cap, khóa Tiếng Việt, verifier @gate)
+    // 8. Kiểm tra chốt chặn OMP workflow-context.ts, config.yml, guard-guessed-code.md & dispatch-contract.mjs
     const wfHookPath = join(repoRoot, '.agent', 'harness', 'omp', 'hooks', 'pre', 'workflow-context.ts');
     if (existsSync(wfHookPath)) {
       const wfSrc = readFileSync(wfHookPath, 'utf8');
       for (const requiredToken of [
         '[non-blocking-queue]',
         '[handle-retirement-cap]',
+        '[audit-loop-cap]',
         'MAX_REWORK_CONTINUATIONS_PER_HANDLE = 2',
+        'MAX_AUDIT_WAVES_PER_USER_TURN = 1',
         'AI_RULES.md §8',
       ]) {
         if (!wfSrc.includes(requiredToken)) {
@@ -902,6 +905,54 @@ function validateAutonomousContinuationGate() {
       if (!/^\s*verifier:\s*["']?@gate["']?\s*$/m.test(ompCfgSrc)) {
         errors.push('.agent/harness/omp/config.yml: verifier must map to "@gate" to avoid saturating main Anthropic pool');
       }
+      if (!/^\s*modelFallback:\s*true\s*$/m.test(ompCfgSrc) || !/^\s*gate:\s*$/m.test(ompCfgSrc) || !/^\s*advisor:\s*$/m.test(ompCfgSrc)) {
+        errors.push('.agent/harness/omp/config.yml: retry must enable modelFallback: true and define advisor/gate fallbackChains');
+      }
+    }
+    const guessedRulePath = join(repoRoot, '.agent', 'rules', 'guard-guessed-code.md');
+    if (existsSync(guessedRulePath)) {
+      const guessedSrc = readFileSync(guessedRulePath, 'utf8');
+      if (guessedSrc.includes('tool:apply_patch')) {
+        errors.push('.agent/rules/guard-guessed-code.md: must not bind TTSR to tool:apply_patch (aborts diff context/deleted lines)');
+      }
+    }
+
+    // 9. Kiểm tra prepareDispatchAssignment chấp nhận ghi chú ngắn đi kèm contract_ref và dung sai lệch 1 dòng cuối tệp
+    mkdirSync(join(tmpDir, '.git'), { recursive: true });
+    mkdirSync(join(tmpDir, 'backend', 'src'), { recursive: true });
+    writeFileSync(join(tmpDir, 'backend', 'src', 'Sample.cs'), 'public class Sample\n{\n}\n');
+    const dcContract = {
+      task_id: 'task-01',
+      slice_id: 'TASK-01-a',
+      contract_version: 1,
+      lifecycle_ref: `${planRel}/00-OVERVIEW.md`,
+      goal: 'Test dispatch preparation',
+      mode: 'implementation',
+      owner: 'backend-specialist',
+      allowed_paths: ['backend/src/Sample.cs'],
+      source_paths: ['backend/src/Sample.cs'],
+      acceptance: ['Sample compiles cleanly'],
+      dependencies: [],
+      permitted_checks: [],
+      stop_conditions: ['Stop on out-of-scope dependency'],
+      execution: {
+        changes: [
+          {
+            file: 'backend/src/Sample.cs',
+            instruction: 'Keep Sample intact',
+            evidence: ['backend/src/Sample.cs:1-4'],
+            mapping: null,
+          },
+        ],
+      },
+    };
+    writeFileSync(join(planAbs, 'TASK-01-a.md'), `\`\`\`json task-contract\n${JSON.stringify(dcContract, null, 2)}\n\`\`\`\n`);
+    const expandedBrief = prepareDispatchAssignment(
+      tmpDir,
+      `contract_ref: ${planRel}/TASK-01-a.md\ncontract_version: 1\n\nLưu ý giữ nguyên chữ ký.`
+    );
+    if (!expandedBrief.includes('```json dispatch-contract') || !expandedBrief.includes('Lưu ý giữ nguyên chữ ký.')) {
+      errors.push('dispatch-contract: prepareDispatchAssignment failed to expand contract_ref accompanied by a short note');
     }
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });

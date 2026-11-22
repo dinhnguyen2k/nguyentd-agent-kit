@@ -73,7 +73,7 @@ Data & performance
 - [ ] Soft-delete respected; unique indexes carry `.HasFilter("\"deleted_date\" IS NULL")`
 
 Consistency
-- [ ] Multi-step writes wrapped in `ExecuteInTransactionAsync` (or explicit Begin/Commit/Rollback)
+- [ ] Multi-step writes wrapped in `ExecuteInTransactionAsync` / `ExecuteResultInTransactionAsync` (manual Begin/Commit/Rollback is `[Obsolete]`)
 - [ ] Cross-service writes declare their model: compensation, outbox, or saga
 - [ ] Read-check-write races protected (`AcquireAdvisoryLockAsync` or a DB constraint)
 

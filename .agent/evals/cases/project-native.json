@@ -25,7 +25,7 @@
       "query": "Resolve snapshots for newly synchronized child rows during Update.",
       "expected_behavior": [
         "Recognizes AfterMappingAsync runs before child synchronization",
-        "Uses AfterReconcileCollectionsAsync when synchronized children must already exist",
+        "Uses AfterChildrenSyncedAsync when synchronized children must already exist",
         "Assesses remote-write consistency"
       ],
       "forbidden_behavior": [
@@ -39,9 +39,9 @@
       ],
       "query": "Add OperationDetails collection synchronization to ProductionEstimate; payload rows may omit Id.",
       "expected_behavior": [
-        "Entity implements ISyncsChildren<ProductionEstimate>",
+        "Adds a ChildrenByKey node to the existing ProductionEstimate AggregateShape",
         "Service overrides BuildIncomingGraph",
-        "Selects a stable natural key and separates mutable fields into onUpdate",
+        "Selects a stable natural key and copies mutable fields in the node update callback",
         "Uses soft-delete without removing tracked required-FK children"
       ],
       "forbidden_behavior": [

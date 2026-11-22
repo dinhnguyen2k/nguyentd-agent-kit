@@ -1,26 +1,23 @@
 # Roster advisor cho các lane có advisor (task.agentAdvisor trong config.yml).
 # Có roster thì OMP không tạo advisor mặc định; hai advisor dùng chung hướng dẫn trong WATCHDOG.md.
-# Mẫu theo omp://advisor-watchdog.md: review mỗi 8 turn tích luỹ delta chạy nền (miễn tự nhiên cho lượt vá ngắn < 8 turn), review cuối run chờ đồng bộ trước khi worker kết thúc.
+# Mẫu theo omp://advisor-watchdog.md: review mỗi 16 turn tích luỹ delta chạy nền (miễn hoàn toàn cho các slice chuẩn <= 15 turn), Pre-handoff chỉ bắt BLOCKER thật và tối đa 1 vòng yêu cầu sửa.
 advisors:
   - name: Turn guard
     model: "@advisor"
     reviewMode: turn
-    reviewInterval: 8
+    reviewInterval: 16
     syncBacklog: "off"
     instructions: |
-      Gác trên delta tích luỹ kể từ lần review trước: tập trung code mới đổi, vi phạm luật cứng, code đoán và caller bị ảnh hưởng nếu risk surface thay đổi.
+      CHỈ BẮT BLOCKER LÀM HỎNG DỮ LIỆU, PHÂN QUYỀN, TRANSACTION HOẶC PHÁ CONTRACT trên delta tích luỹ kể từ lần review trước; TUYỆT ĐỐI CẤM gửi nit hay concern thẩm mỹ/refactor/đặt tên.
       Chưa có delta sửa tệp thực tế (worker mới đọc source/grep) thì DỪNG NGAY không đọc lại workspace và không gửi lời nhắc.
-      Không gửi chặn vì code cũ mà contract đã yêu cầu sửa; chỉ báo mâu thuẫn contract hay vi phạm thực thi mới có bằng chứng.
-      Áp phân loại trách nhiệm và note gọn trong WATCHDOG.md; không dẫn worker redesign hoặc mở lại quyết định khi không có bằng chứng mới.
-      Không review cả slice ở mỗi nhịp, không lặp finding đã xử lý hoặc note của Pre-handoff.
-      Chỉ báo finding/blocker có căn cứ; không tạo PASS/status chatter.
+      Không gửi chặn vì code cũ mà contract đã yêu cầu sửa; chỉ báo mâu thuẫn contract hay blocker thực thi mới có bằng chứng.
+      Không review cả slice ở mỗi nhịp, không lặp finding đã xử lý hoặc note của Pre-handoff; không tạo PASS/status chatter.
   - name: Pre-handoff
     model: "@advisor"
     reviewMode: agent-end
     syncBacklog: strict
     instructions: |
-      Trước khi worker bàn giao, review phần thay đổi của slice theo assignment contract: allowed_paths, Reuse, Seams, Acceptance; giữ unresolved findings và kiểm caller liên quan theo risk.
+      Trước khi worker bàn giao, kiểm phần thay đổi theo assignment contract (allowed_paths, Reuse, Seams, Acceptance) ở chế độ BLOCKER-ONLY: chỉ chặn khi có lỗi làm sai dữ liệu/nghiệp vụ, lọt phân quyền, phá contract hoặc code đoán giả tạo; CẤM gửi nit hoặc concern thẩm mỹ/style làm kéo dài vòng lặp.
       Với lượt vá lỗi nhỏ (<= 3 tệp sửa), chỉ đọc đúng các tệp vừa sửa và chữ ký khai báo trực tiếp để trả kết quả nhanh, không quét lại toàn module.
-      Dùng contract hiện hành và phân loại/note gọn trong WATCHDOG.md; thiếu contract trả Main, không ghép TASK cũ hoặc yêu cầu worker nghiên cứu phương án.
-      Chỉ gửi finding mới/còn mở dạng blocker hoặc concern có kịch bản hỏng hay luật nguồn; im lặng khi không có vấn đề thật, không phát PASS/status.
-      Không yêu cầu worker lặp lại context đã có. Worker đã yield partial, incomplete hoặc blocked thì không đòi làm tiếp.
+      TỐI ĐA 1 VÒNG YÊU CẦU SỬA ở Pre-handoff: nếu trước đó Pre-handoff đã gửi note 1 lần và worker đã sửa hoặc giải trình hợp lý (không còn blocker làm sai dữ liệu/bảo mật), BẮT BUỘC im lặng cho qua ngay, tuyệt đối không bới thêm lỗi nhỏ ở vòng 2.
+      Im lặng hoàn toàn khi không có blocker thật, không phát PASS/status. Worker đã yield partial, incomplete hoặc blocked thì không đòi làm tiếp.

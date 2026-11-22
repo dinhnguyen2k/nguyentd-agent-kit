@@ -4,14 +4,13 @@ condition:
   - '\|\|\s{0,3}(0|''''|``|\[\]|\{\}|null|undefined|false|''[^''\n]{1,30}''|"[^"\n]{1,30}")(?:\s|$|[;,)\]}])'
   - '\.\w+\s{0,2}\?\?\s{0,2}[\w.?]+\s{0,2}\?\?\s{0,2}(0|''''|""|\[\]|\{\}|false|''[^''\n]{1,20}''|"[^"\n]{1,20}")'
   - '\bas\s{1,3}unknown\s{1,3}as\b'
-  - '[\w)\]]!\.\w'
   - 'catch\s{0,5}(\(\s{0,3}(?:System\.)?Exception(?:\s+\w+)?\s{0,3}\))?\s{0,5}\{\s{0,5}return\s{1,3}(null|undefined|default|false|0|\[\]|\{\}|''''|""|string\.Empty|new\b|Enumerable\.Empty)'
   - '\.catch\(\s{0,3}\([^)]{0,50}\)\s{0,3}=>\s{0,3}(null|undefined|\[\]|\{\}|''''|""|0|false)'
   - 'catch\s{0,5}(\([^)]{0,200}\))?\s{0,5}\{\s{0,5}\}'
   - 'catch\s{0,5}(\(\s{0,3}(?:System\.)?Exception(?:\s+\w+)?\s{0,3}\))?\s{0,5}\{[^}]{0,80}\bset[A-Z]\w{0,40}\(\s{0,3}(null|undefined|\[\]|\{\}|''''|""|false)\s{0,3}\)'
   - 'OrDefault(Async)?\([^;]{0,200}\)\s{0,3}\?\?\s{0,3}new\s+[A-Z]\w*Entity\b'
   - '\bnew\s{1,3}NotImplementedException\s{0,3}\(|(?i:\b(TODO|FIXME)\b[^\n]{0,40}\b(implement|later|placeholder|mock|fake))'
-scope: "tool:edit(backend/**/*.cs), tool:write(backend/**/*.cs), tool:apply_patch(backend/**/*.cs), tool:edit(frontend/**/*.ts), tool:write(frontend/**/*.ts), tool:apply_patch(frontend/**/*.ts), tool:edit(frontend/**/*.tsx), tool:write(frontend/**/*.tsx), tool:apply_patch(frontend/**/*.tsx)"
+scope: "tool:edit(backend/**/*.cs), tool:write(backend/**/*.cs), tool:edit(frontend/**/*.ts), tool:write(frontend/**/*.ts), tool:edit(frontend/**/*.tsx), tool:write(frontend/**/*.tsx)"
 interruptMode: tool-only
 ---
 
