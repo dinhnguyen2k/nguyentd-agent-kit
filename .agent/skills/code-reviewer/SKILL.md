@@ -54,7 +54,7 @@ For UI findings, retain the [UI review taxonomy](../code-review/references/ui-re
 | D9 | Bảo mật, cấu hình, phân quyền endpoint/rate-limit và an toàn dữ liệu nhạy cảm | Blocker |
 | D10 | Quản lý nợ kỹ thuật: bề mặt khó quay lui (schema DB, public contract, permission, tiền tệ) bắt buộc sửa ngay; vấn đề cục bộ ghi nhận vào `.planning/codebase/CONCERNS.md` | Minor |
 
-- **Backend**: Đúng lớp `API -> Services -> Repositories -> Data`; tùy biến `BaseService` qua hook (`BeforeApplyAutoFilterCoreAsync`, `AfterReconcileCollectionsAsync`, `ISyncsChildren<T>`); logic dùng chung ở `backend/src/BuildingBlocks/*`; ghi nhiều bước có transaction không bao external call.
+- **Backend**: Đúng lớp `API -> Services -> Repositories -> Data`; tùy biến `BaseService` qua hook (`BeforeApplyAutoFilterCoreAsync`, `AfterChildrenSyncedAsync`, `ExecuteUpdateWriteAsync`); bảng con khai báo bằng `AggregateShape` trên aggregate root; logic dùng chung ở `backend/src/BuildingBlocks/*`; ghi nhiều bước có transaction không bao external call.
 - **Frontend**: Đúng luồng `routes -> hooks -> services -> api-client`; `useQuery`/`useMutation` trong hook, service qua `createBaseService`, không đẩy server data vào Zustand; type/hook dùng chung ở `@shared/types` và `@shared/hooks`; invalidate đúng family query key (`cogain-query-cache`) và giữ idempotency form (`cogain-form-rhf-zod`).
 - **Chống code đoán**: Mọi field, method, endpoint, enum, prop phải có `<file>:<line>` xác thực trong repo; cấm chuỗi fallback đoán shape (`res.data?.items || res.items || []`), ép kiểu (`as any`, `as unknown as`, `!.`), `FirstOrDefault() ?? new T()`, hoặc `catch` nuốt lỗi trả default.
 

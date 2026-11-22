@@ -18,7 +18,8 @@ Dùng router `backend-development` đã nạp; chỉ đọc skill hoặc phần 
    Đọc pattern/test và caller trực tiếp theo rủi ro; tái dùng bằng chứng khi source không đổi, không ghép yêu cầu từ TASK cha hay lịch sử và không coi gate/contract hợp lệ là bằng chứng API tồn tại.
 3. Sửa theo recipe và milestone hiện hành; tự quyết chi tiết cài đặt cục bộ tương đương (tên biến, guard clause, chuẩn hóa nullability, tối ưu tránh cấp phát thừa/N+1 trong `allowed_paths`) mà không đổi hành vi nghiệp vụ.
 4. **Vi-xác minh giữa chừng (`MICRO` <= 3 bước)**: khi gặp lệch nhỏ chữ ký/nullability/hành vi thư viện, tra ngay khai báo gốc + `lsp` (`find_references`/`find_definition`) + `context7`. Nếu xử lý trọn vẹn trong `allowed_paths` và giữ nguyên bất biến thì làm tiếp và ghi vào `assumptions`; nếu cần vượt `allowed_paths` hoặc đổi thiết kế/bất biến thì gom gói `file:line + expected/actual + đề xuất sửa chính xác` trả Main trong 1 nhịp, đồng thời hoàn tất hết phần độc lập còn lại.
-5. Đối chiếu delta với acceptance rồi bàn giao; ghi blocker vào `needs_main_decision`/`contract_deviations` nếu còn, không báo toàn task xong khi còn blocker.
+5. **Gom lô 3 nhịp (chống kéo dài hàng trăm turn)**: (a) *Discovery*: gọi song song các lệnh `Read`/`Grep`/`Glob` độc lập trong 1 lượt (tối đa 4-6 tệp hoặc <=1.500 dòng mục tiêu/lượt), không đọc lặp từng tệp lẻ; (b) *Edit*: gộp các điểm sửa đã xác minh vào ít lượt `Edit`/`apply_patch` đa hunk/đa tệp nhất; (c) *Self-Check*: sau 1 Canary LSP khỏe, gom toàn bộ tệp còn lại và `find_references` vào 1 lượt song song.
+6. Đối chiếu delta với acceptance rồi bàn giao; ghi blocker vào `needs_main_decision`/`contract_deviations` nếu còn, không báo xong khi còn blocker.
 
 ## Bất biến backend
 
@@ -31,15 +32,8 @@ Dùng router `backend-development` đã nạp; chỉ đọc skill hoặc phần 
 
 ## Quyền và bàn giao
 
-Không tự chạy validation/app/codegen hoặc commit; quyền user cấp không bỏ qua giới hạn vai trò.
-Build/CI chỉ qua `verifier`/`maintainer` và `.agent/scripts/ci-parity.sh` khi user yêu cầu.
-R8 cấm build/`fast-build.sh` trực tiếp; R1 cấm worker chạy suite; R2 cấm sửa test.
-Guard chặn thì dừng, báo nguyên văn, không đi vòng.
-
-Bàn giao khi hoàn tất, không chờ validation chưa được yêu cầu.
-Ghi `Validation: not run - not requested`; chỉ báo `verified` khi có bằng chứng lệnh thực tế.
-Manifest/verifier độc lập chỉ dành cho governed `/orchestrate`, không thêm artifact cho task cục bộ.
-Chỉ báo kết quả, file đổi, blocker và rủi ro chưa kiểm; không kể lại plan hay lịch sử tìm hiểu.
+Cấm tự chạy validation/app/codegen/commit (quyền user không bỏ qua giới hạn vai trò): R8 cấm build/`fast-build.sh` trực tiếp (CI qua `verifier`/`maintainer`), R1 cấm chạy suite, R2 cấm sửa test. Guard chặn thì dừng, báo nguyên văn.
+Bàn giao ngay khi hoàn tất kèm file đổi, blocker, rủi ro chưa kiểm và `Validation: not run - not requested` (chỉ báo `verified` khi có bằng chứng lệnh thực tế); không thêm artifact governed cho task cục bộ, không kể lại plan/lịch sử.
 
 ## Sửa tiếp
 

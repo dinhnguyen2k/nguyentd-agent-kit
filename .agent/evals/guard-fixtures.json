@@ -957,6 +957,52 @@
       "options": { "envRole": "researcher" },
       "expected_decision": "deny",
       "expected_rule": "R4-gate-readonly-shell"
+    },
+    {
+      "id": "R4-valid-verifier-git-merge-base",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git merge-base HEAD origin/develop"
+        }
+      },
+      "options": { "envRole": "verifier" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R4-invalid-verifier-git-merge",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git merge origin/develop"
+        }
+      },
+      "options": { "envRole": "verifier" },
+      "expected_decision": "deny",
+      "expected_rule": "R4-gate-readonly-shell"
+    },
+    {
+      "id": "R4-valid-verifier-redirect-tmp-and-scratch",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "bash .agent/scripts/ci-parity.sh --backend-all > /tmp/cip.log 2>&1 && dotnet test backend/tests/A.csproj > .agent/scratch/vt.log 2>&1"
+        }
+      },
+      "options": { "envRole": "verifier" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R4-invalid-verifier-redirect-repo-file",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "echo x > backend/src/Services/HR/LeaveService.cs"
+        }
+      },
+      "options": { "envRole": "verifier" },
+      "expected_decision": "deny",
+      "expected_rule": "R4-gate-readonly-shell"
     }
   ]
 }

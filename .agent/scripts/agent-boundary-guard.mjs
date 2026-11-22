@@ -279,9 +279,18 @@ export function evaluateBoundaryPayload(payload, options = {}) {
       const r2 = rules.test_write || {};
       const stripQuotes = (s) => s.replace(SHELL_QUOTE_RE, " ");
       const unquoted = stripQuotes(cmd);
-      const stripped = unquoted
+      const allowEphemeralLogRedirect = role !== "researcher" && role !== "reviewer";
+      const baseStripped = unquoted
         .replace(/\d?>\s*&\s*\d/g, " ")
-        .replace(/(?:&|\d?)>>?\s*\/dev\/null/g, " ")
+        .replace(/(?:&|\d?)>>?\s*\/dev\/null\b/g, " ");
+      const stripped = (
+        allowEphemeralLogRedirect
+          ? baseStripped.replace(
+              /(?:&|\d?)>>?\s*(?:\/tmp\/(?:(?!\.\.)[^\s;&|)'"`])+|(?:\.\/)?\.agent\/scratch\/(?:(?!\.\.)[^\s;&|)'"`])+)/g,
+              " "
+            )
+          : baseStripped
+      )
         .replace(/[=-]>/g, "  ")
         .replace(/[<>!]=(?!=)/g, "  ");
 
@@ -357,8 +366,8 @@ export function evaluateBoundaryPayload(payload, options = {}) {
       if (agentEntry && agentEntry.kind === "gate" && role !== DEFAULT_ROLE && (source === "subagent" || source === "env")) {
         const gitMutatingRe =
           role === "verifier"
-            ? /\bgit\s+(?:commit|push|reset|clean|checkout|restore|apply|merge|rebase|cherry-pick)\b/i
-            : /\bgit\s+(?:commit|push|reset|clean|checkout|restore|apply|merge|rebase|cherry-pick|stash)\b/i;
+            ? /\bgit\s+(?:commit|push|reset|clean|checkout|restore|apply|merge|rebase|cherry-pick)(?![\w-])/i
+            : /\bgit\s+(?:commit|push|reset|clean|checkout|restore|apply|merge|rebase|cherry-pick|stash)(?![\w-])/i;
         const nonReadOnlyExecRe =
           role === "researcher" || role === "reviewer"
             ? /(?:^|[;&|(`])\s*(?:env\s+)?(?:dotnet|npm|pnpm|yarn|npx|pnpx|bunx|bun|psql|pg_restore|sqlite3|docker)\b/i

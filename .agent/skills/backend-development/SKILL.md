@@ -18,7 +18,7 @@ Use this as a router, not a backend textbook. `AI_RULES.md`, `.agent/rules/backe
 | CRUD chứng từ, bước HR xác nhận, báo cáo theo kỳ lương         | [skill:cogain-screen-archetypes]    |
 | `BaseService`, CRUD hooks, AutoFilter, update/delete lifecycle | [skill:cogain-baseservice-hooks]    |
 | ClosedXML, import/export, Excel template                       | [skill:cogain-excel-import-export]  |
-| `ISyncsChildren`, child collections, `BuildIncomingGraph`      | [skill:cogain-child-sync]           |
+| `AggregateShape`, child collections, `BuildIncomingGraph`      | [skill:cogain-child-sync]           |
 | PostgreSQL schema/index/query plan                             | [skill:postgresql]                  |
 | Measured C# or LINQ performance                                | [skill:backend-csharp-optimization] |
 | API shape/versioning/compatibility                             | [skill:api-patterns]                |

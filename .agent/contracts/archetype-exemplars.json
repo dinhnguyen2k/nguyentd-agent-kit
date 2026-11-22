@@ -40,11 +40,11 @@
     "document-child-sync-form": {
       "title": "Form chứng từ có bảng con & snapshot liên service",
       "backend_exemplars": [
-        "backend/src/BuildingBlocks/Contracts/Domain/Entities/Interfaces/ISyncsChildren.cs",
-        "backend/src/BuildingBlocks/Contracts/Application/Interfaces/ISnapshotLifecycleService.cs",
+        "backend/src/BuildingBlocks/Contracts/Domain/Aggregates/AggregateShape.cs",
+        "backend/src/BuildingBlocks/Infrastructure/Snapshots/AggregateSnapshotService.cs",
         "backend/src/BuildingBlocks/Contracts/Snapshots/SnapshotContracts.cs",
-        "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/CommercialTerms/CommercialTermService.cs",
-        "backend/src/Services/ServiceDesk/ServiceDesk.Data/Entities/Production/LaborOrder.cs"
+        "backend/src/Services/ServiceDesk/ServiceDesk.Data/Entities/SalesOrders/SalesOrder.cs",
+        "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/SalesOrders/SalesOrderService.cs"
       ],
       "frontend_exemplars": [
         "frontend/bizdoc/src/routes/_app/labor-order/_components/labor-order-form.tsx",
@@ -52,13 +52,13 @@
         "frontend/shared/hooks/use-ref-doc-selector.ts"
       ],
       "anti_exemplars_notes": [
-        "Cấm dùng ReconcileCollections reflection đã deprecated; entity phải implement ISyncsChildren<TEntity> và service override BuildIncomingGraph.",
-        "Cấm gán tay *CodeSnapshot/*NameSnapshot từ client hoặc gọi gRPC rời rạc bên trong transaction DB; pha COLLECT phải chạy trước write boundary qua ISnapshotLifecycleService.",
+        "Cấm dùng ReconcileCollections reflection đã deprecated; aggregate root phải khai báo AggregateShape và service override BuildIncomingGraph.",
+        "Cấm gán tay *CodeSnapshot/*NameSnapshot từ client hoặc gọi gRPC rời rạc bên trong transaction DB; thu thập snapshot chạy ngoài transaction qua AggregateSnapshotService (UseSnapshots), transaction riêng đặt trong ExecuteCreateWriteAsync/ExecuteUpdateWriteAsync.",
         "Cấm dùng z.string().uuid() trong Zod 4 vì từ chối ngầm GUID .NET không chuẩn RFC; dùng z.guid()."
       ],
       "invariants": [
         "WorkItem.Id == Entity.Id (ADR-0001) cho mọi chứng từ tham gia luồng WorkItem.",
-        "Aggregate tự đồng bộ xóa mềm/thêm/sửa bảng con qua ISyncsChildren<TEntity>.SyncChildren.",
+        "Aggregate tự đồng bộ thêm/sửa/xóa mềm bảng con theo AggregateShape (một khai báo cho sync, include, snapshot, mapping); dòng mới giữ Id và được MarkAdded.",
         "Form có CreatorSelector hoặc useRefDocSelector bắt buộc giữ createdById và createdOrganizationId xuyên suốt schema -> defaults -> reset -> payload -> CreateWorkItemRequest."
       ],
       "acceptance_template": {
@@ -128,7 +128,7 @@
         "Cấm ghép điều kiện lọc HR Confirm thủ công khi đã có hr-confirm-utils.ts và currentStepCode cố định theo enum bước HR_CONFIRM."
       ],
       "invariants": [
-        "Thu thập snapshot người xác nhận trước transition qua ISnapshotLifecycleService.ExecuteAsync và ISnapshotPolicy<HrConfirmSnapshotCommand, TEntity>.",
+        "Thu thập snapshot người xác nhận trước transition bằng ISnapshotPolicy<HrConfirmSnapshotCommand, TEntity>.CollectAsync và Apply trong transaction (mẫu LaborOrderService).",
         "Chỉ ghi HrConfirmedDate = DateTimeOffset.UtcNow và HrConfirmedById (kèm IsHrConfirm nếu có) khi response.StatusEnum == (int)EWorkItemStatus.Closed.",
         "Màn HRM dưới frontend/hrm/src/routes/_app/hr-confirm/* khóa cứng currentStepCode theo giá trị HR_CONFIRM của domain."
       ],
@@ -233,9 +233,9 @@
     },
     {
       "id": "INV-CHILD-SYNC-SNAPSHOT",
-      "rule": "Aggregate đồng bộ xóa mềm bảng con bằng ISyncsChildren<TEntity> + BuildIncomingGraph và thu thập snapshot liên service trước write boundary qua ISnapshotLifecycleService.",
+      "rule": "Aggregate đồng bộ bảng con bằng AggregateShape + BuildIncomingGraph và thu thập snapshot liên service ngoài transaction qua AggregateSnapshotService (ADR-0003).",
       "forbidden": "Dùng ReconcileCollections reflection (đã Obsolete), gán tay cột *Snapshot từ client, hoặc gọi gRPC snapshot bên trong DB transaction.",
-      "evidence": "backend/src/BuildingBlocks/Contracts/Domain/Entities/Interfaces/ISyncsChildren.cs"
+      "evidence": "backend/src/BuildingBlocks/Contracts/Domain/Aggregates/AggregateShape.cs"
     }
   ]
 }

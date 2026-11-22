@@ -10,7 +10,7 @@ Dùng trực tiếp các mẫu tham số chuẩn dưới đây với `call_mcp_t
   - `ServerName`: `"lsp"`, `ToolName`: `"find_references"`, `Arguments`: `{ "file_path": "<đường_dẫn_tuyệt_đối>", "symbol_name": "<TênHàmHoặcKiểu>" }` (có thể kèm `"line": <số_dòng_1_based>` khi trùng tên).
 - **Quy tắc thực chiến C# Roslyn (`csharp-ls`)**:
   - Lần gọi đầu tiên khi máy chủ vừa nạp `backend/Cogain.Lsp.slnf` có thể mất 30-60 giây làm ấm; các lượt sau phản hồi trong 4-20 giây.
-  - **Không** gọi `find_references` trực tiếp vào tên generic interface (`ISyncsChildren`); luôn gọi vào **tên method thành viên phi-generic** (`SyncChildren`, `BuildIncomingGraph`) để lấy đủ 100% điểm tham chiếu toàn workspace.
+  - **Không** gọi `find_references` trực tiếp vào tên generic interface (`IAggregateRoot<TSelf>`); luôn gọi vào **tên member phi-generic** (`Shape`, `BuildIncomingGraph`) để lấy đủ 100% điểm tham chiếu toàn workspace.
   - Nếu cầu chì LSP đang mở (`[lsp-circuit-open]`) hoặc quá hạn, dừng ngay không thử lại và chuyển sang đọc/tìm văn bản tĩnh.
 
 ## 2. MCP `context7` (Tài liệu chính thức theo phiên bản)

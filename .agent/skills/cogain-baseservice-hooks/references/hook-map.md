@@ -9,8 +9,8 @@ This map is a navigation aid, not an API contract. Search `BaseService.cs` befor
 | Get all        | `BeforeGetAllAsync`, `BeforeApplyAutoFilterCoreAsync`                                                                                          | `AfterGetAllAsync`                                    | `BeforeReturnGetAllAsync`    |
 | Dropdown       | `BeforeGetDropdownAsync`, `BeforeApplyAutoFilterCoreAsync`                                                                                     | —                                                     | —                            |
 | Dropdown paged | `BeforeGetDropdownPagedAsync`, `BeforeApplyAutoFilterAsync`                                                                                    | —                                                     | —                            |
-| Create         | `BeforeCreateAsync`                                                                                                                            | `AfterMapperAsync`                                    | `AfterCreateAsync`           |
-| Update         | `BeforeUpdateAsync`, `BuildIncomingGraph`                                                                                                      | `AfterMappingAsync`, `AfterReconcileCollectionsAsync` | `AfterUpdateAsync`           |
+| Create         | `BeforeCreateAsync`                                                                                                                            | `AfterMapperAsync`, `ExecuteCreateWriteAsync`         | `AfterCreateAsync`           |
+| Update         | `BeforeUpdateAsync`, `BuildIncomingGraph`, `GetUpdateIncludeString`                                                                            | `AfterMappingAsync`, `AfterChildrenSyncedAsync`, `ExecuteUpdateWriteAsync` | `AfterUpdateAsync`           |
 | Delete         | `GetDeleteIncludeString`, `GetEntityForDeleteAsync`, `ResolveDeleteWorkItemIdAsync`                                                            | `BeforeDeleteAsync`, `BeforeDeleteByIdsAsync`         | —                            |
 | Import         | `CustomParseExcelToDtosAsync`, `LoadImportReferencesAsync`, `ValidateImportDtosAsync`, `PrepareImportEntitiesAsync`, `SaveImportEntitiesAsync` | project-specific hooks in the current source          | —                            |
 | Export         | `GenerateTemplateBytesAsync`, `GenerateExportDataBytesAsync`                                                                                   | —                                                     | filename hooks               |
@@ -19,9 +19,11 @@ This map is a navigation aid, not an API contract. Search `BaseService.cs` befor
 
 - `GetPaged` uses `AsNoTracking`; it uses `AsSplitQuery` when includes are present.
 - `BeforeApplyAutoFilterCoreAsync` is shared by paged and non-paged flows; `BeforeApplyAutoFilterAsync` adds paged/access-control behavior.
-- Update maps scalar fields, calls `AfterMappingAsync`, builds/synchronizes the incoming child graph, then calls `AfterReconcileCollectionsAsync` before repository update/save.
-- Returning non-null from `BuildIncomingGraph` requires the entity to implement `ISyncsChildren<TEntity>`; otherwise update throws.
-- Returning null from `BuildIncomingGraph` currently enters the legacy reconciliation path for backward compatibility.
+- Update runs in three phases: prepare (load with shape includes, map scalars, `AfterMappingAsync`, sync children, `MarkAdded`, `AfterChildrenSyncedAsync`, `DetectChanges`), collect snapshots outside any transaction, then `ExecuteUpdateWriteAsync(id, dto, write)` whose default is `write.PersistAsync()`.
+- `PreparedWrite.PersistAsync()` re-runs prepare on execution-strategy replay; override `Execute*WriteAsync` to wrap WorkItem/transaction, never wrap `base.Update` in an outer transaction when the aggregate has snapshots (fail-fast).
+- For entities with `AggregateShape`, `BuildIncomingGraph` must return non-null; null throws `InternalInvariantException`.
+- Entities without a shape still use the `[Obsolete]` reflection reconciliation fallback.
+- Snapshot services must call `UseSnapshots(AggregateSnapshotService)` in the constructor; missing wiring throws on first write.
 
 ## Search Commands
 

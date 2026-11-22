@@ -29,5 +29,5 @@ Rule này áp cho mọi agent, kể cả main, `task`, `sonic`.
 | `FirstOrDefault(...) ?? new T()` | Tạo entity giả khi không tìm thấy | Không tìm thấy thì trả lỗi nghiệp vụ rõ ràng |
 | `NotImplementedException`, `TODO: implement` | Placeholder trong code production | Làm thật, hoặc dừng và ghi phần còn thiếu trong báo cáo bàn giao |
 
-Không xác định được shape, nullability hay quy tắc thì đọc nguồn trước; đọc rồi vẫn không rõ thì dừng phần đó và ghi `Cần main quyết định` (subagent) hoặc hỏi user bằng `ask` (main), không viết code đoán.
+Không xác định được shape, nullability hay quy tắc thì đọc nguồn trước; đọc rồi vẫn không rõ thì dừng phần đó và ghi `Cần main quyết định` (subagent) hoặc đóng gói vào `Hộp thư Quyết định` để treo riêng nhánh đó và chạy tiếp các nhánh độc lập (main), không viết code đoán.
 Trường hợp hợp lệ (biểu thức boolean, type khai báo nullable và spec quy định mặc định): ghi `<file>:<line>` làm nguồn trong báo cáo bàn giao.

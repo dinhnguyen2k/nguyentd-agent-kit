@@ -31,7 +31,7 @@ task:
   speculativeLaunch: false
   # Advisor chỉ gác lane viết code; lane read-only không sinh code để bắt lỗi. Map này thắng frontmatter `advisor`.
   agentModelOverrides:
-    verifier: anthropic/claude-opus-5-5:medium
+    verifier: "@gate"
     researcher: "@advisor"
     reviewer: "@advisor"
     task: "@task"
@@ -54,19 +54,19 @@ task:
     reviewer: "off"
     security-reviewer: "off"
     verifier: "off"
-  # Ngân sách request theo vai trò (OMP 18.22+ dừng cứng ở 1.5x): tránh cắt ngang slice BE/FE lớn ở turn 50/75 nhưng vẫn chặn vòng lặp vô ích ở lane nhẹ.
+  # Ngân sách request theo vai trò (OMP 18.22+ dừng cứng ở 1.5x): kết hợp 3-Beat Tool Batching và chia nhỏ slice <= 2-3 aggregate/worker, vẫn đủ trần cho aggregate lớn (~28 tệp).
   softRequestBudget: 60
   agentSoftRequestBudget:
-    backend-specialist: 110
-    frontend-specialist: 110
-    test-author: 90
-    verifier: 80
-    reviewer: 80
-    security-reviewer: 80
-    researcher: 75
-    task: 60
-    sonic: 50
-    scout: 45
+    backend-specialist: 90
+    frontend-specialist: 90
+    test-author: 80
+    verifier: 60
+    reviewer: 60
+    security-reviewer: 60
+    researcher: 65
+    task: 55
+    sonic: 45
+    scout: 40
   # Mặc định OMP tắt LSP cho subagent; không bật thì worker không có `xd://lsp` và `lsp.diagnosticsOnEdit` ở trên vô tác dụng.
   enableLsp: true
 edit:
@@ -80,9 +80,12 @@ retry:
   # Dùng quota đáng tin cậy để chọn account/fallback sẵn có, không đổi model policy.
   usageAwareFallback: true
   fallbackChains:
-    # Không hạ worker xuống flash âm thầm: pool khác trước, rồi Anthropic.
+    # Không hạ worker/gate xuống flash âm thầm: pool khác trước, rồi Anthropic/Gemini.
     task:
       - google-antigravity/claude-opus-4-6:high
+    openai-codex/gpt-6-luna:
+      - google-antigravity/claude-opus-4-6:high
+      - google-antigravity/gemini-3.8-flash:high
     # Main (Opus 5.5) rơi sang Opus 4.6 ở pool khác, hết pool đó mới xuống flash (user chọn 03/10).
     anthropic/claude-opus-5-5:
       - google-antigravity/claude-opus-4-6:high

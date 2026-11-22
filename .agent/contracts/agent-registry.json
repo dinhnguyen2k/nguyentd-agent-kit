@@ -436,11 +436,14 @@
       "profile": ".agent/agents/backend-specialist.md",
       "kind": "worker",
       "write_paths": [
-        "backend/**"
+        "backend/**",
+        "home/nguyentd/.treehouse/cogain-excel-delivery/.treehouse/cogain-core-3386eb/1/cogain-core/backend/**"
       ],
       "deny_write_paths": [
         "backend/tests/**",
-        "backend/src/**/Migrations/**"
+        "backend/src/**/Migrations/**",
+        "home/nguyentd/.treehouse/cogain-excel-delivery/.treehouse/cogain-core-3386eb/1/cogain-core/backend/tests/**",
+        "home/nguyentd/.treehouse/cogain-excel-delivery/.treehouse/cogain-core-3386eb/1/cogain-core/backend/src/**/Migrations/**"
       ],
       "tools": [
         "Read",
@@ -544,10 +547,7 @@
           "dotnet test (toàn bộ suite không filter)"
         ]
       },
-      "parallel_safe_with": [
-        "backend-specialist",
-        "frontend-specialist"
-      ],
+      "execution_sequencing": "Chỉ được viết/sửa file test song song khi khác đường dẫn; CẤM chạy build/test (fast-build.sh, dotnet test, vitest) đồng thời khi backend-specialist/frontend-specialist đang sửa mã nguồn trên cùng worktree để tránh tranh chấp khóa bin/obj và kết quả test bẩn.",
       "runtime_registration": "subagent thật: .claude/agents/test-author.md -> ../../.agent/agents/test-author.md"
     },
     {
@@ -582,6 +582,7 @@
         ]
       },
       "activation": "A governed task may activate read-only source verification. DO NOT RUN validation commands unless the user explicitly requests the action and scope.",
+      "execution_sequencing": "CẤM gọi song song nhiều verifier chạy ci-parity.sh (đụng ci-parity.lock exit 75) hoặc dotnet test không --no-build (tranh chấp bin/obj). Phải chạy 1 Compile Gate tuần tự trước, sau đó mới fan-out tối đa 2 shard Pure Unit (--no-build --no-restore -nodeReuse:false -- xUnit.MaxParallelThreads=4) và cô lập đúng 1 shard tuần tự cho Testcontainers Postgres (ServiceDesk.IntegrationTests + Excel.UnitTests MasterDataImport, không chạy chồng với tsgo).",
       "runtime_registration": "subagent thật: .claude/agents/verifier.md -> ../../.agent/agents/verifier.md. Không có Edit/Write ở tầng runtime, đó là ranh giới cứng thật sự."
     },
     {

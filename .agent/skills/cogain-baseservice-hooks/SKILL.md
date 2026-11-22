@@ -32,7 +32,8 @@ Before editing, inspect:
 | Validate update                                  | `BeforeUpdateAsync`                                                                                |
 | Change mapped entity after update mapping        | `AfterMappingAsync`                                                                                |
 | Synchronize aggregate children                   | [skill:cogain-child-sync], not a mapping hook workaround                                           |
-| Resolve data after child synchronization         | `AfterReconcileCollectionsAsync`                                                                   |
+| Resolve data after child synchronization         | `AfterChildrenSyncedAsync`                                                                         |
+| Wrap create/update in WorkItem or transaction    | `ExecuteCreateWriteAsync` / `ExecuteUpdateWriteAsync`, calling `write.PersistAsync()` inside        |
 | Post-save side effect                            | `AfterCreateAsync` or `AfterUpdateAsync`; assess remote consistency first                          |
 | Delete-specific include/validation               | `GetDeleteIncludeString`, `GetEntityForDeleteAsync`, `BeforeDeleteAsync`, `BeforeDeleteByIdsAsync` |
 | Excel import/export                              | [skill:cogain-excel-import-export]                                                                 |
@@ -50,8 +51,9 @@ Before editing, inspect:
 - Do not override an orchestration method solely to add validation, includes, mapping, or a side effect.
 - Do not add special-case entity checks to `BaseService` when a hook or domain interface can own the behavior.
 - Do not issue a remote write inside a transaction without compensation/outbox/saga analysis.
-- Do not call `ReconcileCollections` from new code.
-- `AfterMappingAsync` runs before aggregate child synchronization; use `AfterReconcileCollectionsAsync` when newly synchronized children must exist first.
+- Do not call `ReconcileCollections*` from new code; declare an `AggregateShape` instead ([skill:cogain-child-sync]).
+- Do not wrap `base.Create`/`base.Update` in an outer transaction; snapshot collection must run outside it and fails fast otherwise.
+- `AfterMappingAsync` runs before aggregate child synchronization; use `AfterChildrenSyncedAsync` when newly synchronized children must exist first.
 
 ## Verification
 

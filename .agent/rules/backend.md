@@ -27,7 +27,7 @@ interruptMode: never
 3. **Gateway**: Định cấu hình thông qua `OcelotApiGw`.
 4. **BaseService Hooks**: Cấm override phương thức gốc của `BaseService`. Bắt buộc tùy biến qua các hook (`BeforeCreateAsync`, `AfterMapperAsync`, `BeforeUpdateAsync`...).
 5. **Excel Import/Export**: Xem quy tắc chi tiết tại [.agent/rules/backend-excel-import.md](backend-excel-import.md).
-6. **Cơ chế Snapshot cho chức năng mới**: Triển khai chức năng mới bắt buộc làm theo cơ chế snapshot chuẩn (`[SnapshotReference]`, `ISnapshotPolicy`, `ISnapshotLifecycleService`) khi tham chiếu dữ liệu liên service. Cấm fetch hoặc gán code/name thủ công trong luồng ghi.
+6. **Cơ chế Snapshot cho chức năng mới**: Triển khai chức năng mới bắt buộc làm theo cơ chế snapshot chuẩn (`[SnapshotReference]` + `AggregateShape` + `AggregateSnapshotService`, xem `docs/adr/0003-aggregate-write-pipeline.md`) khi tham chiếu dữ liệu liên service. Cấm fetch hoặc gán code/name thủ công trong luồng ghi.
 
 ---
 

@@ -55,22 +55,29 @@ state, which would break assembly-level parallelization.
 Tests are mandatory for money, permission, inventory, and legal-record invariants
 per `AI_RULES.md` section 9.
 
+## Tool Batching (3-Beat Discipline)
+
+Batch independent `Read`/`Grep`/`Glob` calls in parallel (max 4-6 files or <=1,500 lines/turn), group verified test edits into multi-hunk/multi-file patches instead of 1-file micro-turns, and batch post-canary `get_diagnostics` calls in one turn.
+
 ## Validation
 
-**DO NOT RUN build or tests automatically.** If the user explicitly requests test
-execution, run only the narrowest authorized command and report output:
+**DO NOT RUN build or tests automatically unless authorized.** When the user or the
+dispatch assignment (`permitted_checks`) authorizes test execution for the session,
+you **MUST** compile the affected test project and run the filtered tests to verify
+every touched test passes **before** yielding back to Main (never hand off blind test
+edits for `verifier` to debug round-by-round):
 
 ```
 backend/fast-build.sh backend/tests/<Project>/<Project>.csproj --no-restore -v q
 dotnet test  backend/tests/<Project>/<Project>.csproj --no-build --filter "FullyQualifiedName~<Area>"
 ```
 
-Report added/changed test names, the defect each rejects, any `derived-from-impl`
-markers, and any `needs-seam` blockers. Never commit unless the user explicitly
-asks.
+Report added/changed test names, the defect each rejects, exact filter command exit
+codes (when authorized), any `derived-from-impl` markers, and any `needs-seam`
+blockers. Never commit unless the user explicitly asks.
 
 ## Rework từ Main
 
-Tin `<irc>` từ `Main` (hoặc yêu cầu sửa từ advisor) là rework packet: chỉ sửa các finding được nêu, trong write boundary ở trên.
-Trả lời bằng `yield`: mỗi finding `fixed | disputed | blocked` kèm `file:line`; phản bác phải có bằng chứng.
-Chỉ nhắn `Main` khi bị chặn về quyền hoặc cần quyết định nghiệp vụ; còn lại trả kết quả qua `yield`.
+Tin `<irc>` từ `Main` (hoặc yêu cầu sửa từ advisor) là rework packet: chỉ sửa các finding được nêu, trong write boundary ở trên, và chạy lại đúng lệnh filter đã được cấp quyền trước khi kết thúc.
+Trả kết quả trực tiếp qua `yield`/`output` (mỗi finding `fixed | disputed | blocked` kèm `file:line`; phản bác phải có bằng chứng).
+**Cấm gửi thêm tin `<irc>` báo xong ngay trước khi kết thúc lượt** (gây đánh thức kép phiên chính); chỉ nhắn `<irc>` khi đang kẹt quyết định nghiệp vụ/quyền giữa chừng.

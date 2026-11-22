@@ -18,15 +18,13 @@ Dùng router `frontend-development` đã nạp; chỉ đọc skill hoặc phần
    Đọc pattern/test và consumer trực tiếp theo rủi ro; tái dùng bằng chứng khi source không đổi, không ghép yêu cầu từ TASK cha hay lịch sử và không coi gate/contract hợp lệ là bằng chứng API tồn tại.
 3. Sửa theo recipe và milestone hiện hành; tự quyết chi tiết cục bộ tương đương (tên biến, guard clause, chuẩn hóa nullability/giá trị rỗng tại boundary trong `allowed_paths`) mà không đổi hành vi nghiệp vụ.
 4. **Vi-xác minh giữa chừng (`MICRO` <= 3 bước)**: khi gặp lệch nhỏ prop/type/hành vi thư viện, tra ngay khai báo gốc + `lsp` + `context7`. Nếu xử lý trọn vẹn trong `allowed_paths` và giữ nguyên bất biến thì làm tiếp và ghi vào `assumptions`; nếu cần vượt `allowed_paths` hoặc đổi thiết kế/endpoint thì gom gói `file:line + expected/actual + đề xuất sửa chính xác` trả Main trong 1 nhịp, đồng thời hoàn tất hết phần độc lập còn lại.
-5. Đối chiếu delta với acceptance rồi bàn giao; ghi blocker vào `needs_main_decision`/`contract_deviations` nếu còn, không báo xong khi còn blocker.
+5. **Gom lô 3 nhịp (chống kéo dài hàng trăm turn)**: (a) *Discovery*: gọi song song các lệnh `Read`/`Grep`/`Glob` độc lập trong 1 lượt (tối đa 4-6 tệp hoặc <=1.500 dòng mục tiêu/lượt), không đọc lặp từng tệp lẻ; (b) *Edit*: gộp các điểm sửa đã xác minh vào ít lượt `Edit`/`apply_patch` đa hunk/đa tệp nhất; (c) *Self-Check*: sau 1 Canary LSP khỏe, gom toàn bộ tệp còn lại và `find_references` vào 1 lượt song song.
+6. Đối chiếu delta với acceptance rồi bàn giao; ghi blocker vào `needs_main_decision`/`contract_deviations` nếu còn, không báo xong khi còn blocker.
 
 ## UI đúng điểm chạm
 
-- Chỉ khi sửa UI/layout: đọc phần liên quan của `design.md` ở root nếu có, đối chiếu source, theme và component dùng chung.
-- Chỉ áp dụng trong contract và `allowed_paths`; sửa logic/query/service không cấp quyền đổi giao diện hoặc buộc đọc tài liệu thiết kế.
-- Production Order là tham chiếu bố cục, không sao chép nguyên mẫu hay các ngoại lệ.
-- Hướng dẫn trái source/contract hoặc cần mở rộng phạm vi thì trả Main.
-  `design.md` bị exclude cục bộ; thiếu file không tự tạo blocker, trừ khi contract yêu cầu.
+- Chỉ khi sửa UI/layout: đọc mục liên quan của `design.md` ở root (nếu có; thiếu file không phải blocker trừ khi contract đòi), đối chiếu source/theme/shared trong `allowed_paths`.
+- Production Order là tham chiếu bố cục, không sao chép ngoại lệ; sửa logic/query/service không tự đổi giao diện; hướng dẫn trái contract hoặc vượt phạm vi thì trả Main.
 
 ## Bất biến frontend
 
@@ -39,14 +37,8 @@ Dùng router `frontend-development` đã nạp; chỉ đọc skill hoặc phần
 
 ## Quyền và bàn giao
 
-Không tự chạy lint/typecheck/build/browser/test/app/codegen/format hoặc commit; skill, tier và manifest không cấp quyền chạy.
-Build/CI chỉ qua `verifier`/`maintainer` và `.agent/scripts/ci-parity.sh` khi user yêu cầu; R8 cấm build/typecheck/`fast-check.sh` trực tiếp.
-Guard chặn thì dừng, báo nguyên văn, không đi vòng.
-
-Bàn giao `implemented` khi hoàn tất, không chờ validation chưa được yêu cầu.
-Ghi `Validation: not run - not requested`; chỉ báo `verified` khi có bằng chứng lệnh thực tế.
-Manifest/verifier độc lập chỉ dành cho governed `/orchestrate`, không thêm artifact cho task cục bộ.
-Chỉ báo kết quả, file đổi, blocker và rủi ro chưa kiểm; không kể lại plan hay lịch sử tìm hiểu.
+Cấm tự chạy lint/typecheck/build/browser/test/app/codegen/format/commit (skill/tier/manifest không cấp quyền; R8 cấm build/typecheck/`fast-check.sh` trực tiếp; CI qua `verifier`/`maintainer`). Guard chặn thì dừng, báo nguyên văn.
+Bàn giao `implemented` ngay khi xong kèm file đổi, blocker, rủi ro chưa kiểm và `Validation: not run - not requested` (chỉ báo `verified` khi có bằng chứng lệnh thực tế); không thêm artifact governed cho task cục bộ, không kể lại plan/lịch sử.
 
 ## Sửa tiếp
 

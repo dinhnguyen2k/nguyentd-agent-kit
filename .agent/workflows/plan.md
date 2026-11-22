@@ -33,7 +33,7 @@ $ARGUMENTS
    Mapping phải dựa trên DTO/type, FK và flow đã đọc: phân biệt ID của thực thể nguồn với ID của dòng đích, quan hệ 1:1/1:N và khóa giữ các dòng trùng công đoạn.
    Không dùng field dự phòng, ID thay thế hoặc default khi chưa có contract quy định; thiếu bằng chứng thì chưa dispatch.
    Với flow cần thiết, chốt transaction, compensation, tracking/replay và cancellation ownership.
-   Trước khi giao viết tính năng, màn hình, luồng duyệt hoặc báo cáo mới: bắt buộc đối chiếu `[skill:cogain-screen-archetypes]` và chốt đủ 5 bất biến nghiệp vụ (nếu mã nguồn chưa tường minh thì phải hỏi gọn người dùng trước khi giao code):
+   Trước khi giao viết tính năng, màn hình, luồng duyệt hoặc báo cáo mới: bắt buộc đối chiếu `[skill:cogain-screen-archetypes]` và chốt đủ 5 bất biến nghiệp vụ (nếu mã nguồn chưa tường minh và thuộc Vùng Đỏ thì đóng gói vào `Hộp thư Quyết định`, treo riêng nhánh đó và chạy tiếp các nhánh độc lập):
    (1) Trạng thái vòng đời hợp lệ được tính số liệu (`EWorkItemStatus.Closed` so với trạng thái bảng nội bộ);
    (2) Mốc thời gian hiệu lực nghiệp vụ (`HrConfirmedDate` so với `CreatedDate` hoặc `ExecutionDate`);
    (3) Quy tắc cắt kỳ thời gian và helper chuẩn (`AttendanceReportPeriod` / `PayrollReportQueryHelper` so với `PeriodId`);
@@ -101,6 +101,7 @@ Không cắt error behavior, authorization, data integrity, cancellation, transa
 - Xác nhận lại source nếu đã thay đổi sau lần đọc.
 - Không sửa file worker đang sở hữu; gửi delta cho worker đó.
 - Giữ một owner cho cùng luồng/context; gom các bước sửa thành checklist, không tạo worker theo từng method/finding.
+- **Trần kích thước Slice & Sharding 2 pha (chống 1 worker ôm >120 turns)**: mỗi slice thực thi giao cho 1 specialist không vượt quá **2-3 aggregate đơn giản (hoặc 1 aggregate phức tạp >= 10 tệp) / ~8-12 tệp ghi** (tối đa **2-4 shard song song/đợt**). Với bài toán nhiều aggregate độc lập: *Pha 0* chốt trước contract/DTO/base class dùng chung -> *Pha A* fan-out các shard trên `allowed_paths` rời nhau hoàn toàn -> *Pha B* giao 1 owner nối tiếp cập nhật các tệp xương sống (`*DbContext.cs`, `Program.cs`, `ConfigureServices.cs`, `ServiceExtensions.cs`, `routeTree.gen.ts`).
 - Chỉ tách worker khi độc lập về vùng đọc/ghi và không dùng chung core service lớn, transaction, lifecycle hoặc contract đang biến động.
 - Chỉ cho phép dùng chung interface chỉ đọc đã chốt; giữ `allowed_paths` tách biệt và kiểm dependency trước dispatch.
 - Chia luồng dài thành milestone theo dependency và điểm rủi ro, không theo số file/method; giữ một owner khi còn cùng context, transaction hoặc service.
@@ -109,8 +110,8 @@ Không cắt error behavior, authorization, data integrity, cancellation, transa
   Không tạo worker/artifact riêng hoặc để lại scaffold chỉ để đủ milestone; chỉ nạp source cho milestone hiện hành và dependency trực tiếp.
   Checkpoint giữ requirement, contract version, decisions, unresolved, source evidence và unverified; dùng artifact hiện có chỉ khi cần resume, không tạo state store hoặc template mới.
 - Khi runtime báo giới hạn context/request, checkpoint rồi quyết định continuation hoặc handoff; không cố kéo dài phiên hoặc suy phần trăm context từ request budget.
-  OMP có hook `worker-checkpoint.ts` nhắc ở turn 30 và 40, trước soft request budget 50; đây là tín hiệu chủ động, không phải số đo context hay khóa runtime.
-  Cảnh báo mốc 40 không đồng nghĩa handoff bắt buộc hoặc tự dừng; worker không từ chối bước cần thiết nếu acceptance còn khả thi trong run. Chỉ bàn giao `partial`/`blocked` khi gặp giới hạn runtime/context hoặc blocker thực tế, kèm file/symbol còn lại, LSP ở lần sửa cuối và finding mở; không mở thêm nhánh discovery mới rồi đợi bị hủy.
+  OMP có hook `worker-checkpoint.ts` nhắc theo vai trò (ví dụ turn 45 và 70 trước soft request budget 90 của BE/FE specialist); đây là tín hiệu chủ động để gom lô thao tác còn lại, không phải số đo context hay khóa runtime.
+  Cảnh báo mốc checkpoint không đồng nghĩa handoff bắt buộc hoặc tự dừng; worker không từ chối bước cần thiết nếu acceptance còn khả thi trong run. Chỉ bàn giao `partial`/`blocked` khi gặp giới hạn runtime/context hoặc blocker thực tế, kèm file/symbol còn lại, LSP ở lần sửa cuối và finding mở; không mở thêm nhánh discovery mới rồi đợi bị hủy.
 
 ## Contract thực thi
 
@@ -135,7 +136,7 @@ Block này là brief thực thi, không phải metadata đính kèm một bản 
 - `preserve`: chỉ thêm khi có invariant hoặc phần phải giữ nguyên cần nêu riêng.
 - `acceptance`: kết quả quan sát được cho luồng chính, nhánh biên/lỗi liên quan; mapping 1:N phải chỉ rõ các dòng và identity cần bảo toàn, không chỉ “hiển thị đúng”.
   Mỗi tiêu chí phải được đáp ứng bởi bước sửa hoặc hành vi nguồn được giữ nguyên có bằng chứng; không để acceptance đòi sửa file ngoài `allowed_paths` hoặc phụ thuộc quyết định chưa chốt.
-- `permitted_checks`: chỉ các hành động user đã cho phép đích danh, mặc định không được cấp quyền và ghi `[]`.
+- `permitted_checks`: chỉ các hành động user đã cho phép đích danh (mặc định `[]`). Khi user đã cấp quyền chạy build/test cho phiên hiện tại, Main **bắt buộc** điền lệnh kiểm tra hẹp tương ứng vào `permitted_checks` của `test-author` (`backend/fast-build.sh backend/tests/<Project>/<Project>.csproj --no-restore -v q` và `dotnet test ... --no-build --filter "<Scope>"` hoặc `vitest run <file>`) để `test-author` tự xác nhận xanh cục bộ trước khi bàn giao, tránh vòng lặp đánh bóng bàn qua `verifier`.
 
 Main phải kiểm evidence thực sự chứng minh mapping, không chỉ trỏ tới file tồn tại.
 Hai dòng dùng cùng ID công đoạn chưa chắc là một dòng nghiệp vụ; không dedup hoặc đổi khóa trước khi xác minh cardinality và identity.
@@ -179,7 +180,7 @@ Worker chỉ mở rộng tra cứu khi gặp thiếu/mâu thuẫn cụ thể nh�
 Main đối chiếu assignment với TASK hiện hành trước dispatch; nếu thiếu acceptance, lệch version hoặc còn yêu cầu phải tự tìm hiểu thiết kế thì chưa giao.
 Rework và resume theo mục **Nghiệm thu và rework** bên dưới; giao delta trực tiếp, không tạo một nguồn yêu cầu khác với TASK hiện hành.
 
-Worker đọc các vị trí đã chỉ để xác nhận source rồi sửa theo từng bước; không viết lại plan, khảo sát module, tìm thêm pattern hoặc so sánh giải pháp khi source khớp contract.
+Worker đọc các vị trí đã chỉ bằng **lô gọi song song** (`Read`/`Grep` độc lập gom vào 1 lượt, tối đa 4-6 tệp hoặc <=1.500 dòng/lượt) để xác nhận source rồi gộp các điểm sửa đã rõ thành ít lượt `Edit`/`apply_patch` nhất; không viết lại plan, khảo sát module, đọc lẻ từng tệp mỗi turn hoặc so sánh giải pháp khi source khớp contract.
 Đọc đủ thân hàm/type và ngữ cảnh trực tiếp cần để sửa an toàn, không coi khoảng dòng là giới hạn cứng hoặc bỏ qua rule/skill bắt buộc.
 Trước lần ghi đầu tiên sử dụng một seam, đối chiếu declaration/type thực tế với recipe: signature, field/prop và nullability liên quan; không coi contract hoặc gate hợp lệ là bằng chứng symbol tồn tại.
 Tái dùng kết quả xác nhận khi source không đổi; đây là xác nhận cục bộ, không phải discovery lại hay quyền chạy build/typecheck.
@@ -244,8 +245,9 @@ Trước khi giao sửa tiếp, phân loại finding từ bằng chứng:
 - **Contract/discovery**: recipe thiếu/sai, reuse không đáp ứng invariant hoặc acceptance không thể đạt trong scope; Main giải quyết phần thiếu trước khi giao tiếp.
 - **Requirement change**: user làm rõ hoặc đổi hành vi so với baseline; cập nhật yêu cầu, không tính thành lỗi worker nếu implementation đúng contract trước đó.
 
-Rework bằng continuation đúng agent handle/session hiện hữu; không spawn mới rồi gắn lại tên owner.
-Không resume được thì ghi nhận chuyển giao sang worker mới; không gọi đó là resume hoặc suy rằng có cache hit.
+Rework bằng continuation đúng agent handle/session hiện hữu tối đa **2 vòng** (hoặc dưới ~60 turn tích lũy); vượt 2 vòng sửa mà chưa xong thì dừng nuôi handle cũ, tóm tắt gọn 5 trường `Phase Snapshot` và giao sang một specialist mới có ngữ cảnh sạch để tránh phình ngữ cảnh và độ trễ luỹ tiến ở worker/advisor.
+Không resume được hoặc đã chạm trần nghỉ hưu handle thì ghi nhận chuyển giao sang worker mới; không gọi đó là resume hoặc suy rằng có cache hit.
+Các lượt vá lỗi biên dịch thuần túy (`BuildFix`) giữ nguyên phạm vi `allowed_paths` và `acceptance` gốc được dùng contract inline gọn mà không cần tăng `contract_version` hay chạy lại supersession.
 Chỉ gửi delta: finding với expected/actual và evidence, điểm sửa/cách sửa, mapping thay đổi, source/version và invariant cần giữ; không gửi lại toàn bộ lịch sử hoặc chỉ nhắn “tiếp tục TASK”.
 Nếu nội dung thực thi đổi, cập nhật TASK/version/lifecycle và supersede theo protocol trước khi giao lại, không sửa riêng assignment để tạo hai nguồn yêu cầu.
 Khi resume hoặc source/requirement/luật liên quan đổi, đối chiếu lại phần contract bị ảnh hưởng trước dispatch; bỏ hoặc thay chỉ dẫn cũ trái quyết định mới, không ghép recipe từ nhiều version.

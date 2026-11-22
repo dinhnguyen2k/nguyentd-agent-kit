@@ -1,55 +1,64 @@
 ---
 name: cogain-child-sync
-description: Implements aggregate-owned soft-delete synchronization for Cogain EF Core child collections. Use when adding or changing nested update DTOs, ISyncsChildren, BuildIncomingGraph, SyncChildCollection, or legacy ReconcileCollections behavior.
+description: Declares and changes Cogain aggregate child collections through AggregateShape (sync, soft-delete, includes, snapshot nodes, mapping). Use when adding or changing nested update DTOs, child tables, BuildIncomingGraph, AggregateShape, SyncCollection on tab/import/confirm paths, or legacy ReconcileCollections behavior.
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   layer: project-skill
 ---
 
-# Cogain Child Collection Sync
+# Cogain Aggregate Child Sync
 
-The target pattern is aggregate-owned synchronization: the entity owns child invariants; the service translates DTOs into a transient entity graph.
+Decision record: `docs/adr/0003-aggregate-write-pipeline.md`.
+Step-by-step guide with code: `docs/snapshot-policy-development-guide.md`.
 
 ## Required Pattern
 
-1. The aggregate entity implements invariant `ISyncsChildren<TEntity>`.
-2. `SyncChildren(TEntity incoming)` calls `EntityAuditBase.SyncChildCollection` for each owned collection.
-3. The service overrides `BuildIncomingGraph(TUpdateDto dto, TEntity existing)` and maps DTO child rows to transient child entities.
-4. `BaseService.Update` calls `SyncChildren` and skips legacy reflection reconciliation.
-5. Removed children stay in the tracked navigation and receive soft-delete audit fields.
+1. The root entity implements `IAggregateRoot<TSelf>` and declares `public static AggregateShape<TSelf> Shape`.
+2. Each owned collection is one `ChildrenById` or `ChildrenByKey` node with an explicit `update` callback; grandchildren nest inside the child builder.
+3. The service overrides `BuildIncomingGraph(TUpdateDto dto, TEntity existing)` and maps DTO rows to transient child entities, keeping `null` when the DTO sends `null`.
+4. AutoMapper: `IgnoreAggregateChildren()` on update DTO -> entity; `MapActiveChildren()` on entity -> DTO.
+5. Services whose nodes carry `[SnapshotReference]` inject `AggregateSnapshotService` and call `UseSnapshots(service)` in the constructor.
+6. Services needing WorkItem/transaction override `ExecuteCreateWriteAsync`/`ExecuteUpdateWriteAsync` and call `write.PersistAsync()` inside their boundary.
 
 Reference implementation:
 
-- `backend/src/Services/MasterData/MasterData.Data/Entities/Production/SemiFinishedGood.cs`
-- `backend/src/Services/MasterData/MasterData.Services/Implement/Production/SemiFinishedGoodService.cs`
-- `backend/tests/Architecture.Tests/ChildSyncArchitectureTests.cs`
+- `backend/src/Services/ServiceDesk/ServiceDesk.Data/Entities/SalesOrders/SalesOrder.cs`
+- `backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/SalesOrders/SalesOrderService.cs`
+- `backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/Production/ProductionOrder/ProductionOrderService.cs` (transactional write seam)
 
-## Design the Natural Key
+## Matching and Keys
 
-- Prefer persisted `Id` when the payload carries a valid ID; `SyncChildCollection` already handles this.
-- Supply a stable domain natural key for new rows. Use a tuple when uniqueness spans columns.
-- Include every field that determines child identity, but exclude mutable fields that should be updated in place.
-- Use `onUpdate` for mutable properties and `beforeAdd` for parent FK, owner type, or other creation invariants.
+- `ChildrenById`: match by persisted `Id` only.
+- `ChildrenByKey`: match `Id` first, then the natural key; each existing row matches once.
+- The key holds identity columns only, never mutable fields; use a tuple when uniqueness spans columns.
+- Duplicate `Id` in the payload throws before any change.
+- New rows keep their `Id`; BaseService calls `IUnitOfWork.MarkAdded(sync.Added)` so pre-assigned Ids insert instead of causing 409. Siblings/grandchildren may reference that Id as FK.
 
 ## Null and Empty Semantics
 
-Current `SyncChildCollection` treats `incoming == null` as “soft-delete all active children.” Do not assume null means “leave unchanged.” If the API needs patch semantics, establish that contract explicitly before using this pattern.
+- `NullMeans.Keep` (default): `null` collection leaves rows untouched.
+- `NullMeans.ClearAll`: `null` soft-deletes all active rows; choose it only when that is the existing FE/API contract.
+- Empty collection always soft-deletes all active rows.
+- `ManagedWhen(predicate)` restricts reconciliation to rows the screen owns.
+- Soft-deleting a row cascades to its whole subtree.
 
-## Legacy
+## Other Write Paths
 
-`EntityAuditBase.SyncCollection` (hard-remove, no soft-delete) is legacy and still serves CRM only. Do not use it for new code.
+- Tab update: `TabUpdateHelpers.UpsertTabWithSnapshotAsync`.
+- Import/confirm/custom: `AggregateSynchronizer.SyncCollection(root, x => x.Items, incoming)` then `_unitOfWork.MarkAdded(sync.Added)`; collect snapshots with `AggregateSnapshotService.CollectAsync` before the transaction, `Apply` inside it before `SaveChanges`.
 
 ## Boundaries
 
-- Do not add new `ReconcileCollections` or `ReconcileCollectionsAsync` usage; both are obsolete.
-- Do not remove children from an EF-tracked navigation when the child FK is required. That severs the association and can cause EF to null a non-nullable FK.
+- One-to-one relations stay outside the shape; handle them in the parent node's `update` callback.
+- `update` callbacks copy every mutable column and never touch `Id`, parent FK, audit or snapshot columns; a new column not copied there is silently never updated.
+- Do not hand-write update includes, collection ignores or soft-delete filters for collections already in the shape.
+- Do not remove children from an EF-tracked navigation when the FK is required; the shape soft-deletes instead.
+- Do not assign `LastModified*` manually; the shared `AuditingInterceptor` owns audit fields.
+- Do not add entity-specific branches to `AggregateShape`, `AggregateSynchronizer`, `AggregateSnapshotService` or `BaseService`.
+- `ReconcileCollections*` reflection remains only for entities without a shape and is `[Obsolete]`. Any aggregate whose children you touch must get a shape instead.
 - Do not make domain entities depend on DTO types.
-- Do not make `ISyncsChildren<T>` contravariant; the invariant runtime guard is deliberate.
-- Do not sync non-owned references as children. Aggregate ownership must be clear.
 
 ## Verification
 
-- `ChildSyncArchitectureTests` passes.
-- Tests cover add, update, duplicate payload key, omitted/removal behavior, and soft-delete behavior relevant to the collection.
-- Parent FK and creation-only invariants are set in `beforeAdd`.
-- Existing active rows update in place; removed rows keep audit history.
+- App starts: `AddAggregateShapeValidation<AppDbContext>()` rejects shapes that disagree with the EF model.
+- Covered: add (including pre-assigned Id), update in place, removal soft-deletes subtree, `null` vs empty per `NullMeans`, unchanged FK keeps historical snapshot, changed FK resolves new snapshot, every listed write path.

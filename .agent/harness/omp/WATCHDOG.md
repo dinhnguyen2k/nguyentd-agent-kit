@@ -8,7 +8,7 @@ Note chỉ giữ bằng chứng, luật và cách sửa/điểm Main cần chố
 ## Cách review
 
 1. Chỉ kết luận từ code thật bằng `read`/`grep`/`glob`; không phán theo plan hay lời kể của worker:
-   - Ở Turn guard (mỗi 3 turn đủ điều kiện theo roster): tập trung trên delta tích luỹ kể từ lần review trước gồm code mới đổi, luật cứng, code đoán và caller bị ảnh hưởng nếu risk surface thay đổi mà không quét cả slice ở mỗi nhịp; không đọc lại workspace khi không có thay đổi mới và không còn finding mở, nhưng bắt buộc đọc source khi có bối cảnh mới, thiếu bằng chứng hoặc finding chưa giải quyết.
+   - Ở Turn guard (mỗi 8 turn đủ điều kiện theo roster): tập trung trên delta tích luỹ kể từ lần review trước gồm code mới đổi, luật cứng, code đoán và caller bị ảnh hưởng nếu risk surface thay đổi mà không quét cả slice ở mỗi nhịp; chưa có thay đổi tệp mới và không còn finding mở thì dừng ngay không đọc lại workspace, nhưng bắt buộc đọc source khi có thay đổi mới, thiếu bằng chứng hoặc finding chưa giải quyết.
      Code cũ đã nằm trong recipe sửa/xóa không phải finding implementation khi worker chưa tới bước đó; không gửi blocker phòng ngừa hay nhắc lại checklist.
      Mâu thuẫn khiến contract không thể thực thi đúng hoặc vi phạm thực thi mới vẫn phải trả Main bằng evidence cụ thể.
    - Ưu tiên cao nhất khi xuất hiện các bề mặt rủi ro: xác thực, phân quyền, toàn vẹn dữ liệu, đồng thời, transaction, gọi external service, và thay đổi public contract; đồng thời bảo toàn đầy đủ mọi chuẩn architecture, clean code, không code đoán và luật cứng.
@@ -126,7 +126,7 @@ Thuộc các trường hợp trên thì gửi `concern` mở đầu `CẦN MAIN 
 Không bắt worker trace lại toàn flow, nghiên cứu phương án hay điền báo cáo nhiều mục để chứng minh blocker.
 Worker dừng phần liên quan, tiếp tục phần độc lập và ghi blocker qua `needs_main_decision`/`contract_deviations` nếu profile có; không báo xong trọn vẹn khi còn mở.
 
-Phiên đang review là main thì main quyết theo `AI_RULES.md` §5 và `OPINION.md`; vẫn không chốt được thì hỏi user bằng `ask`.
+Phiên đang review là main thì main quyết theo `AI_RULES.md` §3 & §5 và `OPINION.md`; nếu thực sự thuộc Vùng Đỏ chưa có tiền lệ thì đóng gói vào `Hộp thư Quyết định`, chỉ treo riêng nhánh đó và chạy tiếp các nhánh độc lập (cấm gọi `ask` chặn cứng toàn phiên khi vẫn còn hạng mục độc lập).
 Không dùng nhánh này để né phán quyết: luật đã nói rõ thì phán luôn theo luật.
 
 ## Giới hạn của advisor

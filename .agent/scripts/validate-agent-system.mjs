@@ -880,6 +880,29 @@ function validateAutonomousContinuationGate() {
     if (usrStop.decision !== 'allow') {
       errors.push(`stop-gate: explicit user stop intent must allow stop, got ${JSON.stringify(usrStop)}`);
     }
+
+    // 8. Kiểm tra chốt chặn OMP workflow-context.ts & config.yml (non-blocking ask, handle retirement cap, khóa Tiếng Việt, verifier @gate)
+    const wfHookPath = join(repoRoot, '.agent', 'harness', 'omp', 'hooks', 'pre', 'workflow-context.ts');
+    if (existsSync(wfHookPath)) {
+      const wfSrc = readFileSync(wfHookPath, 'utf8');
+      for (const requiredToken of [
+        '[non-blocking-queue]',
+        '[handle-retirement-cap]',
+        'MAX_REWORK_CONTINUATIONS_PER_HANDLE = 2',
+        'AI_RULES.md §8',
+      ]) {
+        if (!wfSrc.includes(requiredToken)) {
+          errors.push(`.agent/harness/omp/hooks/pre/workflow-context.ts: missing required guard token '${requiredToken}'`);
+        }
+      }
+    }
+    const ompCfgPath = join(repoRoot, '.agent', 'harness', 'omp', 'config.yml');
+    if (existsSync(ompCfgPath)) {
+      const ompCfgSrc = readFileSync(ompCfgPath, 'utf8');
+      if (!/^\s*verifier:\s*["']?@gate["']?\s*$/m.test(ompCfgSrc)) {
+        errors.push('.agent/harness/omp/config.yml: verifier must map to "@gate" to avoid saturating main Anthropic pool');
+      }
+    }
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }

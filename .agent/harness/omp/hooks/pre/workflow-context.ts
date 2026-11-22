@@ -59,6 +59,11 @@ type CompactingEvent = {
 	messages: unknown[];
 };
 
+type ToolCallEvent = {
+	toolName: string;
+	input: unknown;
+};
+
 type ToolResultEvent = {
 	toolName: string;
 	toolCallId: string;
@@ -79,6 +84,7 @@ type SessionStopEvent = {
 
 type WorkflowHookAPI = {
 	on(event: "before_agent_start", handler: (event: BeforeAgentStartEvent, ctx: ExtensionContext) => { systemPrompt?: string[] } | void): void;
+	on(event: "tool_call", handler: (event: ToolCallEvent, ctx: ExtensionContext) => { block: true; reason: string } | void): void;
 	on(
 		event: "session.compacting",
 		handler: (event: CompactingEvent, ctx: ExtensionContext) => { context?: string[]; prompt?: string; preserveData?: Record<string, unknown> } | void,
@@ -92,14 +98,15 @@ type WorkflowHookAPI = {
 };
 
 const CUSTOM_TYPE = "cogain.workflow";
+const MAX_REWORK_CONTINUATIONS_PER_HANDLE = 2;
+const SHORT_STOP_CONTROL_RE = /^\s*(?:dừng|stop|cancel|abort|hủy|thôi)\b/i;
 const LIFECYCLE_POLICY_MARKER = "<!-- cogain-workflow-lifecycle -->";
 const LIFECYCLE_POLICY_BLOCK = `${LIFECYCLE_POLICY_MARKER}
-[Workflow Lifecycle & Continuous Execution]
-- Main↔user: nói như trao đổi với người cùng dự án, câu đầy đủ, kết quả và ảnh hưởng thực tế trước; ngắn gọn là bỏ ý thừa, không nén thành ký hiệu/câu cụt, không dùng từ nội bộ giữa agent, nêu tên file/lệnh thì giải thích công dụng (AI_RULES.md §8).
-- Main↔agent: ngắn gọn, kết luận trước, không lặp bối cảnh hay kể lại quá trình; luôn giữ đủ rủi ro, bằng chứng và LSP cần thiết.
-- Chạy xuyên suốt không đứt gãy: khi kế hoạch/todo còn hạng mục độc lập khả thi, Main nghiệm thu xong một slice PHẢI gọi ngay tool dispatch/thực thi slice kế tiếp trong cùng lượt, CẤM chỉ viết báo cáo tiến độ trung gian rồi dừng lượt.
-- Cô lập nhánh lỗi (Branch Fault Isolation): nhánh vướng Vùng Đỏ, lỗi worktree, guard deny hoặc blocker cục bộ chỉ treo riêng nhánh đó (và nhánh phụ thuộc trực tiếp); bắt buộc chạy xuyên suốt hết mọi nhánh độc lập còn lại trước khi tổng hợp báo cáo cuối.
-- Main chốt recipe/source trước dispatch, worker xác nhận điểm sửa rồi thi hành theo đúng recipe; source mismatch thì dừng phần liên quan và trả Main, không đoán field.`;
+[Quy tắc Vận hành Xuyên Suốt & Ngôn ngữ Bắt buộc]
+- NGÔN NGỮ BẮT BUỘC (AI_RULES.md §8): Mọi câu trả lời, thông báo tiến độ và báo cáo gửi người dùng PHẢI viết bằng Tiếng Việt có dấu đầy đủ (tuyệt đối không trượt sang Tiếng Anh và cấm độc thoại kể lể "Next I'm planning to..." sau nhiều lần nén ngữ cảnh); nêu kết quả và ảnh hưởng thực tế trước, không dùng từ nội bộ khó hiểu.
+- Giao tiếp Main↔agent: ngắn gọn, kết luận trước, đủ bằng chứng/rủi ro/LSP; worker bàn giao qua kết quả kết thúc lượt, KHÔNG gửi thêm tin <irc> báo xong trùng lặp gây đánh thức kép Main.
+- Chạy xuyên suốt theo chặng: hoàn tất toàn bộ thay đổi mã nguồn + dọn API cũ trước khi mở cổng build/test tổng; đóng băng sửa mã nguồn trong lúc verifier/test-author đang chạy kiểm tra; khi user đã cho phép chạy test, bắt buộc cấp permitted_checks để test-author tự chạy xanh cục bộ trước khi bàn giao.
+- Nghỉ hưu tác vụ dài & Cô lập nhánh lỗi: tối đa 2 vòng gửi sửa tiếp trên một handle (quá 2 vòng thì tóm tắt bàn giao sang specialist mới ngữ cảnh sạch); nhánh vướng Vùng Đỏ hoặc lỗi cục bộ thì ghi vào Hộp thư Quyết định (không gọi ask chặn luồng khi còn nhánh độc lập) và chạy hết các nhánh độc lập còn lại.`;
 
 type ContractInfo = {
 	raw: string;
@@ -192,6 +199,7 @@ type MainTaskRecord = {
 	handle?: string;
 	activeContract?: ContractInfo;
 	deltas: string[];
+	continuationCount: number;
 	status: "dispatched" | "completed";
 };
 
@@ -199,6 +207,7 @@ type UnmatchedContinuationRecord = {
 	target: string;
 	activeContract?: ContractInfo;
 	deltas: string[];
+	continuationCount: number;
 };
 
 type MainState = {
@@ -359,6 +368,7 @@ function reconstructMainState(branch: SessionEntry[]): MainState {
 					handle: data.handle,
 					activeContract: data.contract,
 					deltas: [],
+					continuationCount: 0,
 					status: "dispatched",
 				};
 				if (data.contract.contractRef) {
@@ -372,12 +382,19 @@ function reconstructMainState(branch: SessionEntry[]): MainState {
 					if ((task.handle && task.handle === data.target) || (task.name && task.name === data.target)) {
 						task.activeContract = data.contract;
 						task.deltas = [];
+						task.continuationCount += 1;
 						task.status = "dispatched";
 						matched = true;
 					}
 				}
 				if (!matched) {
-					unmatchedContinuations[data.target] = { target: data.target, activeContract: data.contract, deltas: [] };
+					const prev = unmatchedContinuations[data.target];
+					unmatchedContinuations[data.target] = {
+						target: data.target,
+						activeContract: data.contract,
+						deltas: [],
+						continuationCount: (prev?.continuationCount ?? 0) + 1,
+					};
 				}
 				if (data.contract.contractRef) {
 					const m = data.contract.contractRef.match(/^(\.agent\/planning\/[^/]+)\/TASK-[^/]+\.md$/);
@@ -389,14 +406,16 @@ function reconstructMainState(branch: SessionEntry[]): MainState {
 				for (const task of Object.values(tasks)) {
 					if ((task.handle && task.handle === data.target) || (task.name && task.name === data.target)) {
 						task.deltas.push(data.delta);
+						task.continuationCount += 1;
 						matched = true;
 					}
 				}
 				if (!matched) {
 					if (!unmatchedContinuations[data.target]) {
-						unmatchedContinuations[data.target] = { target: data.target, deltas: [data.delta] };
+						unmatchedContinuations[data.target] = { target: data.target, deltas: [data.delta], continuationCount: 1 };
 					} else {
 						unmatchedContinuations[data.target].deltas.push(data.delta);
+						unmatchedContinuations[data.target].continuationCount += 1;
 					}
 				}
 			} else if (data.type === "todo_snapshot") {
@@ -424,15 +443,28 @@ function reconstructMainState(branch: SessionEntry[]): MainState {
 	};
 }
 
+function countContinuationsForTarget(state: MainState, target: string): number {
+	let maxCount = state.unmatchedContinuations[target]?.continuationCount ?? 0;
+	for (const task of Object.values(state.tasks)) {
+		if (task.handle === target || task.name === target) {
+			if (task.continuationCount > maxCount) maxCount = task.continuationCount;
+		}
+	}
+	return maxCount;
+}
+
 function resolveSessionId(ctx: ExtensionContext, fallback?: string): string {
 	const fromMgr = typeof ctx.sessionManager.getSessionId === "function" ? ctx.sessionManager.getSessionId() : "";
 	return fromMgr || fallback || "omp-main";
 }
 
 export default function workflowContext(pi: WorkflowHookAPI): void {
+	let askWarnedInCurrentTurn = false;
+
 	pi.on("before_agent_start", (event, ctx) => {
 		if (ctx.agent.id === "advisor" || ctx.agent.name === "advisor") return;
 		if (ctx.agent.kind === "main" && event.reason !== "revive" && typeof event.prompt === "string" && event.prompt.trim()) {
+			askWarnedInCurrentTurn = false;
 			const root = findRepoRoot(ctx.cwd);
 			if (root) {
 				resetSessionTurnCounters(root, resolveSessionId(ctx), { userPrompt: event.prompt });
@@ -441,6 +473,66 @@ export default function workflowContext(pi: WorkflowHookAPI): void {
 		if (event.reason === "revive") return;
 		if (event.systemPrompt.some(block => typeof block === "string" && block.includes(LIFECYCLE_POLICY_MARKER))) return;
 		return { systemPrompt: [...event.systemPrompt, LIFECYCLE_POLICY_BLOCK] };
+	});
+
+	pi.on("tool_call", (event, ctx) => {
+		try {
+			if (ctx.agent.kind !== "main") return;
+			if (ctx.agent.id === "advisor" || ctx.agent.name === "advisor") return;
+
+			if (event.toolName === "ask") {
+				if (askWarnedInCurrentTurn) return;
+				const root = findRepoRoot(ctx.cwd);
+				if (!root) return;
+				const state = reconstructMainState(ctx.sessionManager.getBranch());
+				const taskList = Object.values(state.tasks);
+				const dispatchedRefs = taskList.map(t => t.activeContract?.contractRef).filter((x): x is string => Boolean(x));
+				const completedRefs = taskList
+					.filter(t => t.status === "completed")
+					.map(t => t.activeContract?.contractRef)
+					.filter((x): x is string => Boolean(x));
+				const planStatus = state.planDir
+					? inspectPlanDirRemaining(root, state.planDir, { completedRefs, dispatchedRefs })
+					: { remainingSlices: [] };
+
+				if (state.openTodoCount > 1 || planStatus.remainingSlices.length > 0) {
+					askWarnedInCurrentTurn = true;
+					return {
+						block: true,
+						reason:
+							"[non-blocking-queue] CẤM gọi tool 'ask' làm treo cứng toàn bộ phiên chạy xuyên suốt khi vẫn còn hạng mục todo mở hoặc TASK chưa triển khai! " +
+							"Theo AI_RULES.md §3: hãy đóng gói câu hỏi kèm đề xuất vào 'Hộp thư Quyết định', chỉ treo riêng nhánh đang vướng đó, và gọi ngay tool thực thi TẤT CẢ các nhánh/TASK độc lập còn lại trước. " +
+							"(Chỉ gọi lại 'ask' nếu bạn đã kiểm chứng chắc chắn 100% phần việc còn lại đều bị chặn trực tiếp bởi câu hỏi này).",
+					};
+				}
+				return;
+			}
+
+			if (event.toolName === "write") {
+				const input = event.input as { path?: unknown; content?: unknown } | undefined;
+				const path = typeof input?.path === "string" ? input.path : "";
+				const content = typeof input?.content === "string" ? input.content : "";
+				const match = path.match(/^agent:\/\/([^\s/]+)$/);
+				if (!match || match[1] === "all") return;
+				if (content.length < 100 && SHORT_STOP_CONTROL_RE.test(content)) return;
+
+				const target = match[1];
+				const state = reconstructMainState(ctx.sessionManager.getBranch());
+				const usedContinuations = countContinuationsForTarget(state, target);
+				if (usedContinuations >= MAX_REWORK_CONTINUATIONS_PER_HANDLE) {
+					return {
+						block: true,
+						reason:
+							`[handle-retirement-cap] Tác vụ '${target}' đã dùng đủ trần ${MAX_REWORK_CONTINUATIONS_PER_HANDLE} vòng gửi sửa tiếp qua 'write agent://${target}'. ` +
+							`Nuôi tiếp cùng một handle sẽ làm phình ngữ cảnh (tăng vọt độ trễ ở cả worker lẫn bộ đôi advisor). ` +
+							`Hãy dừng dùng handle '${target}', tóm tắt gọn phần việc còn lại (kèm tệp đã đổi, lỗi cụ thể và quyền kiểm tra permitted_checks nếu có) rồi gọi tool 'task' tạo một specialist mới có ngữ cảnh sạch.`,
+					};
+				}
+			}
+		} catch {
+			// Fail-open an toàn
+		}
+		return undefined;
 	});
 
 	pi.on("tool_result", (event, ctx) => {
@@ -576,15 +668,15 @@ export default function workflowContext(pi: WorkflowHookAPI): void {
 
 			if (state.activeContract) {
 				if (state.activeContract.isCanonical) {
-					contextLines.push(`[Active Contract] (canonical) ref: ${state.activeContract.contractRef}, version: ${state.activeContract.contractVersion}`);
+					contextLines.push(`[Hợp đồng đang thực thi] (canonical) ref: ${state.activeContract.contractRef}, version: ${state.activeContract.contractVersion}`);
 				} else {
-					contextLines.push(`[Active Contract] (inline recipe):\n${state.activeContract.raw}`);
+					contextLines.push(`[Hợp đồng đang thực thi] (inline):\n${state.activeContract.raw}`);
 				}
 			}
 			if (state.deltas.length > 0) {
 				contextLines.push(
-					`[Active Deltas] (${state.deltas.length} items):\n` +
-						state.deltas.slice(-4).map((d, i) => `--- Delta ${i + 1} ---\n${d}`).join("\n"),
+					`[Yêu cầu sửa bổ sung gần nhất] (${state.deltas.length} mục):\n` +
+						state.deltas.slice(-3).map((d, i) => `--- Mục ${i + 1} ---\n${d}`).join("\n"),
 				);
 			}
 
@@ -594,15 +686,21 @@ export default function workflowContext(pi: WorkflowHookAPI): void {
 			};
 		}
 
+		contextLines.push(
+			"[Quy tắc Ngôn ngữ & Điều phối Bắt buộc Sau Khi Nén Ngữ Cảnh]\n" +
+				"- BẮT BUỘC trả lời người dùng bằng Tiếng Việt có dấu đầy đủ (AI_RULES.md §8); cấm trượt sang Tiếng Anh, cấm độc thoại 'Next I am planning to...'.\n" +
+				"- Chạy xuyên suốt theo chặng: hoàn tất toàn bộ sửa mã nguồn + dọn API cũ trước khi chạy bộ test tổng; đóng băng sửa mã nguồn khi verifier/test-author đang chạy kiểm tra; tối đa 2 vòng gửi sửa tiếp trên một tác vụ con.",
+		);
+
 		const state = reconstructMainState(branch);
 		const root = findRepoRoot(ctx.cwd);
 		const taskList = Object.values(state.tasks);
 		const unmatchedList = Object.values(state.unmatchedContinuations);
 
 		if (state.planDir || state.openTodoCount > 0) {
-			const roadmapParts: string[] = ["[Active Roadmap & Autonomous Continuation - DO NOT STOP UNTIL ALL READY ITEMS COMPLETE]"];
+			const roadmapParts: string[] = ["[Lộ trình Kế hoạch Đang Chạy - Không Dừng Non Khi Còn Hạng Mục Khả Thi]"];
 			if (state.planDir) {
-				roadmapParts.push(`Active Plan Root: ${state.planDir}/00-OVERVIEW.md`);
+				roadmapParts.push(`Thư mục kế hoạch: ${state.planDir}/00-OVERVIEW.md`);
 				if (root) {
 					const dispatchedRefs = taskList.map(t => t.activeContract?.contractRef).filter((x): x is string => Boolean(x));
 					const completedRefs = taskList
@@ -611,18 +709,18 @@ export default function workflowContext(pi: WorkflowHookAPI): void {
 						.filter((x): x is string => Boolean(x));
 					const planStatus = inspectPlanDirRemaining(root, state.planDir, { completedRefs, dispatchedRefs });
 					if (planStatus.remainingSlices.length > 0) {
-						roadmapParts.push(`Remaining Undispatched TASK Slices (${planStatus.remainingSlices.length}): ${planStatus.remainingSlices.join(", ")}`);
+						roadmapParts.push(`Các TASK chưa giao (${planStatus.remainingSlices.length}): ${planStatus.remainingSlices.join(", ")}`);
 					}
 					if (planStatus.inFlightSlices.length > 0) {
-						roadmapParts.push(`In-Flight / Pending Acceptance Slices (${planStatus.inFlightSlices.length}): ${planStatus.inFlightSlices.join(", ")}`);
+						roadmapParts.push(`Các TASK đang chạy / chờ nghiệm thu (${planStatus.inFlightSlices.length}): ${planStatus.inFlightSlices.join(", ")}`);
 					}
 				}
 			}
 			if (state.openTodoCount > 0) {
-				roadmapParts.push(`Open Todo Items (${state.openTodoCount} remaining, ${state.completedTodoCount} completed): ${state.todoSample.join(" | ")}`);
+				roadmapParts.push(`Mục todo còn mở (${state.openTodoCount} chưa xong, ${state.completedTodoCount} đã xong): ${state.todoSample.join(" | ")}`);
 			}
 			roadmapParts.push(
-				"Rule: Sau khi nghiệm thu mỗi slice, gọi ngay tool dispatch cho slice sẵn sàng kế tiếp trong cùng lượt; nhánh lỗi/Vùng Đỏ chỉ treo riêng nhánh đó, tiếp tục chạy hết các nhánh độc lập còn lại.",
+				"Quy tắc nối nhịp: Sau khi nghiệm thu mỗi phần, gọi ngay công cụ thực thi phần kế tiếp trong cùng lượt; nhánh vướng Vùng Đỏ/lỗi cục bộ thì ghi vào Hộp thư Quyết định (không gọi ask chặn luồng) và làm hết các nhánh độc lập.",
 			);
 			contextLines.push(roadmapParts.join("\n"));
 		}
@@ -634,41 +732,40 @@ export default function workflowContext(pi: WorkflowHookAPI): void {
 			const compactDone = completedTasks
 				.map(t => `${t.name || t.handle || t.id}${t.activeContract?.contractRef ? ` (${t.activeContract.contractRef} v${t.activeContract.contractVersion})` : ""}`)
 				.join(", ");
-			contextLines.push(`[Completed Dispatches (${completedTasks.length})]: ${compactDone}`);
+			contextLines.push(`[Các tác vụ đã hoàn tất (${completedTasks.length})]: ${compactDone}`);
 		}
 
 		const recentActive = activeTasks.slice(-4);
 		for (const task of recentActive) {
-			const nameStr = task.name ? `name=${task.name}` : "name=unspecified";
-			const agentStr = task.agent ? `agent=${task.agent}` : "agent=unspecified";
-			const handleStr = task.handle ? `handle=${task.handle}` : "handle=unassigned";
-			let line = `[Active Task: id=${task.id}, ${nameStr}, ${agentStr}, ${handleStr}] Status: ${task.status}`;
+			const nameStr = task.name ? `tên=${task.name}` : "tên=chưa-đặt";
+			const agentStr = task.agent ? `vai-trò=${task.agent}` : "vai-trò=chưa-rõ";
+			const handleStr = task.handle ? `handle=${task.handle}` : "handle=chưa-gán";
+			let line = `[Tác vụ đang mở: id=${task.id}, ${nameStr}, ${agentStr}, ${handleStr}, số-vòng-rework=${task.continuationCount}/${MAX_REWORK_CONTINUATIONS_PER_HANDLE}]`;
 			if (task.activeContract) {
 				if (task.activeContract.isCanonical) {
-					line += ` | Contract: ${task.activeContract.contractRef} v${task.activeContract.contractVersion}`;
+					line += ` | Hợp đồng: ${task.activeContract.contractRef} v${task.activeContract.contractVersion}`;
 				} else {
-					line += ` | Contract (inline):\n${task.activeContract.raw.slice(0, 1800)}`;
+					line += ` | Hợp đồng (inline):\n${task.activeContract.raw.slice(0, 1600)}`;
 				}
 			}
 			if (task.deltas.length > 0) {
-				const tailDeltas = task.deltas.slice(-3);
-				line += `\nRecent continuations (${tailDeltas.length}/${task.deltas.length}):\n` + tailDeltas.map((d, i) => `  - ${i + 1}: ${d.slice(0, 500)}`).join("\n");
+				const tailDeltas = task.deltas.slice(-2);
+				line += `\nSửa tiếp gần nhất (${tailDeltas.length}/${task.deltas.length}):\n` + tailDeltas.map((d, i) => `  - ${i + 1}: ${d.slice(0, 450)}`).join("\n");
 			}
 			contextLines.push(line);
 		}
 
-		for (const unmatched of unmatchedList.slice(-3)) {
-			let line = `[Sent Continuation to Target: ${unmatched.target}]`;
+		for (const unmatched of unmatchedList.slice(-2)) {
+			let line = `[Tin sửa tiếp gửi tới: ${unmatched.target}, số-vòng=${unmatched.continuationCount}/${MAX_REWORK_CONTINUATIONS_PER_HANDLE}]`;
 			if (unmatched.activeContract?.isCanonical) {
-				line += ` | Contract: ${unmatched.activeContract.contractRef} v${unmatched.activeContract.contractVersion}`;
+				line += ` | Hợp đồng: ${unmatched.activeContract.contractRef} v${unmatched.activeContract.contractVersion}`;
 			}
 			if (unmatched.deltas.length > 0) {
-				line += `\nLatest delta: ${unmatched.deltas.at(-1)?.slice(0, 500) ?? ""}`;
+				line += `\nNội dung cuối: ${unmatched.deltas.at(-1)?.slice(0, 400) ?? ""}`;
 			}
 			contextLines.push(line);
 		}
 
-		if (contextLines.length === 0) return;
 		return {
 			context: contextLines,
 			preserveData: { [CUSTOM_TYPE]: { planDir: state.planDir, openTodoCount: state.openTodoCount, sessionId: event.sessionId } },

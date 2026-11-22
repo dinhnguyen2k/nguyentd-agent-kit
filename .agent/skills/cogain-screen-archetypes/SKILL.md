@@ -25,7 +25,7 @@ Khi mở rộng hoặc tạo mới màn hình/service theo một trong 4 archety
 - Nạp kèm `[skill:cogain-form-rhf-zod]` và `[skill:cogain-child-sync]`.
 - Cú pháp cấm (`z.string().uuid()`, `<input type="number">`): đã cưỡng chế tự động tại `R10` (`agent-registry.json`); dùng `z.guid()` và `NumericInput`.
 - Chọn người lập / phiếu tham chiếu: form có `CreatorSelector` hoặc `useRefDocSelector` (`frontend/shared/hooks/use-ref-doc-selector.ts`) bắt buộc giữ `createdById` và `createdOrganizationId` xuyên suốt schema -> defaults -> `form.reset` -> payload submit -> `CreateWorkItemRequest`.
-- Tham chiếu liên service: đăng ký `ISnapshotPolicy` (`SnapshotContracts.cs`) và điều phối qua `ISnapshotLifecycleService` trước write boundary; cấm gán tay snapshot từ client hoặc gọi gRPC trong transaction DB.
+- Tham chiếu liên service: gắn `[SnapshotReference]` trên FK, khai báo node trong `AggregateShape` và gọi `UseSnapshots(AggregateSnapshotService)` trong service; thu thập chạy ngoài transaction (xem `docs/snapshot-policy-development-guide.md`); cấm gán tay snapshot từ client hoặc gọi gRPC trong transaction DB.
 
 ## 3. Báo Cáo Tổng Hợp & Chi Tiết Theo Kỳ Lương (`payroll-period-report`)
 
@@ -43,5 +43,5 @@ Khi mở rộng hoặc tạo mới màn hình/service theo một trong 4 archety
 ## 4. Luồng Nhân Sự Xác Nhận (`hr-confirm`)
 
 - Mẫu chuẩn BE/FE: xem mục `archetypes.hr-confirm` trong `.agent/contracts/archetype-exemplars.json` (`HrConfirmSnapshotPolicies.cs`, `hr-confirm/labor-order/index.tsx`).
-- **Backend**: đăng ký `ISnapshotPolicy<HrConfirmSnapshotCommand, TEntity>`, thu thập snapshot trước transition qua `ISnapshotLifecycleService.ExecuteAsync`; chỉ ghi `HrConfirmedDate = DateTimeOffset.UtcNow`, `HrConfirmedById` (và `IsHrConfirm = true` nếu có) khi `response.StatusEnum == (int)EWorkItemStatus.Closed`.
+- **Backend**: đăng ký `ISnapshotPolicy<HrConfirmSnapshotCommand, TEntity>`, gọi `policy.CollectAsync(new HrConfirmSnapshotCommand(...), id, ct)` trước transition và `Apply` trong transaction (mẫu `LaborOrderService.cs`); chỉ ghi `HrConfirmedDate = DateTimeOffset.UtcNow`, `HrConfirmedById` (và `IsHrConfirm = true` nếu có) khi `response.StatusEnum == (int)EWorkItemStatus.Closed`.
 - **Frontend**: hiển thị `hrConfirmedDate` và `hrConfirmedByNameSnapshot`; màn HRM dưới `frontend/hrm/src/routes/_app/hr-confirm/*` khóa cứng `currentStepCode` theo giá trị `HR_CONFIRM` của domain và tái dùng tiện ích lọc tại `frontend/hrm/src/routes/_app/hr-confirm/-components/hr-confirm-utils.ts`.
