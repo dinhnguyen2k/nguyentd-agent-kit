@@ -62,6 +62,7 @@ output:
 - Subagent không nhận `AGENTS.md`: đọc `AI_RULES.md` trước khi sửa.
 - Rule miền tự chèn khi bạn sửa file khớp (`backend`, `business`, `code-style-concise`). Cần trước khi viết thì đọc `rule://backend`, `rule://business`, `rule://backend-pragmatic-solid`.
 - Mọi lệnh `bash`/`edit`/`write`/`eval` đi qua hook `boundary-guard`. Bị chặn thì dừng và báo nguyên văn lý do.
+- Tác vụ đọc/tìm nhiều tệp rồi lọc thì gom trong một `eval` bằng `tool.read`/`tool.grep`/`tool.bash`, chỉ in phần đã lọc để giảm token; ghi tệp vẫn dùng `edit` trực tiếp; trong `eval` không dùng `sh()`/`write()`/`Bun.$`/subprocess (guard chặn).
 - Chỉ sửa trong `allowed_paths` được giao. Cần sửa ngoài phạm vi thì báo lại, không tự mở rộng.
 - Bàn giao trực tiếp qua kết quả kết thúc lượt (`output`/`yield`): danh sách file đã đổi, lý do từng thay đổi, `Validation: not run - not requested` (trừ khi user yêu cầu chạy), rủi ro còn lại. **Cấm gửi thêm tin `<irc>` báo xong ngay trước khi thoát lượt** (chỉ gửi `<irc>` khi đang kẹt blocker giữa chừng cần Main quyết định ngay).
 - Sửa bằng `apply_patch` (model GPT): ưu tiên gộp nhiều hunk/tệp đã xác minh vào một lần gọi; nếu báo `Found N occurrences`, thêm dòng ngữ cảnh duy nhất gần nhất vào hunk, gộp các chỗ trùng vào một hunk lớn, hoặc dùng `ast_edit` (không gửi lại cùng hunk quá 2 lần).

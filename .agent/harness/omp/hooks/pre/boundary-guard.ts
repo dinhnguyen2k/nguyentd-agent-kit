@@ -31,7 +31,8 @@ const EVAL_WRITE_PATTERNS = [
 	/\bopen\(\s*["']([^"']+)["']\s*,\s*["'][wax]/g,
 	/\bPath\(\s*["']([^"']+)["']\s*\)\.write_(?:text|bytes)\(/g,
 ];
-const EVAL_SPAWNS_PROCESS = /\bsubprocess\b|\bos\.system\b|\bBun\.\$|\$`|\bspawn(?:Sync)?\(|\bexec(?:Sync)?\(|\btool\.bash\b/;
+const EVAL_SPAWNS_PROCESS = /\bsh\(|\bsubprocess\b|\bos\.system\b|\bBun\.\$|\$`|\bspawn(?:Sync)?\(|\bexec(?:Sync)?\(|\btool\.bash\b/;
+const SUB_EVAL_ESCAPE_HATCH = /\bsh\(|\bBun\.\$|\$`|\bsubprocess\b|\bchild_process\b|\bos\.(?:system|popen|exec\w*|spawn\w*)\b|(?<![\w.$])(?:spawn|exec|execFile|fork)(?:Sync)?\(|\bBun\.write\(|\b(?:writeFileSync|appendFileSync)\(|\bopen\([^)]*,\s*["'][wax]|\bPath\([^)]*\)\.write_(?:text|bytes)\(|\.write_(?:text|bytes)\(|(?<![\w.$])write\(/;
 const MCP_FS_WRITE = /^mcp_+filesystem_+(write_file|append_file|edit_file|move_file|create_directory)$/;
 
 function findRepoRoot(start: string): string | null {
@@ -60,6 +61,28 @@ function parseJson(text: unknown): Record<string, unknown> {
 	}
 }
 
+function lspMutation(device: string, args: Record<string, unknown>): { mutates: boolean; files: string[] } {
+	const action = str(args.action);
+	const isRenameDevice = device !== "lsp";
+	const mutates = isRenameDevice || action === "rename" || action === "rename_file" || action === "request" || (action === "code_actions" && args.apply === true);
+	const file = isRenameDevice ? str(args.file_path) ?? str(args.file) ?? str(args.path) : str(args.file);
+	return { mutates, files: mutates && file ? [file, ...(device === "lsp" && action === "rename_file" && str(args.new_name) ? [str(args.new_name)!] : [])] : [] };
+}
+
+function subBlockReason(toolName: string, input: Record<string, unknown>): string | null {
+	if (toolName === "eval" && SUB_EVAL_ESCAPE_HATCH.test(str(input.code) ?? "")) {
+		return "Trong eval của subagent chỉ được chạy lệnh/ghi tệp qua tool.bash, tool.edit, tool.write (đi qua guard với giá trị lúc chạy); không dùng sh(), Bun.$, $`...`, subprocess, os.system, spawn/exec, Bun.write, writeFileSync/appendFileSync, open(...,'w'), Path.write_*, write() của prelude.";
+	}
+	if (toolName !== "write") return null;
+	const device = str(input.path)?.match(/^xd:\/\/([\w-]+)/)?.[1];
+	if (device === "debug") return "Subagent không được gắn vào hoặc khởi chạy tiến trình qua debugger.";
+	if (device === "lsp" || device === "mcp__lsp_rename_symbol" || device === "mcp__lsp_rename_symbol_strict") {
+		const { mutates, files } = lspMutation(device, parseJson(input.content));
+		if (mutates && files.length === 0) return "Thiếu đối số tệp đích cho thao tác có thể sửa tệp qua thiết bị LSP.";
+	}
+	return null;
+}
+
 function extractPatchAddedContent(input: Record<string, unknown>, fullText: string): string | null {
 	const direct =
 		str(input.newText) ??
@@ -83,7 +106,7 @@ function writes(paths: string[], newContent?: string | null): GuardCheck[] {
 		.map(p => ({ tool_name: "Write", tool_input: { file_path: p, ...(newContent ? { new_content: newContent } : {}) } }));
 }
 
-function toChecks(toolName: string, input: Record<string, unknown>): GuardCheck[] {
+function toChecks(toolName: string, input: Record<string, unknown>, isSub: boolean): GuardCheck[] {
 	if (toolName === "bash") {
 		const command = str(input.command);
 		return command ? [{ tool_name: "Bash", tool_input: { command } }] : [];
@@ -105,6 +128,10 @@ function toChecks(toolName: string, input: Record<string, unknown>): GuardCheck[
 		if (!path) return [];
 		const device = path.match(/^xd:\/\/([\w-]+)/)?.[1];
 		if (!device) return writes([path], str(input.content));
+		if (isSub && (device === "lsp" || device === "mcp__lsp_rename_symbol" || device === "mcp__lsp_rename_symbol_strict")) {
+			const { mutates, files } = lspMutation(device, parseJson(input.content));
+			return mutates ? writes(files) : [];
+		}
 		if (device === "ast_edit" || MCP_FS_WRITE.test(device)) {
 			const mcpArgs = parseJson(input.content);
 			return writes(argPaths(mcpArgs), str(mcpArgs.content) ?? str(mcpArgs.newText) ?? str(mcpArgs.new_string));
@@ -130,13 +157,16 @@ export default function boundaryGuard(pi: ExtensionAPI): void {
 			const root = findRepoRoot(ctx.cwd);
 			if (!root) return;
 			const input = (event.input ?? {}) as Record<string, unknown>;
-			const checks = toChecks(event.toolName, input).map(c =>
+			const isSub = ctx.agent?.kind === "sub" && ctx.agent.name !== "sub";
+			const blockReason = isSub ? subBlockReason(event.toolName, input) : null;
+			if (blockReason) return { block: true, reason: `[boundary-guard] ${blockReason}` };
+			const checks = toChecks(event.toolName, input, isSub).map(c =>
 				c.tool_input.file_path && !isAbsolute(c.tool_input.file_path)
 					? { ...c, tool_input: { ...c.tool_input, file_path: resolve(ctx.cwd, c.tool_input.file_path) } }
 					: c,
 			);
 			if (checks.length === 0) return;
-			const agentName = ctx.agent?.kind === "sub" && ctx.agent.name !== "sub" ? ctx.agent.name : undefined;
+			const agentName = isSub ? ctx.agent?.name : undefined;
 			const reason = evaluateBoundaryChecks(checks, { root, agentName });
 			if (reason) return { block: true, reason: `[boundary-guard] ${reason}` };
 		} catch {
