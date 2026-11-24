@@ -903,6 +903,39 @@ function collectPathCandidates(input) {
   return [...direct, ...many, ...nested];
 }
 
+const LSP_NAV_TOOLS = new Set([
+  "find_definition",
+  "find_references",
+  "find_implementation",
+  "get_hover",
+  "find_workspace_symbols",
+  "prepare_call_hierarchy",
+  "get_incoming_calls",
+  "get_outgoing_calls",
+]);
+
+function extractLspMethodName(toolName, args = {}) {
+  const name = String(toolName || "").trim();
+  if (!name) return "";
+  if (name.toLowerCase() === "call_mcp_tool") {
+    const parsed = parseJsonObject(args);
+    return (str(parsed.ToolName) ?? str(parsed.toolName) ?? str(parsed.tool_name) ?? "").toLowerCase();
+  }
+  const m = name.match(/([^_]+(?:_[^_]+)*)$/);
+  const parts = name.split("__");
+  return (parts.length > 1 ? parts[parts.length - 1] : m ? m[1] : name).toLowerCase();
+}
+
+export function isLspNavigationCall(toolName, args = {}) {
+  if (!isLspToolCall(toolName, args)) return false;
+  return LSP_NAV_TOOLS.has(extractLspMethodName(toolName, args));
+}
+
+export function inferLspCircuitTarget(toolName, args = {}) {
+  const lang = inferLspLanguage(args);
+  return isLspNavigationCall(toolName, args) ? `${lang}-nav` : lang;
+}
+
 export function inferLspLanguage(argsOrPath) {
   for (const raw of collectPathCandidates(argsOrPath)) {
     const clean = raw.replace(/^file:\/\//i, "").split(/[?#]/)[0];
@@ -936,7 +969,59 @@ export function isLspFailureOrTimeout(eventOrPayload) {
 }
 
 function normalizeLspLang(lang) {
-  return lang === "csharp" || lang === "typescript" ? lang : "general";
+  if (
+    lang === "csharp" ||
+    lang === "typescript" ||
+    lang === "general" ||
+    lang === "csharp-nav" ||
+    lang === "typescript-nav" ||
+    lang === "general-nav"
+  ) {
+    return lang;
+  }
+  return "general";
+}
+
+export async function queryWarmLspCheck(files, { port = Number(process.env.AGY_LSP_PORT || 48991), maxSeverity = 1, timeoutMs = 2000 } = {}) {
+  const list = Array.isArray(files) ? files.filter((f) => typeof f === "string" && CODE_FILE_RE.test(f)) : [];
+  if (list.length === 0) return { ok: false, totalErrors: 0, results: [] };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs + 500);
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: list, maxSeverity, timeoutMs }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return { ok: false, totalErrors: 0, results: [] };
+    const json = await res.json();
+    return json && typeof json === "object" ? json : { ok: false, totalErrors: 0, results: [] };
+  } catch {
+    return { ok: false, totalErrors: 0, results: [] };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function formatWarmLspErrors(checkRes, root = null) {
+  const lines = [];
+  for (const item of checkRes?.results || []) {
+    if (!Array.isArray(item.diagnostics) || item.diagnostics.length === 0) continue;
+    const label = root ? relative(resolve(root), item.file).replace(/\\/g, "/") : item.file;
+    for (const d of item.diagnostics.slice(0, 8)) {
+      const code = d.code != null ? ` [${d.code}]` : "";
+      lines.push(`- ${label}:${d.line}:${d.character}${code}: ${d.message}`);
+    }
+    if (item.diagnostics.length > 8) {
+      lines.push(`- ${label}: ... và ${item.diagnostics.length - 8} lỗi khác`);
+    }
+  }
+  if (lines.length === 0) return "";
+  return (
+    `[lsp-tức-thì] Phát hiện ${checkRes.totalErrors} lỗi biên dịch/kiểu trên tệp vừa sửa (sửa dứt điểm ngay tại chỗ, tối đa 2 vòng nếu lỗi đến từ tệp ngoài phạm vi):\n` +
+    lines.join("\n")
+  );
 }
 
 function resolveCircuitFile(root, opts = {}) {

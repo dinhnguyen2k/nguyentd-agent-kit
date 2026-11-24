@@ -9,8 +9,9 @@ agents: main
 Mọi quy tắc gốc, cổng an toàn và định tuyến vai trò tuân theo `AI_RULES.md` và `AGENTS.md` (không chép lặp lại tại đây).
 File này quy định 6 cơ chế điều phối đặc thù của runtime Oh-My-Pi:
 
-1. **Chẩn đoán `xd://lsp` trước bàn giao**:
-   - Agent sửa code chỉ kiểm tra 1 lượt cuối slice bằng **Canary Probe 1 tệp** (`timeout: 8`, không dùng glob); chỉ hỏi tiếp các tệp còn lại khi tệp đầu phản hồi bình thường. Quá hạn/lỗi thì dừng ngay không `reload`, đối chiếu tĩnh chữ ký khai báo gốc/caller và báo `LSP: timeout (circuit-open, skipped remaining files)`.
+1. **Chẩn đoán `xd://lsp` & Shared Warm LSP trước bàn giao**:
+   - Agent sửa code có thể kiểm tra ngay trong lúc sửa qua `cogain-lsp check <files>` (Warm Daemon dùng `tsgo` + `csharp-ls`, đồng bộ trực tiếp đĩa theo `sha1`) hoặc gọi `xd://lsp` cuối slice (`timeout: 8`, không dùng glob). Nếu quá hạn/lỗi thì dừng ngay không `reload`, đối chiếu tĩnh chữ ký khai báo gốc/caller và báo `LSP: timeout (circuit-open, skipped remaining files)`.
+   - `circuit-open` nghĩa là **chưa kiểm**, không phải sạch: worker tự rà thứ tự khai báo (biến/hook dùng trước `const` khai báo, TDZ `TS2448`) trên mọi tệp đã sửa; Main nghiệm thu bằng cách đọc đủ diff **mọi** tệp đã đổi (không chỉ schema/type) và ghi rủi ro `LSP chưa kiểm` vào báo cáo, đề xuất user cho chạy typecheck nhanh app bị sửa (escaped-defect 2026-11-23).
 2. **Giao persisted TASK & Sửa lỗi nhẹ không làm phình kế hoạch**:
    - Với task nhiều slice dùng `.agent/planning/<slug>/`, Main truyền đúng 2 dòng `contract_ref` và `contract_version` để hook `dispatch-contract.ts` tự chèn brief đầy đủ từ canonical TASK.
    - Các lượt vá lỗi biên dịch nội bộ (`BuildFix`) giữ nguyên phạm vi và tiêu chí nghiệm thu gốc được phép giao bằng block `json dispatch-contract` inline gọn, không cần tăng `contract_version` hay chạy supersession lặp lại.

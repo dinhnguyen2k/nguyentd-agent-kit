@@ -331,6 +331,43 @@
       "expected_rule": "R8-build-runner"
     },
     {
+      "id": "R8-valid-heredoc-data-mentions-build",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "node .agent/skills/cogain-gitlab-mr/scripts/gitlab-mr.mjs submit \\\n  --target develop \\\n  --title \"fix(excel): tách SharedStringCatalog\" \\\n  --description-stdin <<'EOF'\n## Test\n- Verifier đã chạy `dotnet build` và `ci-parity.sh` xanh.\nEOF"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-invalid-heredoc-into-bash",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "bash <<'EOF'\ncd backend; dotnet build x.csproj\nEOF" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R8-invalid-heredoc-piped-into-sh",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "cat <<'EOF' | sh\ncd backend; dotnet build x.csproj\nEOF" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R8-invalid-heredoc-quoted-args-into-bash",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": { "command": "bash --noprofile --rcfile \"a(b\" <<'EOF'\ncd backend; dotnet build x.csproj\nEOF" }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
       "id": "R8-invalid-piped-ci-parity",
       "payload": { "tool_name": "Bash", "tool_input": { "command": "printf x | bash .agent/scripts/ci-parity.sh" } },
       "expected_decision": "deny",
@@ -450,6 +487,29 @@
         "tool_input": {
           "file_path": "frontend/hrm/src/routes/attendance/index.tsx",
           "new_string": "import { LeaveModal } from '../../leave/_components/leave-modal';"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-cross-route-private-components"
+    },
+    {
+      "id": "R10-valid-ancestor-route-private-deep",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/bizdoc/src/routes/_app/labor-order/$id/detail/index.tsx",
+          "new_string": "import { LaborOrderForm } from '../../_components/labor-order-form';"
+        }
+      },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-cross-route-private-deep",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/bizdoc/src/routes/_app/team-loan/$id/detail/index.tsx",
+          "new_string": "import { LaborOrderForm } from '../../../labor-order/_components/labor-order-form';"
         }
       },
       "expected_decision": "deny",
@@ -696,12 +756,12 @@
       "expected_rule": "R4-gate-readonly-shell"
     },
     {
-      "id": "R10-valid-sync-children",
+      "id": "R10-valid-aggregate-sync-collection",
       "payload": {
         "tool_name": "Edit",
         "tool_input": {
           "file_path": "backend/src/Services/ServiceDesk/Services/OrderService.cs",
-          "new_string": "entity.SyncChildren(incomingGraph);"
+          "new_string": "var sync = AggregateSynchronizer.SyncCollection(entity, x => x.Items, incoming); _unitOfWork.MarkAdded(sync.Added);"
         }
       },
       "expected_decision": "allow"
@@ -1001,6 +1061,29 @@
         }
       },
       "options": { "envRole": "verifier" },
+      "expected_decision": "deny",
+      "expected_rule": "R4-gate-readonly-shell"
+    },
+    {
+      "id": "R4-valid-researcher-rg-generics-and-escaped-angle",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "rg -n -A 6 \"CreateMap<.*(PaymentVoucher|PaymentRequest)>\" backend/src && grep -rn \\<ISyncsChildren\\> backend/src"
+        }
+      },
+      "options": { "envRole": "researcher" },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R4-invalid-researcher-rg-redirect-tmp",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "rg -n \"CreateMap<.*>\" backend/src > /tmp/out.txt"
+        }
+      },
+      "options": { "envRole": "researcher" },
       "expected_decision": "deny",
       "expected_rule": "R4-gate-readonly-shell"
     }

@@ -30,15 +30,16 @@ Mặc định dùng `FOCUSED` cho nghiên cứu độc lập và `MICRO` cho vi-
 | --- | --- | --- |
 | `MICRO` | Phát sinh 1 trong 4 tín hiệu lệch giả định khi đang lập kế hoạch hoặc viết mã | Tối đa 3 bước tra cứu có mục tiêu (`lsp`/`context7`/source) cho mỗi sự kiện kích hoạt; nâng lên `FOCUSED` chỉ khi phát hiện chuỗi nhân quả liên dịch vụ |
 | `LOOKUP` | Một dữ kiện cụ thể, tùy chọn API, cú pháp, phiên bản hoặc trạng thái hiện tại | Main tự tra: 1 câu hỏi; tối đa 3 kết quả tìm kiếm; mở 1 nguồn chính + tối đa 1 nguồn xác nhận |
-| `FOCUSED` | Một quyết định có tối đa 3 câu hỏi ảnh hưởng đến lựa chọn | Một `researcher` sở hữu trong cửa sổ ngữ cảnh riêng (chống làm nhiễu Main); tối đa 3 câu hỏi logic và 6 nguồn bên ngoài cho quyết định đó |
-| `DEEP` | Người dùng yêu cầu rõ nghiên cứu chuyên sâu hoặc quy trình cho phép rõ | Main chia câu hỏi độc lập không chồng lấn cho các `researcher` với ngân sách tổng và từng nhánh chốt cứng trước khi chạy |
+| `FOCUSED` | Một quyết định có tối đa 3 câu hỏi ảnh hưởng đến lựa chọn | Dùng `1-2` `researcher` độc lập (1 nhánh cho đơn miền, 2 nhánh khi đối chiếu liên miền hẹp BE-FE/gRPC) trong cửa sổ ngữ cảnh riêng; tối đa 3 câu hỏi logic và 6 nguồn bên ngoài |
+| `DEEP` | Người dùng yêu cầu rõ nghiên cứu chuyên sâu hoặc bài toán kiến trúc/liên phân hệ/lỗi phức tạp | Mở rộng tối đa **6 nhánh `researcher` trực giao (`6-Lane Research`)** không chồng lấn với ngân sách nguồn hữu hạn chốt trước và trần đầu ra nén `<= 220` từ/nhánh để Main đối chiếu chéo |
 
 Chỉ đọc hướng dẫn của cấp độ tương ứng khi cần chi tiết:
 - `LOOKUP`: [references/lookup.md](references/lookup.md)
 - `FOCUSED`: [references/focused.md](references/focused.md)
 - `DEEP`: [references/deep.md](references/deep.md)
 - Bảng chữ ký tham số MCP dùng ngay (không cần đọc schema JSON lẻ): [references/mcp-cheatsheet.md](references/mcp-cheatsheet.md)
-- Trên Antigravity (`agy`), khi phiên chính đang dùng model lập kế hoạch nặng hoặc chạy `DEEP` nhiều nhánh, skill này cho phép Main gọi `swarm` (`action: "add"`, `model: "gemini-4-hydrogen-high"`, yêu cầu đọc `.agents/agents/researcher.md` và báo `@coordinator [done]`) để chạy nghiên cứu tốc độ cao trên Hydrogen High rồi `kill` sau khi thu kết quả.
+- Trên Antigravity (`agy`), khi phiên chính dùng model lập kế hoạch nặng hoặc chạy nghiên cứu `FOCUSED`/`DEEP`, skill này cho phép rõ Main gọi `swarm` (`action: "add"`, `model: "gemini-4-hydrogen-high"`, `tasks: [...]`, đặt tiền tố tên mới theo từng đợt như `res1`, `res2`... để không đụng tên cũ, yêu cầu đọc `.agents/agents/researcher.md` và báo `@coordinator [done]`) để chạy nghiên cứu tốc độ cao trên Hydrogen High rồi `swarm` (`action: "kill"`) thu hồi ngay khi nhận đủ kết quả.
+- Phân vai theo năng lực runtime trên `agy`: các nhánh `swarm` dùng `read_file`, `rg -n`, `git log/show` và `search_web` quét rộng trong ngữ cảnh cô lập; Main giữ `call_mcp_tool` (`lsp`, `context7`) để kiểm chứng chốt hạ các điểm nghi vấn hoặc xung đột giữa các nhánh.
 
 **4 Chốt chặn định lượng bắt buộc**:
 1. **Cấm đổi thiết kế không có bằng chứng ngoại sinh mới**: không mở vòng đổi phương án nếu không chỉ ra được `file:line` mới, lỗi chẩn đoán tĩnh hoặc đặc tả gốc chứng minh điểm yếu thật.

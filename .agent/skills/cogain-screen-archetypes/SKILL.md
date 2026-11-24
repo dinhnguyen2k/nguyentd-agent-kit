@@ -31,14 +31,18 @@ Khi mở rộng hoặc tạo mới màn hình/service theo một trong 4 archety
 
 - Mẫu chuẩn BE/FE: xem mục `archetypes.payroll-period-report` trong `.agent/contracts/archetype-exemplars.json` (`LaborOrderPayrollReportService.cs`, `labor-order-payroll-report/index.tsx`).
 - **Backend**:
-  - Kỳ lương & phiếu đóng: dùng `PayrollReportQueryHelper.TryResolvePayrollPeriod` (bọc `AttendanceReportPeriod.Resolve(..., payroll: true)`) và `PayrollReportQueryHelper.GetClosedWorkItemIdsAsync` (lọc `EWorkItemStatus.Closed`; cấm đếm phiếu chưa `Closed`).
+  - Kỳ lương & phiếu đóng: dùng `PayrollReportQueryHelper.TryResolvePayrollPeriod` (bọc `AttendanceReportPeriod.Resolve(..., payroll: true)`) và `PayrollReportQueryHelper.GetClosedWorkItemIdsAsync` (lọc `EWorkItemStatus.Closed`; cấm đếm phiếu chưa `Closed`). Không thay bước gRPC này bằng `HrConfirmedDate != null`: MasterData có thể hủy cưỡng bức (`ForceCancel`) hoặc mở lại phiếu đã Closed mà không cập nhật entity ServiceDesk.
   - Kỳ chấm công/chốt công (không phải báo cáo kỳ lương ServiceDesk): lấy qua `AttendancePeriodCalendar` (danh mục kỳ `TYPQUA03` của MasterData, dựng bằng `MasterDataAttendancePeriodCalendar.CreateAttendancePeriodCalendar`); `16..15` chỉ là `DefaultWindow` khi tháng chưa cấu hình kỳ.
   - Mốc thời gian hiệu lực: cắt kỳ theo mốc nghiệp vụ đã chốt (như `HrConfirmedDate`), không tự đổi sang `CreatedDate`.
-  - Khung thực thi & xuất Excel: dùng `ReportExecution.RunPageAsync` / `RunReadAsync` / `RunExportAsync` kết hợp `ExcelReportWriter`, `ReportCol`, `ExcelReportLabels.ResolveFilterLabel` và `Dictionary<string, string>? FilterLabels` (cấm khai báo lặp cặp `*Label` cho từng `*Id`).
+  - Khung thực thi & xuất Excel: dùng `ReportExecution.RunPageAsync` / `RunReadAsync` / `RunExportStreamAsync` (xuất stream, trần `MaxExportRows` 100.000 dòng) kết hợp `ExcelReportWriter.WriteToStream`, `ReportCol`, `ExcelReportLabels.ResolveFilterLabel` và `Dictionary<string, string>? FilterLabels` (cấm khai báo lặp cặp `*Label` cho từng `*Id`).
+  - Export có đầu phiếu + chi tiết: không project cột snapshot đầu phiếu lên từng dòng chi tiết (lặp ~10 lần/phiếu, ~50% băng thông). Dùng truy vấn chi tiết hẹp giữ `ORDER BY` qua navigation + truy vấn đầu phiếu bằng subquery `Contains` -> `ToDictionaryAsync` -> ghép theo FK (mẫu `LaborOrderPayrollReportService.BuildExportReportAsync`/`ProjectExportDetails`).
+  - Phân tích hiệu năng báo cáo: tách thời gian SQL (`EXPLAIN ANALYZE`), truyền mạng (`pg_stat_activity` `Client/ClientWrite` = DB chờ app đọc) và dựng Excel trước khi kết luận; DB dev qua VPN rất chậm nên số đo export ở dev bị băng thông chi phối. Ưu tiên thay đổi cục bộ nhỏ nhất có lợi cả ở prod; không đề xuất job xuất nền, rate limiter, writer streaming riêng hay đổi schema/nghiệp vụ khi chưa có số đo prod chứng minh.
 - **Frontend**:
   - Giao diện: dùng `ReportLayout`, `ReportPanel`, `ReportSummaryTable`, `ReportDetailTable`, `ReportFilterChips` và helper dựng cột trong `frontend/shared/components/report-layout.tsx` cùng `<PayrollPeriodInput />`.
   - Hooks dữ liệu: dùng `useReportSummaryQuery`, `useReportPageQuery`, `useReportExcelExport` cùng `ReportFilterLabels` / `buildExportFilterLabelParams` (`frontend/shared/hooks/use-report-queries.ts`).
+  - Đổi kỳ/từ khóa/bộ lọc: hai hook query dùng `keepPreviousData` nên trả cờ `isFilterPending`; khi cờ bật thì không hiển thị số liệu kỳ cũ (truyền `undefined`/mảng rỗng, `loading` = khung chờ) và đặt `ReportLoadingIndicator` cạnh `PayrollPeriodInput`; chuyển trang chi tiết giữ dữ liệu trang cũ, không nháy khung chờ.
   - Import chéo `_components`/`-components` giữa các route đã bị chặn tại `R10`; dùng helper từ `@shared/lib`.
+  - Tối ưu hiệu năng render báo cáo dữ liệu lớn (phương án đề xuất tham chiếu để đối chiếu/mở rộng, không phải luật cứng): chỉ nạp [Đề xuất tối ưu render báo cáo kỳ lương](references/payroll-report-render-proposal.md) khi phân tích hoặc tối ưu hiệu năng bảng báo cáo nặng.
 
 ## 4. Luồng Nhân Sự Xác Nhận (`hr-confirm`)
 

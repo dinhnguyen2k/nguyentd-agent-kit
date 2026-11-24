@@ -30,10 +30,12 @@ metadata:
 - Gỡ phần tử khỏi collection con đang được EF Core track với FK bắt buộc sẽ làm đứt quan hệ và cố set FK về null; phải dùng đồng bộ xóa mềm do aggregate sở hữu theo `[skill:cogain-child-sync]`.
 - Cột snapshot non-null trong DB đòi hỏi phủ đủ resolver/mapping và fallback hợp lệ về nghiệp vụ; `?? string.Empty` chỉ tránh null chứ không chứng minh đúng nghiệp vụ.
 - Batch Excel import không kích hoạt tra cứu snapshot gRPC khi cột mã tham chiếu để trống: giữ `Guid.Empty` ở provisional graph và bảo lưu nguyên trạng ID/snapshot cũ khi update.
+- Mọi service bật `EnableRetryOnFailure` (vd. `ServiceDesk.Data/ConfigureServices.cs`) nên EF Core buffer toàn bộ resultset kể cả `AsAsyncEnumerable`; `ToListAsync` = nạp 2 lần. Giảm RAM bằng cách thu hẹp cột/số dòng, không phải đổi sang enumerate.
 
 ## Screen Archetypes & Giao Diện Dùng Chung
 
 - Dùng `[skill:cogain-screen-archetypes]` và `.agent/contracts/archetype-exemplars.json` làm chuẩn duy nhất cho CRUD list, bảng con, báo cáo kỳ lương (`PayrollReportQueryHelper`, `ReportExecution`, `ReportLayout`) và luồng HR Confirm.
+- Instance bảng TanStack ổn định qua các lần render nên component đọc trạng thái cột từ bên ngoài `CustomTable` (vd. `ColumnSettingsButton` trên `TableToolbar` ngoài bảng) không tự vẽ lại; đăng ký tín hiệu `notifyTableColumnStateChange` (`frontend/shared/components/custom/column-settings-button.tsx`) qua `useSyncExternalStore` thay vì thêm `useEffect` ép render.
 
 ## React Feedback Loops & Radix UI
 

@@ -27,7 +27,7 @@ alwaysApply: true
    typecheck, test, code generation, or similar expensive commands automatically.
    The user must explicitly request the action. When authorized, use bounded waits
    and status polling; never wait indefinitely.
-4. **Step Timeout**: Mỗi bước thực thi (tool call) không kéo dài quá **60 giây**. Nếu tiến trình con bị treo quá 5 phút không có output mới, Agent bắt buộc phải chủ động can thiệp (kill task/zombie process).
+4. **Step Timeout**: Mỗi bước thực thi (tool call) mặc định không quá **60 giây**. Lệnh dài đã được user cho phép (vd `dotnet ef migrations add` ~75s, build/test) chạy nền hoặc đặt `timeout` riêng có trần (tối đa 10 phút), không bị cắt ở 60s rồi chạy lại. Nếu tiến trình con treo quá 5 phút không có output mới, Agent bắt buộc chủ động can thiệp (kill task/zombie process).
 5. **Interactive UI**: Ưu tiên cờ tự động (`--force`, `--skip-prompts`). Nếu CLI yêu cầu tương tác và bị kẹt sau 2 lần thử gõ phím, phải coi là bị treo và dừng tiến trình.
 6. **IDEMPOTENT BUILD AND TEST:** An explicit authorization permits one run of the
    requested command and scope for the current relevant source state. DO NOT rerun

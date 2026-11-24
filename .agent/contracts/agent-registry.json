@@ -303,9 +303,9 @@
               "frontend/*/src/routes/**/*.ts",
               "frontend/*/src/routes/**/*.tsx"
             ],
-            "pattern": "(?:\\.\\./)+[^/'\"]+/(?:_components|-components)/",
+            "pattern": "(?:\\.\\./)+(?!\\.)[^/'\"]+/(?:_components|-components)/",
             "message": "Cấm import component nội bộ (_components/-components) của route khác. Hãy đưa component dùng chung lên @shared hoặc module chung.",
-            "source_feedback": "ESLint route boundary: cấm mượn component nội bộ của route khác"
+            "source_feedback": "ESLint route boundary: cấm mượn component nội bộ của route khác; (?!\\.) bỏ qua _components của route tổ tiên (vd '../../_components/' từ $id/detail, friction 2026-11-23)"
           },
           {
             "id": "no-html-number-input",
@@ -376,8 +376,8 @@
               "backend/src/BuildingBlocks/Infrastructure/Services/BaseService*.cs"
             ],
             "pattern": "\\bReconcileCollections(?:Async)?\\s*(?:<|\\()",
-            "message": "Cấm dùng 'ReconcileCollections' hoặc 'ReconcileCollectionsAsync' (đã Obsolete, dùng reflection dễ gãy FK). Hãy implement 'ISyncsChildren<TEntity>' trên aggregate và override 'BuildIncomingGraph' trong Service (xem [skill:cogain-child-sync]).",
-            "source_feedback": "archetype-exemplars.json & cogain-child-sync: thay ReconcileCollections/ReconcileCollectionsAsync bằng ISyncsChildren"
+            "message": "Cấm dùng 'ReconcileCollections' hoặc 'ReconcileCollectionsAsync' (đã Obsolete, dùng reflection dễ gãy FK). Hãy cho aggregate root implement 'IAggregateRoot<TEntity>', khai báo 'public static AggregateShape<TEntity> Shape' và override 'BuildIncomingGraph' trong Service (xem [skill:cogain-child-sync]).",
+            "source_feedback": "archetype-exemplars.json & cogain-child-sync: thay ReconcileCollections/ReconcileCollectionsAsync bằng AggregateShape (commit 96f0dbbbf9 đã gỡ ISyncsChildren)"
           },
           {
             "id": "no-ts-ignore-blanket",

@@ -13,16 +13,17 @@ import {
   armSessionContinuation,
   checkLspCircuit,
   checkSubagentStopGate,
-  clearSessionFilesForLanguage,
   evaluateMainStopGate,
   extractPlanDirFromPath,
   findRepoRoot,
+  formatWarmLspErrors,
   getCompactionSummary,
-  inferLspLanguage,
+  inferLspCircuitTarget,
   isLspFailureOrTimeout,
   isLspToolCall,
   markSessionFilesChecked,
   normalizeToolChecks,
+  queryWarmLspCheck,
   recordAgentFriction,
   recordLspOutcome,
   recordSessionDispatch,
@@ -131,7 +132,7 @@ try {
       process.exit(0);
     }
     if (isLspToolCall(toolName, toolInput)) {
-      const circuit = checkLspCircuit(root, inferLspLanguage(toolInput));
+      const circuit = checkLspCircuit(root, inferLspCircuitTarget(toolName, toolInput));
       if (!circuit.allowed) denyPreToolUse(circuit.reason);
       process.exit(0);
     }
@@ -179,13 +180,11 @@ try {
     }
 
     if (isLspToolCall(toolName, toolInput)) {
-      const lang = inferLspLanguage(toolInput);
+      const target = inferLspCircuitTarget(toolName, toolInput);
       const failed = isLspFailureOrTimeout(payload);
       const errorText = failed ? extractLspErrorText(payload) : "";
-      recordLspOutcome(root, lang, { failed, errorText });
-      if (failed) {
-        clearSessionFilesForLanguage(root, sessionId, lang);
-      } else {
+      recordLspOutcome(root, target, { failed, errorText });
+      if (!failed) {
         const mcpTool = str(toolInput.ToolName) ?? str(toolInput.toolName) ?? str(toolInput.tool_name);
         const isDiagnostics =
           /get_diagnostics$/i.test(toolName) || (toolName === "call_mcp_tool" && mcpTool === "get_diagnostics");
@@ -208,6 +207,27 @@ try {
       for (const p of edited) {
         const pDir = extractPlanDirFromPath(root, p);
         if (pDir) armSessionContinuation(root, sessionId, { planDir: pDir });
+      }
+      const codeEdited = edited.filter((p) => /\.(?:cs|ts|tsx)$/i.test(p));
+      if (codeEdited.length > 0) {
+        const checkRes = await queryWarmLspCheck(codeEdited, { timeoutMs: 2200 });
+        if (checkRes.ok) {
+          const cleanFiles = (checkRes.results || [])
+            .filter((r) => !r.timedOut && !r.error && Array.isArray(r.diagnostics) && r.diagnostics.length === 0)
+            .map((r) => r.file);
+          if (cleanFiles.length > 0) markSessionFilesChecked(root, sessionId, cleanFiles);
+          if (checkRes.totalErrors > 0) {
+            const msg = formatWarmLspErrors(checkRes, root);
+            if (msg) {
+              out({
+                hookSpecificOutput: {
+                  hookEventName: "PostToolUse",
+                  additionalContext: msg,
+                },
+              });
+            }
+          }
+        }
       }
     }
     process.exit(0);

@@ -137,7 +137,7 @@
       "query": "Build a new ServiceDesk payroll period report with summary tabs, paginated detail table, and Excel export.",
       "expected_behavior": [
         "Backend uses PayrollReportQueryHelper.TryResolvePayrollPeriod and GetClosedWorkItemIdsAsync (EWorkItemStatus.Closed) cutting on HrConfirmedDate",
-        "Backend orchestrates endpoints with ReportExecution.RunPageAsync/RunReadAsync/RunExportAsync and ExcelReportWriter/ReportCol/ExcelReportLabels",
+        "Backend orchestrates endpoints with ReportExecution.RunPageAsync/RunReadAsync/RunExportStreamAsync (MaxExportRows cap) and ExcelReportWriter.WriteToStream/ReportCol/ExcelReportLabels",
         "Frontend composes ReportLayout, ReportPanel, ReportSummaryTable, ReportDetailTable, ReportFilterChips, PayrollPeriodInput, and useReportQueries hooks",
         "Formats money and dates via @shared/lib helpers without cross-importing another route's _components or -components"
       ],

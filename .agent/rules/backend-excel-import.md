@@ -15,7 +15,7 @@ interruptMode: never
 
 Không override method điều phối gốc của `BaseService` (`ImportFromExcel`, `ImportFromExcelAsync`, `ExportTemplateAsync`, `ExportDataAsync`) và không tạo hàm import riêng đi vòng qua pipeline chuẩn; chỉ mở rộng qua đúng hook:
 
-- **Import hooks**: `CustomParseExcelToDtosAsync` -> `LoadImportReferencesAsync` -> `ValidateImportDtosAsync` -> `PrepareImportEntitiesAsync` -> `BeforeImportPersistAsync` -> *(BaseService persist)* -> `AfterImportPersistAsync`.
+- **Import hooks**: `CustomParseExcelToDtosAsync` -> `LoadImportReferencesAsync` -> `ValidateImportDtosAsync` -> `PrepareImportEntitiesAsync` -> `SaveImportEntitiesAsync` (mặc định ghi create/update/delete trong một `ExecuteInTransactionAsync`; logic trước/sau ghi đặt trong override hook này, thu thập snapshot/gRPC trước khi mở transaction).
 - **Export hooks**: `GetExportTemplateFileName`, `GetExportDataFileName`, `GenerateTemplateBytesAsync`, `GenerateExportDataBytesAsync`.
 - Không gọi trực tiếp `_repository.AddAsync` hoặc `_unitOfWork.SaveChangesAsync` bên trong luồng parse/validate import. Nếu `BaseService` thiếu seam, báo cáo để mở rộng hook dùng chung.
 

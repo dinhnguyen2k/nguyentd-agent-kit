@@ -47,6 +47,29 @@ const READONLY_INTERPRETER_MUTATION_RE =
   /\b(?:open\s*\([^)]*,\s*['"][wax+]|write_text\s*\(|write_bytes\s*\(|writeFileSync\s*\(|writeFile\s*\(|appendFileSync\s*\(|appendFile\s*\(|unlinkSync\s*\(|unlink\s*\(|rmSync\s*\(|rmdirSync\s*\(|mkdirSync\s*\(|renameSync\s*\(|copyFileSync\s*\(|shutil\s*\.|os\s*\.\s*(?:remove|unlink|rmdir|rename|replace|system|popen)|subprocess\b|child_process\b)/;
 const registryCache = new Map();
 
+const HEREDOC_BODY_RE = /(<<-?[ \t]*(['"])([A-Za-z_]\w*)\2)([^\n]*)\n[\s\S]*?\n[ \t]*\3[ \t]*(?=\n|$)/g;
+const HEREDOC_INTERPRETER_RE =
+  /^\s*(?:(?:env|sudo|nohup|time)\s+|[A-Za-z_]\w*=\S+\s+)*(?:(?:\S*\/)?(?:bash|sh|zsh|dash|ksh)\b|source\b|\.\s|eval\b|python3?\b|perl\b|ruby\b|xargs\b|ssh\b|node\s*$|node\s+-(?:\s|e\b|-eval\b|p\b))/;
+const HEREDOC_PIPE_INTERPRETER_RE = /\|\s*(?:\S*\/)?(?:bash|sh|zsh|dash|python3?|node|perl|ruby)\b/;
+
+/** Bỏ thân heredoc delimiter có nháy (`<<'EOF'`) là dữ liệu thuần (mô tả MR, commit body) để chữ `dotnet build` trong văn bản không bị tính là lệnh; giữ nguyên khi heredoc nạp vào shell/interpreter. */
+function stripHeredocDataBodies(raw) {
+  return raw.replace(HEREDOC_BODY_RE, (match, head, _quote, _id, rest, offset) => {
+    const prefix = raw.slice(0, offset).replace(SHELL_QUOTE_RE, " ");
+    let start = 0;
+    for (let i = prefix.length - 1; i >= 0; i -= 1) {
+      const ch = prefix[i];
+      if (";&|(`".includes(ch) || (ch === "\n" && prefix[i - 1] !== "\\")) {
+        start = i + 1;
+        break;
+      }
+    }
+    const commandHead = prefix.slice(start);
+    if (HEREDOC_INTERPRETER_RE.test(commandHead) || HEREDOC_PIPE_INTERPRETER_RE.test(rest)) return match;
+    return `${head}${rest}`;
+  });
+}
+
 function stripQuotesForCommandMatch(cmd) {
   return cmd.replace(SHELL_QUOTE_RE, (match, offset) => {
     const prefix = cmd.slice(Math.max(0, offset - 80), offset);
@@ -249,7 +272,7 @@ export function evaluateBoundaryPayload(payload, options = {}) {
         }
       }
 
-      const cmdForVerbMatch = stripQuotesForCommandMatch(cmd);
+      const cmdForVerbMatch = stripQuotesForCommandMatch(stripHeredocDataBodies(raw).replace(/\s+/g, " ").trim());
 
       for (const key of ["secret_inline", "db_destructive", "build_runner", "migration_runner"]) {
         const r = rules[key];
@@ -281,6 +304,7 @@ export function evaluateBoundaryPayload(payload, options = {}) {
       const unquoted = stripQuotes(cmd);
       const allowEphemeralLogRedirect = role !== "researcher" && role !== "reviewer";
       const baseStripped = unquoted
+        .replace(/(^|[^\\])(\\\\)*\\[><]/g, "$1$2  ")
         .replace(/\d?>\s*&\s*\d/g, " ")
         .replace(/(?:&|\d?)>>?\s*\/dev\/null\b/g, " ");
       const stripped = (

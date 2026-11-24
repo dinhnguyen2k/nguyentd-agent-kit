@@ -93,12 +93,16 @@
         "Cấm đếm phiếu chưa đóng (không lọc EWorkItemStatus.Closed) hoặc tự tính khoảng ngày 16..15 bằng tay thay vì AttendanceReportPeriod / PayrollReportQueryHelper.",
         "Cấm tự suy diễn mốc lọc sang CreatedDate khi nghiệp vụ tính theo HrConfirmedDate.",
         "Cấm khai báo lặp các cặp *Label trong DTO bộ lọc; dùng Dictionary<string, string>? FilterLabels kết hợp ExcelReportLabels.ResolveFilterLabel.",
-        "Cấm import chéo _components/-components của route khác; dùng helper từ @shared/lib và @shared/components/report-layout."
+        "Cấm import chéo _components/-components của route khác; dùng helper từ @shared/lib và @shared/components/report-layout.",
+        "Cấm project cột snapshot đầu phiếu lên từng dòng chi tiết khi export; tách truy vấn chi tiết hẹp + truy vấn đầu phiếu rồi ghép theo FK (mẫu LaborOrderPayrollReportService.ProjectExportDetails).",
+        "Cấm thay bước PayrollReportQueryHelper.GetClosedWorkItemIdsAsync bằng HrConfirmedDate != null: MasterData có thể hủy cưỡng bức (ForceCancel) hoặc mở lại phiếu đã Closed mà không cập nhật ServiceDesk."
       ],
       "invariants": [
         "Chỉ tổng hợp phiếu có WorkItem đạt EWorkItemStatus.Closed qua PayrollReportQueryHelper.GetClosedWorkItemIdsAsync.",
         "Cắt kỳ lương qua PayrollReportQueryHelper.TryResolvePayrollPeriod / AttendanceReportPeriod.Resolve(..., payroll: true) từ ngày 16 tháng chọn đến hết ngày 15 tháng sau giờ VN.",
-        "Thực thi phân trang, tổng hợp và xuất Excel qua ReportExecution + ExcelReportWriter + useReportSummaryQuery/useReportPageQuery/useReportExcelExport."
+        "Phân trang, tổng hợp qua ReportExecution.RunPageAsync/RunReadAsync; xuất Excel qua ReportExecution.RunExportStreamAsync + ExcelReportWriter.WriteToStream (materialize toàn bộ dòng rồi OpenXmlWriter ghi vào MemoryStream, trần ReportExecution.MaxExportRows = 100.000 dòng, controller trả Stream).",
+        "FE: useReportSummaryQuery chạy ngay; useReportPageQuery (chi tiết phân trang) chỉ bật khi mở tab chi tiết (enabled: activeTab === 'details'); xuất Excel qua useReportExcelExport.",
+        "FE: khi đổi kỳ/bộ lọc, cờ isFilterPending của hook báo cáo ẩn số liệu placeholder kỳ cũ (hiện khung chờ + ReportLoadingIndicator); chuyển trang chi tiết vẫn giữ dữ liệu trang trước."
       ],
       "acceptance_template": {
         "positive": [

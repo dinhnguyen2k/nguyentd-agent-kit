@@ -611,3 +611,12 @@ var templateLookup = await _unitOfWork.GetRepository<ItemTemplate>().Query()
 - Rule 5 (Dictionary Lookup) — kết hợp để loại bỏ O(n×m) pattern.
 - Rule 4 (Avoid unnecessary ToList) — đặt `.Select()` **trước** `.ToListAsync()` để DB thực hiện projection.
 
+
+## Rule 14: Retry execution strategy làm EF buffer toàn bộ kết quả
+
+ServiceDesk bật `EnableRetryOnFailure` (`ServiceDesk.Data/ConfigureServices.cs`), nên EF tự nạp toàn bộ resultset vào bộ nhớ kể cả khi duyệt bằng `AsAsyncEnumerable()`/`foreach`; nếu thêm `ToListAsync()` thì dữ liệu nằm trong RAM hai lần.
+Vì vậy đề xuất "streaming qua EF" để giảm RAM không có tác dụng trên DbContext có retry, trừ khi tách riêng một đường đọc không retry (quyết định kiến trúc, cần bằng chứng đo trước).
+Hướng giảm bộ nhớ ưu tiên: projection hẹp (Rule 13), tách truy vấn đầu phiếu/chi tiết rồi ghép theo FK, phân trang theo keyset.
+Split query cũng buffer mọi resultset trừ cái cuối.
+
+- [Microsoft Learn - Internal buffering by EF](https://learn.microsoft.com/en-us/ef/core/performance/efficient-querying#internal-buffering-by-ef)

@@ -6,7 +6,7 @@
  * - Stop: nhắc 1 lần duy nhất (chỉ khi NO_TOOL_CALL && !continuationActive) nếu còn dirty files chưa kiểm tra tĩnh, đồng thời ghi nhận ma sát tự động.
  * Fail-open có chủ đích: lỗi nội bộ không bao giờ làm kẹt vòng lặp agent.
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -14,9 +14,12 @@ import {
   checkLspCircuit,
   evaluateMainStopGate,
   extractPlanDirFromPath,
+  formatWarmLspErrors,
+  inferLspCircuitTarget,
   inferLspLanguage,
   isLspFailureOrTimeout,
   isLspToolCall,
+  queryWarmLspCheck,
   recordLspOutcome,
   recordSessionDispatch,
   recordSessionEdit,
@@ -37,6 +40,7 @@ const KNOWN_ROLES = new Set([
   "researcher",
   "reviewer",
 ]);
+const SWARM_ROLE_RE = /\.agents?\/agents\/(backend-specialist|frontend-specialist|test-author|verifier|researcher|reviewer)\.md/i;
 const WRITE_TOOLS = new Set([
   "write_file",
   "edit_file",
@@ -107,6 +111,7 @@ function pruneState(state, now) {
       conversations[id] = {
         role: str(entry.role),
         dirtyFiles: Array.isArray(entry.dirtyFiles) ? entry.dirtyFiles : [],
+        lspAutoStrikes: entry.lspAutoStrikes && typeof entry.lspAutoStrikes === "object" ? entry.lspAutoStrikes : {},
         codegenTouched: Boolean(entry.codegenTouched),
         updatedAt: entry.updatedAt || now,
       };
@@ -114,16 +119,37 @@ function pruneState(state, now) {
   }
   const pendingDispatches = (state.pendingDispatches || [])
     .filter((d) => d && now - (d.createdAt || 0) <= SESSION_TTL_MS)
-    .slice(-20);
-  return { version: 1, conversations, pendingDispatches };
+    .slice(-30);
+  const swarmWorkerRoles = {};
+  for (const [name, entry] of Object.entries(state.swarmWorkerRoles || {})) {
+    if (entry && str(entry.role) && now - (entry.createdAt || 0) <= SESSION_TTL_MS) {
+      swarmWorkerRoles[name] = {
+        role: entry.role,
+        parentConvId: str(entry.parentConvId) ?? "",
+        createdAt: entry.createdAt || now,
+      };
+    }
+  }
+  const usedSwarmNames = {};
+  for (const [cid, entry] of Object.entries(state.usedSwarmNames || {})) {
+    if (entry && Array.isArray(entry.names) && now - (entry.updatedAt || 0) <= SESSION_TTL_MS) {
+      usedSwarmNames[cid] = {
+        names: [...new Set(entry.names.map((n) => String(n).toLowerCase()).filter(Boolean))],
+        updatedAt: entry.updatedAt || now,
+      };
+    }
+  }
+  return { version: 1, conversations, pendingDispatches, swarmWorkerRoles, usedSwarmNames };
 }
 
 function loadSessions(sessionFile, now) {
   try {
-    if (!existsSync(sessionFile)) return { version: 1, conversations: {}, pendingDispatches: [] };
+    if (!existsSync(sessionFile)) {
+      return { version: 1, conversations: {}, pendingDispatches: [], swarmWorkerRoles: {}, usedSwarmNames: {} };
+    }
     return pruneState(JSON.parse(readFileSync(sessionFile, "utf8")), now);
   } catch {
-    return { version: 1, conversations: {}, pendingDispatches: [] };
+    return { version: 1, conversations: {}, pendingDispatches: [], swarmWorkerRoles: {}, usedSwarmNames: {} };
   }
 }
 
@@ -138,10 +164,31 @@ function saveSessions(sessionFile, state, now) {
 
 function ensureConv(state, convId, now) {
   if (!state.conversations[convId]) {
-    state.conversations[convId] = { role: null, dirtyFiles: [], codegenTouched: false, updatedAt: now };
+    state.conversations[convId] = { role: null, dirtyFiles: [], lspAutoStrikes: {}, codegenTouched: false, updatedAt: now };
   }
   state.conversations[convId].updatedAt = now;
   return state.conversations[convId];
+}
+
+function readTranscriptHead(transcriptPath, maxBytes = 4096) {
+  if (!transcriptPath || !existsSync(transcriptPath)) return "";
+  let fd = null;
+  try {
+    fd = openSync(transcriptPath, "r");
+    const buf = Buffer.allocUnsafe(maxBytes);
+    const bytesRead = readSync(fd, buf, 0, maxBytes, 0);
+    return bytesRead > 0 ? buf.toString("utf8", 0, bytesRead) : "";
+  } catch {
+    return "";
+  } finally {
+    if (fd !== null) {
+      try {
+        closeSync(fd);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 }
 
 function extractChildConversationId(event) {
@@ -156,6 +203,114 @@ function extractChildConversationId(event) {
     if (m) return m[1];
   }
   return null;
+}
+
+function extractChildConversationIds(event) {
+  const ids = new Set();
+  const inspectObj = (obj) => {
+    if (!obj || typeof obj !== "object") return;
+    for (const key of ["conversation_ids", "conversationIds"]) {
+      if (Array.isArray(obj[key])) {
+        for (const item of obj[key]) {
+          const s = str(item);
+          if (s) ids.add(s);
+        }
+      }
+    }
+    for (const key of ["conversationId", "conversation_id"]) {
+      const s = str(obj[key]);
+      if (s) ids.add(s);
+    }
+    for (const nestedKey of ["output", "text", "result", "response", "content"]) {
+      const nested = obj[nestedKey];
+      if (typeof nested === "string") {
+        try {
+          inspectObj(JSON.parse(nested));
+        } catch {
+          /* ignore non-JSON string */
+        }
+      } else if (Array.isArray(nested)) {
+        for (const el of nested) inspectObj(el);
+      } else if (nested && typeof nested === "object") {
+        inspectObj(nested);
+      }
+    }
+  };
+  for (const candidate of [event.toolResult, event.output, event.result, event.response, event.tool_response]) {
+    if (!candidate) continue;
+    if (typeof candidate === "object") {
+      inspectObj(candidate);
+    } else if (typeof candidate === "string") {
+      try {
+        inspectObj(JSON.parse(candidate));
+      } catch {
+        /* ignore */
+      }
+    }
+    const text = typeof candidate === "string" ? candidate : JSON.stringify(candidate);
+    const arrMatch = text.match(/\\?"conversation_?ids\\?"\s*:\s*\[([^\]]*)\]/i);
+    if (arrMatch) {
+      for (const m of arrMatch[1].matchAll(/\\?"([^"\\]+)\\?"/g)) {
+        if (m[1]) ids.add(m[1]);
+      }
+    }
+  }
+  const singleId = extractChildConversationId(event);
+  if (singleId) ids.add(singleId);
+  return [...ids];
+}
+
+function extractSwarmResultNames(event) {
+  const names = [];
+  const inspectObj = (obj) => {
+    if (!obj || typeof obj !== "object") return;
+    if (Array.isArray(obj.names)) {
+      for (const n of obj.names) {
+        const s = str(n);
+        if (s) names.push(s.toLowerCase());
+      }
+    }
+    for (const nestedKey of ["output", "text", "result", "response", "content"]) {
+      const nested = obj[nestedKey];
+      if (typeof nested === "string") {
+        try {
+          inspectObj(JSON.parse(nested));
+        } catch {
+          /* ignore */
+        }
+      } else if (Array.isArray(nested)) {
+        for (const el of nested) inspectObj(el);
+      } else if (nested && typeof nested === "object") {
+        inspectObj(nested);
+      }
+    }
+  };
+  for (const candidate of [event.toolResult, event.output, event.result, event.response, event.tool_response]) {
+    if (!candidate) continue;
+    if (typeof candidate === "object") inspectObj(candidate);
+    else if (typeof candidate === "string") {
+      try {
+        inspectObj(JSON.parse(candidate));
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return [...new Set(names)];
+}
+
+function computeSwarmTargetNames(args, event) {
+  const fromResult = extractSwarmResultNames(event);
+  if (fromResult.length > 0) return fromResult;
+  const baseName = (str(args?.name) ?? "").toLowerCase();
+  if (!baseName) return [];
+  if (Array.isArray(args.tasks) && args.tasks.length > 0) {
+    return args.tasks.map((_, i) => `${baseName}-${i + 1}`);
+  }
+  if (Number.isInteger(args.n) && args.n > 1) {
+    return Array.from({ length: args.n }, (_, i) => `${baseName}-${i + 1}`);
+  }
+  return [baseName];
 }
 
 function extractLspErrorText(event) {
@@ -177,19 +332,17 @@ function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
   const args = parseJsonObject(toolCall.args);
 
   if (isLspToolCall(toolName, args)) {
-    const lang = inferLspLanguage(args);
+    const target = inferLspCircuitTarget(toolName, args);
     const failed = isLspFailureOrTimeout(event);
     const errorText = failed ? extractLspErrorText(event) : "";
-    recordLspOutcome(root, lang, { failed, errorText }, { now });
+    recordLspOutcome(root, target, { failed, errorText }, { now });
 
     if (convId) {
       const state = loadSessions(sessionFile, now);
       if (state.conversations[convId]) {
         const conv = ensureConv(state, convId, now);
         const before = conv.dirtyFiles.length;
-        if (failed) {
-          conv.dirtyFiles = lang === "general" ? [] : conv.dirtyFiles.filter((f) => inferLspLanguage(f) !== lang);
-        } else {
+        if (!failed) {
           let lspArgs = null;
           if (toolName === "call_mcp_tool") {
             const mcpTool = str(args.ToolName) ?? str(args.toolName) ?? str(args.tool_name);
@@ -288,6 +441,31 @@ function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
     recordSessionDispatch(root, convId, { agentType: str(args.name) ?? "swarm", contractRef, summary: briefText.slice(0, 120) });
     const pDir = contractRef ? extractPlanDirFromPath(root, contractRef) : null;
     if (pDir) armSessionContinuation(root, convId, { planDir: pDir }, { now });
+
+    const targetNames = computeSwarmTargetNames(args, event);
+    if (targetNames.length > 0) {
+      const existingUsed = state.usedSwarmNames[convId]?.names || [];
+      state.usedSwarmNames[convId] = {
+        names: [...new Set([...existingUsed, ...targetNames])],
+        updatedAt: now,
+      };
+      dirty = true;
+    }
+
+    const swarmName = (str(args.name) ?? "").toLowerCase();
+    const roleMatch = briefText.match(SWARM_ROLE_RE);
+    const swarmRole = roleMatch ? roleMatch[1].toLowerCase() : KNOWN_ROLES.has(swarmName) ? swarmName : null;
+    if (swarmRole) {
+      for (const childId of extractChildConversationIds(event)) {
+        const child = ensureConv(state, childId, now);
+        child.role = swarmRole;
+        dirty = true;
+      }
+      for (const wName of targetNames) {
+        state.swarmWorkerRoles[wName] = { role: swarmRole, parentConvId: convId, createdAt: now };
+        dirty = true;
+      }
+    }
   }
 
   if (writePaths && writePaths.length > 0) {
@@ -347,19 +525,36 @@ function handlePreInvocation(event, root, sessionFile, now) {
         matchedRole = directRole;
       } else {
         const input = (str(event.lastUserInput) ?? "").trim();
-        const idx = state.pendingDispatches.findIndex(
-          (d) =>
-            d.promptSnippet.length >= 20 &&
-            (input.startsWith(d.promptSnippet) || d.promptSnippet.startsWith(input.slice(0, 120)))
-        );
-        if (idx >= 0) {
-          matchedRole = state.pendingDispatches[idx].role;
-          state.pendingDispatches.splice(idx, 1);
-        } else {
-          const swarmMatch = input.match(
-            /\.agents?\/agents\/(backend-specialist|frontend-specialist|test-author|verifier|researcher|reviewer)\.md/i
+        if (input.length >= 20) {
+          const idx = state.pendingDispatches.findIndex(
+            (d) =>
+              d.promptSnippet.length >= 20 &&
+              (input.startsWith(d.promptSnippet) || d.promptSnippet.startsWith(input.slice(0, 120)))
           );
-          if (swarmMatch) matchedRole = swarmMatch[1].toLowerCase();
+          if (idx >= 0) {
+            matchedRole = state.pendingDispatches[idx].role;
+            state.pendingDispatches.splice(idx, 1);
+          }
+        }
+        if (!matchedRole) {
+          const transcriptPath = str(event.transcriptPath);
+          if (transcriptPath) {
+            const head = readTranscriptHead(transcriptPath, 4096);
+            const assignMatch = head.match(/recorded on the board as #\d+ for @([a-z0-9_-]+)\):/i);
+            if (assignMatch) {
+              const workerName = assignMatch[1].toLowerCase();
+              const mappedRole = str(state.swarmWorkerRoles?.[workerName]?.role);
+              if (mappedRole && KNOWN_ROLES.has(mappedRole)) {
+                matchedRole = mappedRole;
+              } else {
+                const after = head.slice(assignMatch.index);
+                const endIdx = after.search(/\r?\n|<\/SYSTEM_MESSAGE>/);
+                const assignLine = endIdx >= 0 ? after.slice(0, endIdx) : after;
+                const roleInAssign = assignLine.match(SWARM_ROLE_RE);
+                if (roleInAssign) matchedRole = roleInAssign[1].toLowerCase();
+              }
+            }
+          }
         }
       }
       if (matchedRole) {
@@ -382,6 +577,64 @@ function handlePreInvocation(event, root, sessionFile, now) {
         },
       ],
     };
+  }
+  return {};
+}
+
+async function handlePostInvocation(event, root, sessionFile, now) {
+  const convId = str(event.conversationId);
+  if (!convId) return {};
+  const state = loadSessions(sessionFile, now);
+  const conv = state.conversations[convId];
+  if (!conv || !Array.isArray(conv.dirtyFiles) || conv.dirtyFiles.length === 0) return {};
+
+  const absFiles = conv.dirtyFiles.map((f) => join(root, f));
+  const checkRes = await queryWarmLspCheck(absFiles, { timeoutMs: 2200 });
+  if (!checkRes.ok) return {};
+
+  let changed = false;
+  const cleanSet = new Set();
+  const errorFiles = [];
+  for (const item of checkRes.results || []) {
+    const rel = toRepoRelative(item.file, root, root);
+    if (!rel) continue;
+    if (!item.timedOut && !item.error && Array.isArray(item.diagnostics)) {
+      if (item.diagnostics.length === 0) {
+        cleanSet.add(rel);
+        if (conv.lspAutoStrikes[rel]) {
+          delete conv.lspAutoStrikes[rel];
+          changed = true;
+        }
+      } else {
+        errorFiles.push(rel);
+      }
+    }
+  }
+
+  if (cleanSet.size > 0) {
+    conv.dirtyFiles = conv.dirtyFiles.filter((f) => !cleanSet.has(f));
+    changed = true;
+  }
+
+  let shouldInject = false;
+  for (const rel of errorFiles) {
+    const strikes = Number(conv.lspAutoStrikes[rel] || 0);
+    if (strikes < 2) {
+      conv.lspAutoStrikes[rel] = strikes + 1;
+      shouldInject = true;
+      changed = true;
+    }
+  }
+  if (changed) saveSessions(sessionFile, state, now);
+
+  if (shouldInject && checkRes.totalErrors > 0) {
+    const msg = formatWarmLspErrors(checkRes, root);
+    if (msg) {
+      return {
+        injectSteps: [{ systemMessage: { systemMessage: msg } }],
+        terminationBehavior: "force_continue",
+      };
+    }
   }
   return {};
 }
@@ -458,6 +711,9 @@ try {
   }
   if (hookEventName === "PreInvocation") {
     out(handlePreInvocation(event, root, sessionFile, now));
+  }
+  if (hookEventName === "PostInvocation") {
+    out(await handlePostInvocation(event, root, sessionFile, now));
   }
   if (hookEventName === "Stop") {
     out(handleStop(event, root, sessionFile, now));

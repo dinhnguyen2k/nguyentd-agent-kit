@@ -2,16 +2,18 @@
 
 Dùng trực tiếp các mẫu tham số chuẩn dưới đây với `call_mcp_tool` mà không cần mở đọc từng tệp `.json` mô tả schema của MCP server.
 
-## 1. MCP `lsp` (Đồ thị ngữ nghĩa C# / TypeScript)
+## 1. MCP `lsp` & `cogain-lsp` CLI (Shared Warm LSP Daemon: `tsgo` + `csharp-ls`)
 
 - **Kiểm tra chẩn đoán tĩnh 1 tệp (`get_diagnostics`)**:
   - `ServerName`: `"lsp"`, `ToolName`: `"get_diagnostics"`, `Arguments`: `{ "file_path": "<đường_dẫn_tuyệt_đối>" }`.
+  - Trong `swarm` hoặc shell nhanh: `cogain-lsp check <file1> [file2...]` (đồng bộ trực tiếp nội dung mới nhất trên đĩa, phản hồi mili-giây với `tsgo`).
 - **Tìm định nghĩa / tham chiếu / bản cài đặt (`find_definition` | `find_references` | `find_implementation` | `get_incoming_calls`)**:
-  - `ServerName`: `"lsp"`, `ToolName`: `"find_references"`, `Arguments`: `{ "file_path": "<đường_dẫn_tuyệt_đối>", "symbol_name": "<TênHàmHoặcKiểu>" }` (có thể kèm `"line": <số_dòng_1_based>` khi trùng tên).
-- **Quy tắc thực chiến C# Roslyn (`csharp-ls`)**:
-  - Lần gọi đầu tiên khi máy chủ vừa nạp `backend/Cogain.Lsp.slnf` có thể mất 30-60 giây làm ấm; các lượt sau phản hồi trong 4-20 giây.
+  - `ServerName`: `"lsp"`, `ToolName`: `"find_references"`, `Arguments`: `{ "file_path": "<đường_dẫn_tuyệt_đối>", "symbol_name": "<TênHàmHoặcKiểu>" }` (có thể kèm `"line": <số_dòng_1_based>`).
+  - Trong `swarm` hoặc shell nhanh: `cogain-lsp def|refs <file> <symbol> [line]`.
+- **Quy tắc thực chiến C# Roslyn (`csharp-ls`) & TS (`tsgo`)**:
+  - Shared Warm Daemon giữ ấm sẵn `tsgo --lsp` (TS/TSX) và `csharp-ls` (`backend/Cogain.Lsp.slnf`), tự đồng bộ `didChange` theo `sha1` trên đĩa trước mọi truy vấn nên không bị trả cache cũ sau `edit_file`.
   - **Không** gọi `find_references` trực tiếp vào tên generic interface (`IAggregateRoot<TSelf>`); luôn gọi vào **tên member phi-generic** (`Shape`, `BuildIncomingGraph`) để lấy đủ 100% điểm tham chiếu toàn workspace.
-  - Nếu cầu chì LSP đang mở (`[lsp-circuit-open]`) hoặc quá hạn, dừng ngay không thử lại và chuyển sang đọc/tìm văn bản tĩnh.
+  - Cầu chì `diagnostics` (`csharp`/`typescript`) tách riêng khỏi cầu chì tra cứu (`csharp-nav`/`typescript-nav`): nếu kiểm lỗi bị mở cầu chì (`[lsp-circuit-open]`), vẫn tra cứu symbol bình thường và chuyển phần kiểm lỗi sang đối chiếu tĩnh.
 
 ## 2. MCP `context7` (Tài liệu chính thức theo phiên bản)
 

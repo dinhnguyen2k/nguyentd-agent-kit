@@ -1,0 +1,9 @@
+{
+  "name": "cogain-warm-lsp",
+  "private": true,
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "typescript": "^5.9.3",
+    "typescript-language-server": "^6.1.0"
+  }
+}

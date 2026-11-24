@@ -37,6 +37,13 @@
         "command": "for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{\"decision\":\"allow\"}\\n'",
         "timeout": 10
       }
+    ],
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{}\\n'",
+        "timeout": 10
+      }
     ]
   }
 }

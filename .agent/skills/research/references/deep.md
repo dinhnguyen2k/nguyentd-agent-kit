@@ -1,35 +1,38 @@
-# Nghiên cứu DEEP
+# Nghiên cứu DEEP (Tối đa 6 Nhánh Trực Giao)
 
-Chỉ dùng `DEEP` khi người dùng yêu cầu rõ nghiên cứu chuyên sâu hoặc quy trình có kiểm soát cho phép rõ ràng. Không tự nâng cấp vì chủ đề rộng hay rủi ro cao. Main điều phối, chia việc và đưa ra quyết định; Researcher chỉ nghiên cứu theo câu hỏi được giao, không tạo người nghiên cứu con.
+Chỉ dùng `DEEP` khi người dùng yêu cầu rõ nghiên cứu chuyên sâu hoặc gặp bài toán kiến trúc/liên phân hệ/lỗi phức tạp được quy trình cho phép.
+Main điều phối, chốt phạm vi và giữ quyền quyết định; `researcher` chỉ đọc/tra cứu theo góc nhìn được giao, không tạo agent con.
 
-## Main chốt phạm vi trước khi tìm
+## 1. Thang mở nhánh linh hoạt & Chốt phạm vi (`1 -> 2-3 -> 6 nhánh`)
 
-Trước khi bắt đầu, Main ghi rõ:
+Không ép mở 6 nhánh cho câu hỏi cục bộ nhỏ: giữ `LOOKUP`/`MICRO` (`<= 3` bước tại Main) cho dữ kiện đơn, `FOCUSED` (`1-2` nhánh) cho bài toán đơn miền hoặc liên miền hẹp, và chỉ mở tối đa **6 nhánh song song** cho `DEEP`.
 
-- Một quyết định chung mà nghiên cứu cần hỗ trợ.
-- Các câu hỏi không chồng lấn; ghi rõ phụ thuộc nếu có và nêu tên người chịu trách nhiệm cho mỗi câu hỏi.
-- Phạm vi cần tìm và nội dung nằm ngoài phạm vi.
-- Loại nguồn cần dùng, bằng chứng đã biết và các phụ thuộc giữa câu hỏi.
-- Điều kiện hoàn tất có thể quan sát được cho từng câu hỏi và cho quyết định chung.
-- Giới hạn nguồn cho mỗi câu hỏi, tổng thể và mỗi lượt tìm kiếm. Các giới hạn phải hữu hạn và được chốt trước khi tìm.
-- Dạng bàn giao mong muốn.
+Trước khi chạy, Main khóa cứng phạm vi:
+- Một quyết định chung cần hỗ trợ và điều kiện hoàn tất có thể quan sát được.
+- Các góc nhìn không chồng lấn, phạm vi loại trừ và phụ thuộc (nhánh phụ thuộc phải chạy sau).
+- Ngân sách nguồn hữu hạn cho từng nhánh và toàn đợt; cấm tự đặt lại ngân sách hay âm thầm mở rộng phạm vi.
 
-Nếu chưa có người được nêu tên cho một câu hỏi, Main phải ghi chính xác ai sẽ tìm hiểu theo vai trò được phép; không ngụ ý rằng đã có người được giao. Chỉ chạy các câu hỏi song song khi DEEP đã được cho phép và có khả năng thực hiện độc lập. Nếu một câu hỏi phụ thuộc kết quả của câu khác, chờ kết quả đó hoặc chỉ chuyển phát hiện cần thiết. Nếu không có khả năng chạy đồng thời, thực hiện tuần tự. Khi khởi chạy từ 3 nhánh `invoke_subagent` trở lên trong cùng một lượt trên CLI mà 1 nhánh báo lỗi tranh chấp mở cơ sở dữ liệu phiên (`initialized by another opener`), giữ nguyên các nhánh đã chạy và chỉ gọi bù lại đúng nhánh bị trượt ở lượt kế tiếp.
+## 2. Bộ 6 Góc nhìn trực giao chuẩn (`6 Orthogonal Lanes`)
 
-Ví dụ chia phạm vi: “Quyết định chung: chọn phương án lưu trữ; câu hỏi A, người phụ trách A, tìm hiểu khả năng khôi phục; câu hỏi B, người phụ trách B, tìm hiểu chi phí vận hành; B dùng kết quả A để so sánh nên bắt đầu sau khi A bàn giao.”
+Với bài toán nghiệp vụ ERP/Microservices, chia tối đa 6 nhánh theo 6 trục sau để tránh tìm trùng nguồn:
 
-## Giới hạn và chất lượng nghiên cứu
+1. **Nhánh 1 - Nghiệp vụ & Bất biến Backend**: `BaseService`, `AggregateShape`, `WorkItem`, trạng thái chứng từ và quy tắc miền gốc.
+2. **Nhánh 2 - Giao dịch, Dữ liệu & Liên dịch vụ**: ranh giới DB transaction, đồng bộ snapshot ngoài giao dịch, gRPC, message broker, Redis cache và hiệu năng truy vấn (`N+1`, index).
+3. **Nhánh 3 - Giao diện, Form & Đồng bộ hai đầu (BE - FE)**: component dùng chung, React Hook Form/Zod (`z.guid()`), query cache, khớp enum và giá trị null/rỗng.
+4. **Nhánh 4 - Khuôn mẫu chuẩn & Tiền lệ nội bộ**: đối chiếu `.agent/contracts/archetype-exemplars.json` cùng mã chuẩn và lịch sử gần nhất cùng phân hệ để tái sử dụng.
+5. **Nhánh 5 - Tài liệu gốc & Thực chiến bên ngoài**: đặc tả đúng phiên bản thư viện/framework và bài học vận hành ngoài (`search_web` đã khử sạch thông tin nội bộ dự án).
+6. **Nhánh 6 - Phản biện & Trường hợp biên (`Devil's Advocate`)**: chuyên tìm bằng chứng bác bỏ giả thuyết ban đầu, rà `.planning/errors/ERRORS.md`, rủi ro tương thích ngược và dữ liệu lịch sử.
 
-- Mỗi câu hỏi trả tối đa 5 phát hiện, cùng câu hỏi chưa giải quyết, giới hạn và mức độ chắc chắn.
-- Tuân thủ ngân sách nguồn theo câu hỏi, tổng thể và lượt đã chốt. Dừng trước khi hết ngân sách nếu câu hỏi đã đủ căn cứ; không tự đặt lại giới hạn, mở rộng phạm vi hoặc thêm câu hỏi.
-- Ưu tiên tài liệu chính thức, đặc tả, mã nguồn upstream, API của bên cung cấp, cảnh báo và báo cáo hậu kiểm trực tiếp. Dùng nguồn từ người thực hành hoặc phản ví dụ khi chúng có thể làm thay đổi lựa chọn.
-- Tìm theo nhóm nhỏ; tiêu đề và đoạn trích chỉ giúp chọn nguồn. Mở đúng phần cần thiết, loại URL trùng và không giữ HTML thô, trích dẫn dài hay toàn bộ kết quả công cụ.
-- Không sao chép lịch sử điều phối, hội thoại, nội dung riêng tư không liên quan, nguồn của câu hỏi khác hoặc toàn bộ đầu ra công cụ vào phần giao việc hay bàn giao.
-- Khi các nguồn bất đồng, so sánh phiên bản, phạm vi áp dụng và sức mạnh bằng chứng; không quyết định theo đa số.
-- Chỉ mở lượt tiếp theo khi có đầu mối cụ thể mới có thể làm thay đổi lựa chọn. Chỉ tiếp tục câu hỏi bị ảnh hưởng và còn ngân sách; không đặt lại ngân sách hoặc âm thầm mở rộng phạm vi.
+*(Với chủ đề hạ tầng, công cụ hoặc điều phối không thuộc nghiệp vụ ERP, Main ánh xạ tương đương sang tối đa 6 góc nhìn độc lập không chồng lấn).*
 
-## Kết thúc và quyết định
+## 3. Điều phối đa nền tảng & Trần nén đầu ra
 
-Dừng khi đã đủ bằng chứng, bị chặn, hết ngân sách hoặc không còn bằng chứng mới có khả năng làm thay đổi lựa chọn. Ghi rõ trạng thái nào áp dụng; nếu nguồn không có sẵn hoặc còn bất đồng, nêu thẳng giới hạn và điều chưa giải quyết.
+- **Trần đầu ra mỗi nhánh**: tối đa **5 phát hiện (`<= 220` từ)**, ghi rõ loại bằng chứng (`fact`, `reported-experience`, `inference`, `open-question`), mức độ chắc chắn, giới hạn và nguồn trực tiếp (`tệp:dòng` hoặc URL), giữ tổng đầu vào 6 nhánh về Main dưới `~2.400` token. Không chép trang tài liệu thô hay lịch sử hội thoại.
+- **Antigravity (`agy`)**: khởi chạy đồng thời qua 1 lệnh `swarm` (`action: "add"`, `name: "res<đợt>"`, `model: "gemini-4-hydrogen-high"`, `tasks: [...]`, yêu cầu đọc `.agents/agents/researcher.md` và báo `@coordinator [done]`) để tránh lỗi tranh chấp DB khi gọi `>= 3` `invoke_subagent`; thu đủ báo cáo thì gọi `swarm` (`action: "kill"`).
+- **OMP & Claude Code**: gọi song song các subagent `researcher` theo cơ chế gốc; khi thiếu một nhánh trên CLI do tranh chấp phiên, chỉ gọi bù đúng nhánh bị trượt ở lượt sau.
 
-Main đối chiếu các phát hiện với câu hỏi chung và tự quyết định dựa trên nguồn trực tiếp cùng mức độ bất định, không bỏ phiếu theo đa số. Researcher chỉ bàn giao phát hiện đã chắt lọc, tham chiếu nguồn, giới hạn, câu hỏi còn mở và mức độ chắc chắn; không gửi bản chép trang hay lịch sử nghiên cứu.
+## 4. Main Đối chiếu chéo & Ra quyết định
+
+- **Đối chiếu phản biện**: đặt phát hiện của `Nhánh 1-5` cạnh phản chứng từ `Nhánh 6`; không cộng phiếu theo đa số mà kiểm chứng trực tiếp bằng `lsp`/`context7` tại mọi điểm bất đồng.
+- **Thứ tự trọng tài**: `runtime source > đặc tả gốc > báo cáo bên ngoài`, cùng mức mạnh bằng chứng (`fact` > `inference`).
+- **Cổng dừng (`Zero-Marginal-Evidence` & `Hysteresis`)**: dừng ngay khi đủ căn cứ, hết ngân sách hoặc 2 bước liên tiếp không thêm ràng buộc đổi thứ hạng phương án; giữ phương án đương nhiệm trừ khi có `file:line` hoặc spec bác bỏ trực tiếp.
