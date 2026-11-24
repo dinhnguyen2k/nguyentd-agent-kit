@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import {
+  chmodSync,
   copyFileSync,
   existsSync,
   lstatSync,
@@ -13,6 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import http from "node:http";
+import net from "node:net";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -32,6 +34,7 @@ const DEFAULT_WORKTREE = resolveDefaultWorktree();
 const TSGO_WRAPPER = join(HERE, "tsgo-wrapper.sh");
 const CSHARP_WRAPPER = join(HERE, "csharp-ls-wrapper.sh");
 const DAEMON_INFO_FILE = join(HERE, "daemon.json");
+const HOOK_SOCKET_FILE = process.env.AGY_LSP_HOOK_SOCK || join(HERE, "hook.sock");
 
 const TS_EXTS = new Set(["ts", "tsx", "js", "jsx", "mjs", "cjs"]);
 const CS_EXTS = new Set(["cs"]);
@@ -1082,6 +1085,7 @@ const httpServer = http.createServer(async (req, res) => {
         ok: true,
         pid: process.pid,
         port: PORT,
+        hookSocket: existsSync(HOOK_SOCKET_FILE),
         uptimeSec: Math.round(process.uptime()),
         worktrees,
       });
@@ -1159,11 +1163,104 @@ setInterval(() => {
   }
 }, 60 * 1000).unref();
 
+const evaluatorCache = new Map();
+
+function findAgyRepoRoot(startDir) {
+  if (!startDir || typeof startDir !== "string") return null;
+  for (let dir = resolve(startDir); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, ".agent", "harness", "agy", "hook-evaluator.mjs"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+  }
+}
+
+async function loadHookEvaluator(root) {
+  const evalPath = join(root, ".agent", "harness", "agy", "hook-evaluator.mjs");
+  if (!existsSync(evalPath)) return null;
+  const st = statSync(evalPath);
+  const cached = evaluatorCache.get(evalPath);
+  if (cached && cached.mtimeMs === st.mtimeMs) return cached.mod;
+  const mod = await import(`${pathToFileURL(evalPath).href}?v=${Math.round(st.mtimeMs)}`);
+  if (evaluatorCache.size >= 32) {
+    const oldest = evaluatorCache.keys().next().value;
+    if (oldest !== undefined) evaluatorCache.delete(oldest);
+  }
+  evaluatorCache.set(evalPath, { mtimeMs: st.mtimeMs, mod });
+  return mod;
+}
+
+const hookServer = net.createServer({ allowHalfOpen: true }, (socket) => {
+  lastActivityAt = Date.now();
+  const chunks = [];
+  let totalBytes = 0;
+  let aborted = false;
+
+  socket.on("data", (chunk) => {
+    totalBytes += chunk.length;
+    if (totalBytes > 8 * 1024 * 1024) {
+      aborted = true;
+      socket.end('{"decision":"allow"}\n');
+      return;
+    }
+    chunks.push(chunk);
+  });
+
+  socket.on("end", async () => {
+    if (aborted) return;
+    let mode = "pre";
+    let callerCwd = "";
+    let eventObj = {};
+    try {
+      const rawBuf = Buffer.concat(chunks, totalBytes);
+      const nlIdx = rawBuf.indexOf(10);
+      const header = nlIdx >= 0 ? rawBuf.subarray(0, nlIdx).toString("utf8") : "";
+      const bodyStr = nlIdx >= 0 ? rawBuf.subarray(nlIdx + 1).toString("utf8") : rawBuf.toString("utf8");
+      const tabIdx = header.indexOf("\t");
+      mode = tabIdx >= 0 ? header.slice(0, tabIdx) : header || "pre";
+      callerCwd = tabIdx >= 0 ? header.slice(tabIdx + 1) : "";
+      if (bodyStr.trim()) {
+        const parsed = JSON.parse(bodyStr);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) eventObj = parsed;
+      }
+
+      const workspaceFirst = Array.isArray(eventObj.workspacePaths) ? eventObj.workspacePaths[0] : null;
+      const root =
+        findAgyRepoRoot(eventObj.cwd) ||
+        findAgyRepoRoot(workspaceFirst) ||
+        findAgyRepoRoot(callerCwd) ||
+        findAgyRepoRoot(DEFAULT_WORKTREE);
+
+      let result = mode === "pre" ? { decision: "allow" } : eventObj.hookEventName === "Stop" ? { decision: "allow" } : {};
+      if (root) {
+        const mod = await loadHookEvaluator(root);
+        if (mod) {
+          result =
+            mode === "pre"
+              ? await mod.evaluateAgyPreToolUse(eventObj, { callerCwd })
+              : await mod.evaluateAgyLifecycle(eventObj, { callerCwd });
+        }
+      }
+      socket.end(`${JSON.stringify(result)}\n`);
+    } catch {
+      const fallback = mode === "pre" ? '{"decision":"allow"}\n' : eventObj.hookEventName === "Stop" ? '{"decision":"allow"}\n' : "{}\n";
+      socket.end(fallback);
+    }
+  });
+
+  socket.on("error", () => {});
+});
+
 function shutdown() {
   for (const pool of worktreePools.values()) {
     pool.typescript?.dispose();
     pool.csharp?.dispose();
   }
+  try {
+    if (existsSync(HOOK_SOCKET_FILE)) unlinkSync(HOOK_SOCKET_FILE);
+  } catch {
+    /* ignore */
+  }
+  hookServer.close(() => {});
   httpServer.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 500).unref();
 }
@@ -1171,12 +1268,29 @@ function shutdown() {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
+httpServer.on("error", (err) => {
+  if (err?.code === "EADDRINUSE") process.exit(0);
+});
+
 httpServer.listen(PORT, "127.0.0.1", () => {
   mkdirSync(HERE, { recursive: true });
   writeFileSync(
     DAEMON_INFO_FILE,
-    JSON.stringify({ pid: process.pid, port: PORT, startedAt: new Date().toISOString() }, null, 2)
+    JSON.stringify({ pid: process.pid, port: PORT, hookSocket: HOOK_SOCKET_FILE, startedAt: new Date().toISOString() }, null, 2)
   );
+  mkdirSync(dirname(HOOK_SOCKET_FILE), { recursive: true });
+  try {
+    if (existsSync(HOOK_SOCKET_FILE)) unlinkSync(HOOK_SOCKET_FILE);
+  } catch {
+    /* ignore */
+  }
+  hookServer.listen(HOOK_SOCKET_FILE, () => {
+    try {
+      chmodSync(HOOK_SOCKET_FILE, 0o600);
+    } catch {
+      /* ignore */
+    }
+  });
   // Pre-warm default workspace in background
   if (existsSync(DEFAULT_WORKTREE)) {
     if (existsSync(join(DEFAULT_WORKTREE, "frontend")) || existsSync(join(DEFAULT_WORKTREE, "tsconfig.json"))) {
