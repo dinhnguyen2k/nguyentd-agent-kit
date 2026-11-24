@@ -41,6 +41,7 @@ const CS_EXTS = new Set(["cs"]);
 
 const SECONDARY_WORKTREE_IDLE_MS = 45 * 60 * 1000;
 const DAEMON_IDLE_MS = 12 * 60 * 60 * 1000;
+const MAX_OPEN_DOCS = 80;
 
 const SYMBOL_KIND_NAMES = {
   1: "file",
@@ -383,8 +384,24 @@ class LspInstance {
           text,
         },
       });
+      while (this.openDocs.size > MAX_OPEN_DOCS) {
+        const oldestKey = this.openDocs.keys().next().value;
+        if (!oldestKey || oldestKey === resolved) break;
+        const oldest = this.openDocs.get(oldestKey);
+        this.openDocs.delete(oldestKey);
+        if (oldest) {
+          this.diagnosticsByUri.delete(oldest.uri);
+          this.diagEpochByUri.delete(oldest.uri);
+          this.pullCache.delete(oldest.uri);
+          this.sendNotification("textDocument/didClose", { textDocument: { uri: oldest.uri } });
+        }
+      }
       return { uri, changed: true, opened: true, doc };
     }
+
+    // Refresh LRU order on cache hit
+    this.openDocs.delete(resolved);
+    this.openDocs.set(resolved, existing);
 
     if (existing.sha1 === sha1) {
       return { uri, changed: false, opened: false, doc: existing };
