@@ -16,24 +16,25 @@ Read `.agent/rules/backend-excel-import.md` for core invariants and [references/
 
 ## Orchestration Boundary
 
-Do not override:
+Choose the right shared infrastructure tier in `backend/src/BuildingBlocks`:
 
-- `ImportFromExcel`
-- `ExportTemplateAsync`
-- `ExportDataAsync`
+- Default (`BaseService.ImportFromExcel`): Do NOT override `ImportFromExcel`, `ExportTemplateAsync`, or `ExportDataAsync` for standard imports; extend via hooks (`CustomParseExcelToDtosAsync`, `LoadImportReferencesAsync`, `ValidateImportDtosAsync`, `PrepareImportEntitiesAsync`, `SaveImportEntitiesAsync`).
+- Large/multi-sheet `WorkItem`-backed aggregates (`ProductionOrderService`, `OvertimeRequestService`):
+  - Parse via `ExcelWorkbookStreamReader` (`ReadSheet<T>` / `ReadRawSheet`) - never `new XLWorkbook(stream)` on large import reads.
+  - Orchestrate snapshots + compensated WorkItem batch creation via `WorkItemImportExecution.RunAsync` + `SaveTrackedChangesAsync` (default `ChunkSize = 1000`). Pass state via captured local closures, NEVER `AsyncLocal` written inside `async` delegates.
+  - Persist large multi-table insert graphs via `IUnitOfWork.BulkInsertEntitiesAsync` (Npgsql metadata-driven multi-row `INSERT` respecting `AggregateShapes` and `AuditingInterceptor`, with safe EF Core fallback).
 
-Use the narrow hook that owns parsing, reference preload, validation, entity preparation/save, byte generation, or filename selection. Confirm the exact hook signature in current source.
+Confirm exact hook and helper signatures in `BaseService.cs`, `ExcelWorkbookStreamReader.cs`, `WorkItemImportExecution.cs`, and `UnitOfWorkBase.cs`.
 
 ## Procedure
 
 1. Define the import/export column contract once and verify symmetry.
-2. Batch-load lookup/reference data before row processing; never make one DB/gRPC call per cell or row.
-3. Parse cells into DTOs with row-aware errors; do not persist partially validated rows accidentally.
-4. Preserve base transaction and result behavior.
-5. If a remote write occurs before local commit, define compensation/reconciliation before implementation.
-6. Generate templates through byte-generation and filename hooks rather than replacing upload/storage orchestration.
-7. For new or modified Excel exports, use `Infrastructure.Services.Excel` instead of manual `XLWorkbook` / `AdjustToContents()` boilerplate:
-   - Use `ExcelDataExporter.WriteBytes` (`ExcelDataSheet.From` / `ExcelDataSheet.FromColumns`) in `GenerateExportDataBytesAsync` for re-importable data exports.
+2. Parse cells via `ExcelWorkbookStreamReader` into DTOs/raw rows with row-aware errors; never make per-cell or per-row DB/gRPC calls inside parsing.
+3. Batch-load lookup/reference data before processing rows (including default enrichments like `ApplyDefaultFromWarehouseBatchAsync` applied for both Create and Update); run independent lookups concurrently with `Task.WhenAll`.
+4. Pre-query lightweight IDs before loading full `QueryAggregate()` graphs under `SplitQuery`; block locked/approved records (e.g. `ApprovedDate != null`) both before mutation and inside the transaction on retry.
+5. Collect snapshots outside the transaction (`AutoDetectChanges = false`), persist updates with `WorkItemImportExecution.SaveTrackedChangesAsync`, and persist bulk creates with `_unitOfWork.BulkInsertEntitiesAsync` + `WorkItemLifecycleService.BulkCreateWithWorkItemsBatchAsync` (never log per-item inside tight loops).
+6. Generate templates and re-importable/analytical exports through `Infrastructure.Services.Excel`:
+   - Use `ExcelDataExporter.WriteBytes` (`ExcelDataSheet.From` / `ExcelDataSheet.FromColumns`) in `GenerateExportDataBytesAsync`.
    - Use `ExcelReportWriter.Write` (`ExcelReport` / `ReportSheet` / `ReportTable.Of` / `ReportCol.*` / `ReportTotal.*`) for analytical/read-only reports, passing human-readable filter labels (never raw GUIDs) and typed dates.
 
 ## Boundaries
@@ -41,7 +42,8 @@ Use the narrow hook that owns parsing, reference preload, validation, entity pre
 - Import and export columns must remain symmetric unless the product contract explicitly distinguishes them.
 - Do not hide validation failures by coercing invalid values to defaults.
 - Do not trust spreadsheet MIME or extension alone; retain base validation.
-- Do not add edit guards to existing import flows without an explicit business decision; `backend-excel-import.md` section 11.1 owns this exception.
+- Explicitly guard locked/approved records (`ApprovedDate != null`) against silent overwrite when business rules forbid editing after approval.
+- Do not write `AsyncLocal` state inside `async` `WorkItemImportExecution` callbacks (`BeforeTransactionAsync`); values will not flow out across `await` boundaries.
 - Do not emit secrets, internal audit fields, or unapproved identifiers into export files.
 
 ## Verification

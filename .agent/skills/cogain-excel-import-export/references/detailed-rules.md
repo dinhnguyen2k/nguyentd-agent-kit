@@ -49,10 +49,25 @@ Tài liệu này lưu chi tiết thiết kế schema header/sheet, gom tra cứu
 
 ## 4. Chi Tiết An Toàn Khi Cập Nhật Qua Import (`Upsert Safety`)
 
-1. **Edit-guard ở nhánh update là quyết định nghiệp vụ tường minh**: Không tự ý thêm hoặc gỡ `ValidateCanEditAsync` / kiểm tra ngày duyệt vào luồng import hiện hữu nếu chưa có quyết định nghiệp vụ (tiền lệ `ProductionOrderService.ImportFromExcel` cố ý cho phép ghi đè khi import).
-2. **Bảo toàn khóa liên kết tạm cha - con**: Giữ nguyên ID tạm sinh ở bước parse (`Id = dto.Id ?? Guid.NewGuid()`), cấm gọi `Guid.NewGuid()` đè làm đứt liên kết dòng con.
+1. **Khóa bản ghi đã chốt / phát hành (`ApprovedDate != null`)**: Mọi luồng có trạng thái chốt như `ProductionOrderService.ImportFromExcel` phải chặn ghi đè bản ghi có `ApprovedDate != null`, báo lỗi rõ theo từng dòng trước khi biến đổi graph và tái kiểm bên trong transaction (kể cả khi transient retry `attempt > 0`).
+2. **Bảo toàn khóa liên kết tạm cha - con**: Giữ nguyên ID tạm sinh ở bước parse (`Id = dto.Id ?? Guid.NewGuid()`), cấm gọi `Guid.NewGuid()` đè làm đứt liên kết dòng con. Với cập nhật chi tiết theo khóa tự nhiên trên `ProductionOrder`, lập chỉ mục độ phức tạp tuyến tính trước khi remap để tránh quét lồng nhau.
 3. **Tra cứu theo `Code` an toàn xóa mềm & không ném ngoại lệ dữ liệu**:
    - Luôn bảo đảm lọc `DeletedDate == null` và dùng `GroupBy(...).ToDictionary(g => g.Key, g => g.First())` sau bước kiểm tra trùng mã (`ExcelImportHelpers.CheckDuplicateCode`).
    - Không để `ValidateImportDtosAsync` ném exception vì khóa `null`/trùng từ dữ liệu người dùng làm mất danh sách lỗi gom được.
 4. **Đồng bộ phân biệt hoa thường C# và PostgreSQL**: `HashSet<string>(StringComparer.OrdinalIgnoreCase)` không tự áp dụng khi dịch sang `IN (...)` trên PostgreSQL; phải chuẩn hóa cả hai vế (`ToUpper()`) hoặc dùng `EF.Functions.ILike` có cân nhắc chỉ mục.
 5. **Không suy diễn loại chứng từ từ cột nhãn tiếng Việt tự do** nếu suy ra được trực tiếp từ mã chứng từ; mọi cột đã thu thập và kiểm tra hợp lệ đều phải được ánh xạ vào thực thể (tránh lỗi lệch đối xứng dữ liệu).
+
+## 5. Kiến Trúc Base Import Streaming & Hiệu Năng Cao (`BuildingBlocks/Infrastructure`)
+
+1. **`ExcelWorkbookStreamReader` (`Infrastructure/Services/Import/ExcelWorkbookStreamReader.cs`)**:
+   - Đọc trực tiếp OpenXML forward-only (`OpenXmlReader` theo state `ReadFirstChild`/`ReadNextSibling`), nạp `SharedStringTable` và `Stylesheet` (gồm cả elapsed time `[h]:mm`) một lượt duy nhất, bỏ qua mọi sheet `Data_*` và VML comments, áp trần `MaxDataRows = 100_000`.
+   - Hỗ trợ `ReadSheet<T>` / `TryReadSheet<T>` và `ReadRawSheet` / `TryReadRawSheet` (`ExcelRawRow` đọc nhanh theo chỉ số cột 1-based) trên cùng một stream bufferable (`MemoryStream` khi `!stream.CanSeek`).
+2. **`WorkItemImportExecution` (`Infrastructure/Services/Import/WorkItemImportExecution.cs`)**:
+   - Điều phối vòng đời chung: thu thập và áp `AggregateSnapshotService` ngoài transaction dưới `AutoDetectChanges = false` (`SnapshotRoots` gồm cả Update đã sync và Create dựng sẵn) -> chạy `BeforeTransactionAsync` -> mở `ExecuteCompensatedTransactionAsync` với `attempt` tracking -> `ExecuteInTransactionBeforeCreateAsync` -> `SaveTrackedChangesAsync` -> `BulkCreateWithWorkItemsBatchAsync` (mặc định `ChunkSize = 1000`, `MaxBatchSize(1000)` trên `DbContext`) -> `AfterCommitAsync` hậu commit (ví dụ `AutoReturnIfReachedEndStepBatchAsync`).
+   - **Cấm truyền dữ liệu giữa các delegate `async` qua `AsyncLocal`**: `BeforeTransactionAsync` chạy trên `async` task con nên thay đổi `.Value` bị hủy sau khi `await` kết thúc; luôn chụp vào biến cục bộ của hàm gọi `RunAsync`.
+   - **`SaveTrackedChangesAsync`**: giữ `SetAutoDetectChanges(false)` bao trọn cả `DetectChanges()` lẫn `await SaveChangesAsync(ct)` và chỉ khôi phục trong `finally` để `AuditingInterceptor` không kích hoạt thêm vòng quét `ChangeTracker`.
+3. **`AggregateSnapshotService` & `QueryAggregate()` SplitQuery**:
+   - Khi root ở trạng thái `Detached` hoặc `Added`, `AggregateSnapshotService` chỉ kiểm tra `rootEntry` một lần và bỏ qua `unitOfWork.Entry(node)` ở các node con, đồng thời khử trùng lặp `(Kind, Id)` ngay bằng `HashSet<SnapshotKey>`.
+   - Khi kiểm tra bản ghi tồn tại trong `Import`, truy vấn danh sách `Id` trước bằng `_repository.Query(...).Select(x => x.Id)`; chỉ gọi `QueryAggregate()` khi `matchedIds.Count > 0`.
+4. **`IUnitOfWork.BulkInsertEntitiesAsync` (`UnitOfWorkBase.cs` + `AuditingInterceptor.cs`)**:
+   - Với cây entity sạch (`Npgsql`, không có hook `ISaveChangesHook`, không owned/discriminator/shadow column), tự động sinh SQL multi-row `INSERT ... VALUES ($1,$2,...),...` theo metadata `DbContext.Model` + `RelationalTypeMapping` + thứ tự tầng khóa ngoại `AggregateShapes` (gộp tới `min(1000, 60000 / số_cột)` dòng mỗi lệnh), đóng dấu audit bằng `ApplyAuditForBulkInsertAsync` và tự fallback về `AddRangeAsync` + `SaveChangesAsync` trong môi trường test (SQLite/in-memory).
