@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "for p in ../.agent/harness/agy/boundary-guard.mjs ./boundary-guard.mjs ./.agent/harness/agy/boundary-guard.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{\"decision\":\"allow\"}\\n'",
+            "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" pre; for p in ../.agent/harness/agy/boundary-guard.mjs ./boundary-guard.mjs ./.agent/harness/agy/boundary-guard.mjs ; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{\"decision\":\"allow\"}\\n'",
             "timeout": 10
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{}\\n'",
+            "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" lifecycle; for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs ; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{}\\n'",
             "timeout": 10
           }
         ]
@@ -27,21 +27,21 @@
     "PreInvocation": [
       {
         "type": "command",
-        "command": "for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{}\\n'",
+        "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" lifecycle; for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs ; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{}\\n'",
         "timeout": 10
       }
     ],
     "Stop": [
       {
         "type": "command",
-        "command": "for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{\"decision\":\"allow\"}\\n'",
+        "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" lifecycle; for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs ; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{\"decision\":\"allow\"}\\n'",
         "timeout": 10
       }
     ],
     "PostInvocation": [
       {
         "type": "command",
-        "command": "for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{}\\n'",
+        "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" lifecycle; for p in ../.agent/harness/agy/lifecycle-hook.mjs ./lifecycle-hook.mjs ./.agent/harness/agy/lifecycle-hook.mjs ; do [ -f \"$p\" ] && exec node \"$p\"; done; printf '{}\\n'",
         "timeout": 10
       }
     ]
