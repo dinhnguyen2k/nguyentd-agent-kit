@@ -1299,7 +1299,12 @@ httpServer.listen(PORT, "127.0.0.1", () => {
     }
     if (existsSync(join(DEFAULT_WORKTREE, "backend"))) {
       const csSrv = getOrCreateInstance(join(DEFAULT_WORKTREE, "backend/CogainSolution.sln"), "csharp");
-      csSrv.start().catch(() => {});
+      csSrv.start().then(() => {
+        const probeCs = join(DEFAULT_WORKTREE, "backend/src/Services/ERP/ERP.API/Program.cs");
+        if (existsSync(probeCs) && !csSrv.warmupComplete) {
+          return csSrv.getDiagnostics(probeCs, 45000);
+        }
+      }).catch(() => {});
     }
   }
 });
