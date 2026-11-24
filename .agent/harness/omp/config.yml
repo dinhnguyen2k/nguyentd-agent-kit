@@ -19,7 +19,7 @@ skills:
     - seo
     - mobile
     - update
-# Số đo 28-30/09 và lý do: .agent/artifacts/omp-agent-lanes-quota-research.md
+# Số đo thực tế 28-30/09: tách tải verifier/researcher khỏi pool chính để chống cạn hạn mức.
 compaction:
   # Đo 28/09-03/10: request main trên 200k context chiếm 30% cost; mốc 180k kết hợp tỉa gọn compaction giữ mạch kế hoạch dài qua đêm mà không phình tới 703k.
   thresholdTokens: 180000

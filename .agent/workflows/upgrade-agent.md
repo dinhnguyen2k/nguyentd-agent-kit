@@ -14,7 +14,8 @@ Phiên làm tính năng thường (Luồng 1) KHÔNG sửa `.agent/**`; mọi ma
 
 1. **Mở quyền `maintainer` (tạm thời trong phiên bảo trì)**:
    - Người dùng mở cổng: `.agent/scripts/agent-role.sh maintainer` (hoặc cấp quyền `maintainer` cho phiên nâng cấp).
-2. **Tổng hợp ma sát & kiểm toán độ trôi 3 chiều**:
+2. **Dọn rác quá 10 ngày, tổng hợp ma sát & kiểm toán độ trôi 3 chiều**:
+   - Chạy `node .agent/scripts/prune-agent-state.mjs --days 10` để dọn sạch phân tích, plan và log quá 10 ngày (giữ nguyên `.planning/codebase/` và `.planning/errors/ERRORS.md`).
    - Chạy `node .agent/scripts/summarize-friction.mjs` để đọc `.agent/reports/agent-friction.jsonl`, `.agent/reports/boundary-guard.log` và `enforcement.allowlist` trong `.agent/contracts/agent-registry.json`.
    - Rà soát độ trôi giữa **Code thực tế ↔ Tài liệu/Rule/Skill ↔ Khuôn mẫu** (`.agent/contracts/archetype-exemplars.json`): xử lý allowlist đã/sắp hết hạn `expires_at`, rule bị nghi chặn nhầm và tài liệu lỗi thời.
 3. **Chuyển xuống Code & Tỉa bớt Chữ**:

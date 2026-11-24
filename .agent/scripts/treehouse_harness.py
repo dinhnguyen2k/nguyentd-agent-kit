@@ -22,6 +22,7 @@ SHARED_PATHS = (
     ".agent/harness/codex",
     ".agent/harness/omp",
     ".agent/harness/agy",
+    ".agent/harness/lsp",
     ".agent/harness/README.md",
     ".agent/contracts/agent-registry.json",
     ".agent/contracts/archetype-exemplars.json",
@@ -56,6 +57,7 @@ LOCAL_LINKS = {
 }
 PRIVATE_STATE = (
     ".agent/planning",
+    ".agent/archive",
     ".agent/artifacts",
     ".agent/reports",
     ".agent/scratch",
