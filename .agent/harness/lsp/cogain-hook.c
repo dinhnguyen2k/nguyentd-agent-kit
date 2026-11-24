@@ -207,6 +207,8 @@ static int find_fallback_script(const char *explicit_arg, const char *mode, cons
   }
   const char *rel = strcmp(mode, "pre") == 0
     ? ".agent/harness/agy/boundary-guard.mjs"
+    : strcmp(mode, "claude") == 0
+    ? ".agent/harness/claude/hook-entry.mjs"
     : ".agent/harness/agy/lifecycle-hook.mjs";
 
   char dir[PATH_MAX];
@@ -271,7 +273,11 @@ static void exec_node_fallback(const char *mode, const char *explicit_arg, const
 }
 
 int main(int argc, char **argv) {
-  const char *mode = (argc >= 2 && strcmp(argv[1], "lifecycle") == 0) ? "lifecycle" : "pre";
+  const char *mode = "pre";
+  if (argc >= 2) {
+    if (strcmp(argv[1], "lifecycle") == 0) mode = "lifecycle";
+    else if (strcmp(argv[1], "claude") == 0) mode = "claude";
+  }
   const char *explicit_script = (argc >= 3) ? argv[2] : NULL;
 
   size_t payload_len = 0;

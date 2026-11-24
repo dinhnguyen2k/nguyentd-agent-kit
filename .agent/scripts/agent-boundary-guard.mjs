@@ -293,8 +293,8 @@ export function evaluateBoundaryPayload(payload, options = {}) {
             `Lệnh bị chặn: ${cmd.slice(0, 200)}\n` +
             `Role hiện tại: ${role} (nguồn: ${source}).\n\n` +
             `Agent triển khai không tự build hay chạy test; CI parity qua verifier/maintainer chỉ khi user yêu cầu CI/build. Dừng riêng lệnh chạy test này (tiếp tục các nhánh độc lập khác nếu còn).\n` +
-            `Chạy test là quyết định của người dùng. Nếu người dùng muốn mở cổng, người dùng chạy:\n` +
-            `  ! .agent/scripts/agent-role.sh verifier\n` +
+            `Nếu người dùng đã yêu cầu chạy test: giao subagent \`verifier\` (hoặc \`test-author\` trong phạm vi test được cấp) chạy, không lặp lại lệnh ở phiên hiện tại; role \`maintainer\` KHÔNG mở được R1.\n` +
+            `Muốn chạy ngay tại phiên này, người dùng tự mở cổng: ! .agent/scripts/agent-role.sh verifier\n` +
             `Không tự ý mở cổng rồi chạy tiếp.`
         );
       }

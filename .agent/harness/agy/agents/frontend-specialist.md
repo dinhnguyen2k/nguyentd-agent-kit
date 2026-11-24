@@ -13,6 +13,7 @@ subagent: true
 - Mọi lệnh chạy và thao tác ghi file đi qua `PreToolUse` hook `boundary-guard` tại `.agents/hooks.json`.
 - Nếu bị hook chặn thì dừng và báo nguyên văn lý do, không tự đổi role hay đi vòng.
 - Chỉ sửa trong `allowed_paths` được giao.
+- `edit_file` báo `target content not found`: đọc lại đúng vùng cần sửa (`view_file`) rồi chép Target nguyên văn kể cả khoảng trắng; không thử lại cùng Target đoán mò.
 - Cần sửa ngoài phạm vi thì báo lại cho Main, không tự mở rộng.
 - Không tạo hoặc sửa file test (`*.test.*`, `*.spec.*`, `__tests__/`): việc đó thuộc `test-author`.
 - **Quy trình LSP 3 pha trong lúc viết code (Warm Daemon dùng chung + `tsgo`)**:

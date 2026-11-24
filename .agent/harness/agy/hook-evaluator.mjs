@@ -187,11 +187,16 @@ function loadSessions(sessionFile, now = Date.now()) {
     const st = statSync(sessionFile);
     const cached = sessionsCache.get(sessionFile);
     if (cached && cached.mtimeMs === st.mtimeMs) {
-      return pruneState(cached.state, now);
+      if (now - (cached.lastPrunedAt || 0) < 60_000) {
+        return cached.state;
+      }
+      const repruned = pruneState(cached.state, now);
+      sessionsCache.set(sessionFile, { mtimeMs: st.mtimeMs, lastPrunedAt: now, state: repruned });
+      return repruned;
     }
     const parsed = pruneState(JSON.parse(readFileSync(sessionFile, "utf8")), now);
-    sessionsCache.set(sessionFile, { mtimeMs: st.mtimeMs, state: parsed });
-    return pruneState(parsed, now);
+    sessionsCache.set(sessionFile, { mtimeMs: st.mtimeMs, lastPrunedAt: now, state: parsed });
+    return parsed;
   } catch {
     return empty;
   }
@@ -208,7 +213,7 @@ function saveSessions(sessionFile, state, now = Date.now()) {
     renameSync(tmpFile, sessionFile);
     try {
       const st = statSync(sessionFile);
-      sessionsCache.set(sessionFile, { mtimeMs: st.mtimeMs, state: pruned });
+      sessionsCache.set(sessionFile, { mtimeMs: st.mtimeMs, lastPrunedAt: now, state: pruned });
     } catch {
       sessionsCache.delete(sessionFile);
     }
@@ -426,6 +431,7 @@ function saveSessionRole(sessionFile, conversationId, role) {
   if (!conversationId || !role || !KNOWN_ROLES.has(role)) return;
   const now = Date.now();
   const state = loadSessions(sessionFile, now);
+  if (state.conversations[conversationId]?.role === role) return;
   const conv = ensureConv(state, conversationId, now);
   conv.role = role;
   saveSessions(sessionFile, state, now);
@@ -857,6 +863,27 @@ function handlePostToolUse(event, root, baseCwd, sessionFile, now) {
           conv.codegenTouched = true;
           dirty = true;
         }
+      }
+    }
+  }
+
+  if ((toolName === "run_command" || toolName === "bash") && state.conversations[convId]?.dirtyFiles?.length > 0) {
+    const cmdStr = str(args.CommandLine) ?? str(args.command) ?? "";
+    const match = /\bcogain-lsp\s+check\b([^;|&`\n]*)/i.exec(cmdStr);
+    if (match) {
+      const rawTokens = match[1].match(/(?:"[^"]*"|'[^']*'|[^\s"']+)/g) || [];
+      const checked = rawTokens
+        .map((t) => t.replace(/^["']|["']$/g, ""))
+        .filter((t) => t && !t.startsWith("-"))
+        .map((p) => toRepoRelative(p, baseCwd, root))
+        .filter(Boolean);
+      if (checked.length > 0) {
+        const conv = ensureConv(state, convId, now);
+        const before = conv.dirtyFiles.length;
+        conv.dirtyFiles = conv.dirtyFiles.filter(
+          (f) => !checked.some((c) => f === c || f.startsWith(c.endsWith("/") ? c : `${c}/`))
+        );
+        if (conv.dirtyFiles.length !== before) dirty = true;
       }
     }
   }

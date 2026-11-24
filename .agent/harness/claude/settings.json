@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
+            "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" claude; exec node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
             "timeout": 10,
             "statusMessage": "Kiểm tra ranh giới & contract..."
           }
@@ -16,11 +16,11 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|Task|Agent|TodoWrite|call_mcp_tool|mcp__.*",
+        "matcher": "Edit|Write|MultiEdit|Bash|Task|Agent|TodoWrite|call_mcp_tool|mcp__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
+            "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" claude; exec node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
             "timeout": 5
           }
         ]
@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
+            "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" claude; exec node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
             "timeout": 5
           }
         ]
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
+            "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" claude; exec node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
             "timeout": 5
           }
         ]
@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
+            "command": "B=\"${AGY_LSP_HOME:-$HOME/.local/share/agy-lsp}/bin/cogain-hook\"; [ -x \"$B\" ] && exec \"$B\" claude; exec node \"${CLAUDE_PROJECT_DIR:-.}/.agent/harness/claude/hook-entry.mjs\"",
             "timeout": 5
           }
         ]

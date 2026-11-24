@@ -1185,14 +1185,18 @@ const evaluatorCache = new Map();
 function findAgyRepoRoot(startDir) {
   if (!startDir || typeof startDir !== "string") return null;
   for (let dir = resolve(startDir); ; dir = dirname(dir)) {
-    if (existsSync(join(dir, ".agent", "harness", "agy", "hook-evaluator.mjs"))) return dir;
+    if (
+      existsSync(join(dir, ".agent", "harness", "agy", "hook-evaluator.mjs")) ||
+      existsSync(join(dir, ".agent", "harness", "claude", "hook-entry.mjs"))
+    ) {
+      return dir;
+    }
     const parent = dirname(dir);
     if (parent === dir) return null;
   }
 }
 
-async function loadHookEvaluator(root) {
-  const evalPath = join(root, ".agent", "harness", "agy", "hook-evaluator.mjs");
+async function loadEvaluatorModule(evalPath) {
   if (!existsSync(evalPath)) return null;
   const st = statSync(evalPath);
   const cached = evaluatorCache.get(evalPath);
@@ -1204,6 +1208,14 @@ async function loadHookEvaluator(root) {
   }
   evaluatorCache.set(evalPath, { mtimeMs: st.mtimeMs, mod });
   return mod;
+}
+
+function loadHookEvaluator(root) {
+  return loadEvaluatorModule(join(root, ".agent", "harness", "agy", "hook-evaluator.mjs"));
+}
+
+function loadClaudeHookEvaluator(root) {
+  return loadEvaluatorModule(join(root, ".agent", "harness", "claude", "hook-entry.mjs"));
 }
 
 const hookServer = net.createServer({ allowHalfOpen: true }, (socket) => {
@@ -1247,19 +1259,40 @@ const hookServer = net.createServer({ allowHalfOpen: true }, (socket) => {
         findAgyRepoRoot(callerCwd) ||
         findAgyRepoRoot(DEFAULT_WORKTREE);
 
-      let result = mode === "pre" ? { decision: "allow" } : eventObj.hookEventName === "Stop" ? { decision: "allow" } : {};
+      let result =
+        mode === "claude"
+          ? {}
+          : mode === "pre"
+          ? { decision: "allow" }
+          : eventObj.hookEventName === "Stop"
+          ? { decision: "allow" }
+          : {};
       if (root) {
-        const mod = await loadHookEvaluator(root);
-        if (mod) {
-          result =
-            mode === "pre"
-              ? await mod.evaluateAgyPreToolUse(eventObj, { callerCwd })
-              : await mod.evaluateAgyLifecycle(eventObj, { callerCwd });
+        if (mode === "claude") {
+          const claudeMod = await loadClaudeHookEvaluator(root);
+          if (claudeMod) {
+            result = (await claudeMod.evaluateClaudeHook(eventObj, { callerCwd })) || {};
+          }
+        } else {
+          const mod = await loadHookEvaluator(root);
+          if (mod) {
+            result =
+              mode === "pre"
+                ? await mod.evaluateAgyPreToolUse(eventObj, { callerCwd })
+                : await mod.evaluateAgyLifecycle(eventObj, { callerCwd });
+          }
         }
       }
       socket.end(`${JSON.stringify(result)}\n`);
     } catch {
-      const fallback = mode === "pre" ? '{"decision":"allow"}\n' : eventObj.hookEventName === "Stop" ? '{"decision":"allow"}\n' : "{}\n";
+      const fallback =
+        mode === "claude"
+          ? "{}\n"
+          : mode === "pre"
+          ? '{"decision":"allow"}\n'
+          : eventObj.hookEventName === "Stop"
+          ? '{"decision":"allow"}\n'
+          : "{}\n";
       socket.end(fallback);
     }
   });
