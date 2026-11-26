@@ -18,6 +18,11 @@ $ARGUMENTS
 - Do not create duplicate PLAN, implementation_plan, walkthrough, or handoff narratives.
 - Preserve requested measurement evidence, flame graphs, and unique runbooks/rollback instructions at their existing owner and link them; persist research only when explicitly requested in `.agent/artifacts`, never new `reports/artifacts`.
 
+## Benchmark một thao tác E2E
+
+Khi yêu cầu là đo E2E từ thao tác thật trên trình duyệt tới dữ liệu hiển thị hoặc file tải xong, áp dụng [quy trình benchmark E2E](references/e2e-benchmark.md) thay vì dùng Lighthouse làm số đo thay thế.
+`researcher` chỉ điều tra và đề xuất; `verifier` phụ trách phép đo đã được cấp quyền.
+
 ---
 
 ## 🟢 PHASE 1: Baseline Profiling

@@ -7,6 +7,10 @@ description: Muốn web chạy mượt? Tối ưu tốc độ và hiệu năng t
 
 $ARGUMENTS
 
+## Benchmark một thao tác E2E
+
+Với yêu cầu đo thao tác thật từ trình duyệt tới dữ liệu hiển thị hoặc file tải xong, dùng [quy trình benchmark E2E](../skills/performance/references/e2e-benchmark.md) và giao `verifier` thực hiện phép đo đã được cấp quyền.
+
 ## Permission & Output Contract
 
 - Audit/analyze is read-only: return findings with source citations and available measurements in chat; do not edit files or persist artifacts without explicit write permission.
