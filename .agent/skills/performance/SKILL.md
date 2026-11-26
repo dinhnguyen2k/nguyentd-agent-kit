@@ -21,7 +21,7 @@ $ARGUMENTS
 ## Benchmark một thao tác E2E
 
 Khi yêu cầu là đo E2E từ thao tác thật trên trình duyệt tới dữ liệu hiển thị hoặc file tải xong, áp dụng [quy trình benchmark E2E](references/e2e-benchmark.md) thay vì dùng Lighthouse làm số đo thay thế.
-`researcher` chỉ điều tra và đề xuất; `verifier` phụ trách phép đo đã được cấp quyền.
+Mặc định agent phụ trách thay đổi tự đo theo [quy tắc phân vai benchmark](../../rules/performance-decision-rules.md#phân-vai-benchmark).
 
 ---
 

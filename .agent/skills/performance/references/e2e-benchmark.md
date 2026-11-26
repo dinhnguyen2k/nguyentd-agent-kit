@@ -12,7 +12,10 @@ Các ca biên chỉ kiểm tính đúng, trừ khi cần kết luận hiệu nă
 Ghi cấu hình build, DB, trình duyệt, điều kiện cache và phạm vi quyền cho cả hai bản.
 - Chốt giới hạn riêng cho chuẩn bị và lấy mẫu, số lần thử lại, cùng ngưỡng cải thiện nếu đã có căn cứ; không tự đặt SLA.
 Khi hết giới hạn, xuất số đã có và trạng thái chưa đủ bằng chứng, không tự kéo dài hoặc mở rộng bài đo.
-- Giao `verifier` làm đầu mối đo từ đầu đến cuối: tái sử dụng kịch bản và driver sẵn có, không sửa mã ứng dụng hoặc test.
+- Giao agent phụ trách thay đổi làm đầu mối đo theo [quy tắc phân vai benchmark](../../../rules/performance-decision-rules.md#phân-vai-benchmark).
+Dùng kịch bản và driver sẵn có; chốt phiên bản kịch bản, bộ lọc, chỉ số và cách đối soát trước khi lấy mẫu.
+Nếu kịch bản hoặc điều kiện đo đổi giữa chừng, không ghép số cũ với số mới; chỉ đo lại hai bản trong giới hạn đã cấp hoặc báo không so sánh được.
+Cần build bản đo thì giao riêng lệnh build đã được cấp quyền và nhận lại đường dẫn bản chạy kèm mã phiên bản; đầu mối đo không đổi.
 Có thể chuẩn bị và đo bản gốc trong khi người khác sửa mã nếu môi trường bản gốc cô lập và không tranh tài nguyên; chỉ đo bản sửa khi bản build đã cố định.
 Chỉ chạy Playwright, build, app hoặc profiling trong phạm vi được người dùng cho phép.
 Không tự chạy tải trên production hoặc khởi động lại dịch vụ dùng chung.
@@ -58,6 +61,8 @@ Nếu lỗi lặp, sai phiên bản, dữ liệu trôi hoặc hết giới hạn
 
 - Báo theo từng ca: thao tác và mốc kết thúc, commit/cấu hình hai bản, fixture và quy mô, số lượt hợp lệ/tổng lần thử, median/min/max, chênh lệch, kết quả đối soát, lỗi và đường dẫn số đo thô đã che thông tin nhạy cảm.
 Không gọi max là p95; không dùng phân vị đuôi từ 7 lượt để cam kết SLA.
+- Khi thí điểm quy trình, ghi riêng thời gian chờ bản chạy, thời gian chạy bài đo hợp lệ và thời gian làm lại do môi trường.
+Dùng ba số này để quyết định nên giảm chuyển giao, sửa khâu chuẩn bị hay rút gọn bài đo; không gộp chúng vào độ trễ của ứng dụng.
 - Kết luận riêng **đúng nghiệp vụ**, **nhanh/chậm hơn có bằng chứng**, hoặc **chưa đủ bằng chứng hiệu năng**.
 Khi mức chênh không tách được khỏi nhiễu, thiếu mẫu hoặc khác ngữ nghĩa đầu ra, không kết luận có cải thiện.
 Số đo API vẫn có thể hữu ích để khoanh tầng, nhưng không được báo là E2E.

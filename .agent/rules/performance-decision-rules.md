@@ -73,6 +73,17 @@ Agent BẮT BUỘC phải đối chiếu nghiệp vụ cần triển khai với 
 4.  **DbSet.AnyAsync() vs CountAsync():** Khi chỉ muốn kiểm tra sự tồn tại của dữ liệu, sử dụng `AnyAsync()` để Postgres trả về True/False ngay lập tức, tuyệt đối không dùng `CountAsync() > 0` hoặc `.ToListAsync()`.
 5.  **Zero-Allocation gRPC Collections:** Danh sách lặp trả về từ Protobuf (`RepeatedField<T>`) bản chất đã là in-memory list (`IReadOnlyList<T>`, `IList<T>`). Tuyệt đối không gọi `.ToList()` hoặc clone `[..]` sang `List<T>` mới; khai báo hàm trả về `IReadOnlyList<T>` và trả trực tiếp `RepeatedField<T>`.
 
+### Phân vai benchmark
+
+- Agent phụ trách thay đổi mặc định sở hữu bài benchmark đã được người dùng cho phép, từ chọn phép đo, kiểm bản gốc đến đo bản sửa và bàn giao bằng chứng.
+Nếu thay đổi qua nhiều tầng, chỉ định một đầu mối cho phép đo E2E; không tách người chạy và người đọc kết quả chỉ vì bài đo đi qua frontend và backend.
+- Tự đo trên bản chạy đã khóa, bằng kịch bản đã được chốt.
+Nếu cần build hoặc chạy bộ test chính thức, chỉ giao đúng việc đó cho vai trò có quyền hiện hành; không chuyển giao cả bài đo.
+Không dùng kịch bản benchmark để chạy vòng qua quy tắc build, test, quyền ghi test hay ghi dữ liệu.
+- Không mặc định gọi `verifier` chạy lại benchmark.
+Khi cần xác nhận độc lập hoặc người dùng yêu cầu, `verifier` đọc bằng chứng trước; chỉ đo lại phép so sánh cần xác nhận trong phạm vi được phép.
+- Áp dụng [quy trình benchmark E2E](../skills/performance/references/e2e-benchmark.md) để chốt dữ liệu, cách đối soát và điều kiện dừng trước khi lấy mẫu.
+
 ### 2.2. Frontend React / Zustand / TanStack Query
 1.  **Stable Query Keys:** Đảm bảo key của `useQuery` luôn nhất quán để tận dụng tối đa cơ chế cache của TanStack Query, tránh fetch lại dữ liệu không cần thiết.
 2.  **Memoize Computations:** Sử dụng `useMemo` cho các hàm biến đổi dữ liệu, filter mảng phức tạp tại client, và `useCallback` cho các event handler truyền xuống component con để giảm re-render.

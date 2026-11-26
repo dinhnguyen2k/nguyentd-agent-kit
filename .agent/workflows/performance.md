@@ -9,7 +9,7 @@ $ARGUMENTS
 
 ## Benchmark một thao tác E2E
 
-Với yêu cầu đo thao tác thật từ trình duyệt tới dữ liệu hiển thị hoặc file tải xong, dùng [quy trình benchmark E2E](../skills/performance/references/e2e-benchmark.md) và giao `verifier` thực hiện phép đo đã được cấp quyền.
+Với yêu cầu đo thao tác thật từ trình duyệt tới dữ liệu hiển thị hoặc file tải xong, dùng [quy trình benchmark E2E](../skills/performance/references/e2e-benchmark.md) và giao agent phụ trách thay đổi làm đầu mối đo trong phạm vi được cấp quyền.
 
 ## Permission & Output Contract
 
