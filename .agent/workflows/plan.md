@@ -224,6 +224,7 @@ Nhánh phụ thuộc chỉ chờ đúng phần nó cần, không chờ toàn b�
   - BE: `ocelot.json`, `*DbContext.cs` (`DbSet`), `*ModelSnapshot.cs` và migration, `MappingProfile.cs`, `ServiceExtensions.cs`/`ConfigureServices.cs`, `Program.cs`, `appsettings.json` (tiền tố sinh mã), `*InfoGrpcService.cs`.
   - FE: `src/i18n/index.ts`, `permission.enum.ts`, `parent-sidebar-constants.ts`, các barrel `index.ts` trong `frontend/shared`.
   - `routeTree.gen.ts` được sinh tự động và bị gitignore nên không thuộc danh sách này.
+  - Khi sửa `BuildingBlocks/**`, `frontend/shared/**` hoặc `.proto`, bắt buộc quét hết caller liên service/app bằng `rg`/`find_references` để đưa vào danh sách sửa; trong `MappingProfile.cs`, `opt.MapFrom(...)` phải giữ cú pháp cây biểu thức (`==`/`||`, cấm `is ... or/and`, rule `R10`).
 - **Lịch giao**: task index trong overview ghi phụ thuộc kèm loại và thêm một dòng đường găng (chuỗi phụ thuộc chặn dài nhất).
   Main ưu tiên giao TASK trên đường găng và TASK mở khóa nhiều nhánh nhất, giữ trần 2-4 nhánh song song.
   TASK M0 và pilot được nghiệm thu ngay khi bàn giao vì nhiều nhánh đang chờ chúng.
@@ -260,6 +261,7 @@ Không cần bug runtime mới được báo rủi ro bảo trì cụ thể: cá
 Với log hoặc scaffolding chỉ phục vụ điều tra do task thêm vào, Main xác định phần cần giữ cho vận hành và yêu cầu bỏ phần không còn cần trước bàn giao; không xóa log nghiệp vụ/vận hành chỉ để giảm dòng.
 Chỉ kết luận trên phần source đã đọc đủ; output bị cắt hoặc thiếu thân hàm/caller liên quan thì phải đọc phần còn thiếu trước khi khẳng định đã bảo toàn hành vi.
 LSP của revision cuối do worker bàn giao là nguồn chẩn đoán; Main không gọi lại cùng file nếu source chưa đổi và không có mâu thuẫn cụ thể.
+Nếu LSP ở trạng thái `circuit-open` hoặc nhánh sửa `.proto`/contract dùng chung qua nhiều worker, đọc mắt không chứng nhận an toàn biên dịch - mọi bước đẩy/merge vào `develop` bắt buộc phải qua cổng biên dịch cục bộ trong `gitlab-mr.mjs`.
 Thiếu hoặc cũ thì trả đúng worker bổ sung, không mở một vòng audit/diagnostics khác thay worker.
 Handoff đầu tiên phải nêu file đổi, LSP ở revision cuối, finding còn mở và trạng thái advisor có bằng chứng; chưa nhận được review thì ghi `not available`, không suy thành PASS.
 Main chỉ yêu cầu bổ sung phần thực sự thiếu để nghiệm thu, không nhắn agent idle hỏi lại trạng thái đã bàn giao.

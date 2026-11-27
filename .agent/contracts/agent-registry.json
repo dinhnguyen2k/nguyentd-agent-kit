@@ -202,7 +202,7 @@
           "maintainer"
         ],
         "echo_command": true,
-        "deny_message": "Permission Denied: build/typecheck ON-DEMAND ONLY, chỉ chạy khi user yêu cầu rõ ràng. CI parity qua verifier/maintainer; test-author chỉ chạy trong phạm vi test được cấp. Worker và main không tự build.",
+        "deny_message": "Permission Denied: build/typecheck trực tiếp trong lúc code chỉ chạy khi user yêu cầu rõ (ON-DEMAND ONLY; CI parity qua verifier/maintainer, còn cổng biên dịch trước khi tạo/merge MR Ready tự chạy bên trong gitlab-mr.mjs). Worker và main không tự gọi build lẻ.",
         "patterns": [
           "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*dotnet\\s+(?:build|publish|msbuild)\\b(?!-)",
           "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*msbuild\\b",
@@ -388,6 +388,15 @@
             "pattern": "@ts-ignore\\b",
             "message": "Cấm dùng '@ts-ignore' che giấu lỗi kiểu tĩnh. Hãy khai báo đúng kiểu từ DTO/@shared/types hoặc tra tài liệu gốc qua context7.",
             "source_feedback": "code-quality.md & continuous-research: chống tắt kiểm tra kiểu tĩnh"
+          },
+          {
+            "id": "no-automapper-expression-pattern",
+            "path_globs": [
+              "backend/**/*MappingProfile*.cs"
+            ],
+            "pattern": "\\.MapFrom\\s*\\([^;]{0,500}?\\bis\\s+(?:not\\s+)?[A-Za-z0-9_.]+\\s+(?:or|and)\\b",
+            "message": "Cấm dùng pattern-matching 'is ... or/and ...' bên trong AutoMapper '.MapFrom(...)' vì biểu thức cây C# (Expression<Func<...>>) gây lỗi biên dịch CS8122. Hãy dùng '==' / '!=' kết hợp '||' / '&&'.",
+            "source_feedback": "CS8122 trong MappingProfile.cs khi dùng is ... or ... trong opt.MapFrom"
           }
         ]
       }

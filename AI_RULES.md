@@ -17,7 +17,7 @@
 - **CẤM tự ý chạy lệnh nặng**: build, lint, typecheck, test, codegen, format chỉ chạy khi user nêu đích danh hành động (`run build`, `typecheck`, `run tests`, `/verify`). Ngoại lệ: quy trình migration CI khi đổi schema DB theo `.agent/rules/backend.md` §4.6.
 - Không suy diễn quyền từ checklist, task tier hay thông lệ. User intent là quyết định.
 - Trước khi bàn giao thay đổi mã nguồn, xử lý sạch lỗi chẩn đoán tĩnh (syntax/type/compile) trên các tệp vừa sửa khi môi trường có công cụ chẩn đoán ngôn ngữ. Chẩn đoán tĩnh không phải validation command và không dùng làm bằng chứng `Status: verified`; không có yêu cầu validation thì ghi: `Validation: not run - not requested`.
-- Cấm build trực tiếp (bị chặn bởi guard R8); `.agent/scripts/ci-parity.sh` chỉ chạy khi user yêu cầu rõ ràng.
+- Cấm build trực tiếp khi code (R8); `.agent/scripts/ci-parity.sh` chỉ chạy khi user yêu cầu rõ hoặc tự động trong cổng MR (`gitlab-mr.mjs`).
 - Cấm tự chạy app/build/test để reproduce bug trừ khi được yêu cầu đích danh.
 
 ## 3. Nguồn Sự Thật & Phân Tầng Tự Quyết (Xanh - Vàng - Đỏ)
@@ -75,3 +75,4 @@ Phân biệt rõ: **Hiện trạng** / **Đề xuất** / **Đã thay đổi**.
 - Thấy build fail, lint error, test fail/flaky trong tầm nhìn của task thì xử lý; đỏ trong cây test không thuộc quyền sửa của agent triển khai thì báo `test-spec-conflict`.
 - Lỗi lặp lại có tính hệ thống đưa vào regression test hẹp nhất hoặc skill sở hữu nó, không nhét vào prompt toàn cục.
 - Warning/hint thẩm mỹ chỉ sửa trên dòng đang chạm (`.agent/rules/code-style-concise.md`).
+- Đổi DTO/enum/`.proto` dùng chung (`BuildingBlocks/**`, `frontend/shared/**`): bắt buộc quét hết caller (`find_references`/`rg`) và sửa đồng bộ trước bàn giao.

@@ -1117,6 +1117,29 @@
       "options": { "checkoutRoots": ["/srv/cogain-core-hotfix"] },
       "expected_decision": "deny",
       "expected_rule": "R10-no-double-cast-unknown"
+    },
+    {
+      "id": "R10-invalid-automapper-expression-pattern",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/ERP/ERP.Services/AutoMapperConfig/MappingProfile.cs",
+          "new_string": ".ForMember(d => d.SourceDocumentId, opt => opt.MapFrom(src => src.SourceType is EInventoryTransferSourceType.Unspecified or EInventoryTransferSourceType.ProductionOrder ? src.ProductionOrderId : null))"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-automapper-expression-pattern"
+    },
+    {
+      "id": "R10-valid-automapper-equality",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "backend/src/Services/ERP/ERP.Services/AutoMapperConfig/MappingProfile.cs",
+          "new_string": ".ForMember(d => d.SourceDocumentId, opt => opt.MapFrom(src => (src.SourceType == EInventoryTransferSourceType.Unspecified || src.SourceType == EInventoryTransferSourceType.ProductionOrder) ? src.ProductionOrderId : null))"
+        }
+      },
+      "expected_decision": "allow"
     }
   ]
 }
