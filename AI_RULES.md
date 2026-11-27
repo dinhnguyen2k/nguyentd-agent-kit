@@ -14,7 +14,7 @@
 - **READ-ONLY INTENT** (`inspect`, `analyze`, `review`, `check`, `xem`, `phân tích`, `đánh giá`): CHỈ ĐỌC. CẤM sửa file, CẤM chạy build, lint, typecheck, test, format, codegen hay lệnh ghi.
 - **Proposal**: Chỉ giải thích phương án và đánh đổi. CẤM sửa code khi chưa có yêu cầu `fix`, `edit`, `sửa`, `triển khai` rõ ràng.
 - **Implementation**: Chỉ sửa trong phạm vi yêu cầu. Sửa code KHÔNG cấp quyền chạy lệnh validation.
-- **CẤM tự ý chạy lệnh nặng**: build, lint, typecheck, test, codegen, format chỉ chạy khi user nêu đích danh hành động (`run build`, `typecheck`, `run tests`, `/verify`). Ngoại lệ: `./dev.sh add-migration` khi triển khai đổi schema DB, theo `.agent/rules/backend.md` §4.6.
+- **CẤM tự ý chạy lệnh nặng**: build, lint, typecheck, test, codegen, format chỉ chạy khi user nêu đích danh hành động (`run build`, `typecheck`, `run tests`, `/verify`). Ngoại lệ: quy trình migration CI khi đổi schema DB theo `.agent/rules/backend.md` §4.6.
 - Không suy diễn quyền từ checklist, task tier hay thông lệ. User intent là quyết định.
 - Trước khi bàn giao thay đổi mã nguồn, xử lý sạch lỗi chẩn đoán tĩnh (syntax/type/compile) trên các tệp vừa sửa khi môi trường có công cụ chẩn đoán ngôn ngữ. Chẩn đoán tĩnh không phải validation command và không dùng làm bằng chứng `Status: verified`; không có yêu cầu validation thì ghi: `Validation: not run - not requested`.
 - Cấm build trực tiếp (bị chặn bởi guard R8); `.agent/scripts/ci-parity.sh` chỉ chạy khi user yêu cầu rõ ràng.
@@ -28,7 +28,7 @@ Khi gặp điểm chưa tường minh hoặc doc/comment cũ lệch code, phân 
 - **Vùng Đỏ (Cửa 1 chiều & Kiến trúc nghiệp vụ gốc)**: công thức tiền/lương/quyền/tồn kho/mốc hiệu lực chưa có tiền lệ rõ, breaking public contract, schema DB/migration phá huỷ, mâu thuẫn nghiệp vụ thật sự -> cấm tự đoán; đóng gói câu hỏi kèm đề xuất có bằng chứng vào `Hộp thư Quyết định`, **chỉ treo riêng nhánh vướng Vùng Đỏ hoặc lỗi công cụ/worktree/guard cục bộ** (cùng nhánh phụ thuộc trực tiếp), bắt buộc chạy xuyên suốt hết các nhánh độc lập còn lại và cấm dừng phiên sau báo cáo tiến độ trung gian khi còn hạng mục sẵn sàng.
 
 ## 4. Cổng An Toàn (Safety Gates)
-- Cấm tự ý chạy `git commit`. Chỉ chạy khi user yêu cầu rõ ràng.
+- Cấm tự ý `git commit`, trừ luồng migration CI (`.agent/rules/backend.md` §4.6) hoặc khi user yêu cầu rõ.
 - Cấm lệnh phá huỷ DB (drop/truncate/delete hàng loạt) khi không có yêu cầu rõ ràng.
 - Tuyệt đối không để lộ secret/token trong code, log, hay báo cáo.
 - Thay đổi phải cục bộ nhỏ nhất và tương thích ngược.

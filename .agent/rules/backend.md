@@ -9,16 +9,10 @@ interruptMode: never
 
 # BACKEND.MD - Quy Tắc Miền Backend Cogain
 
-> Mục tiêu: Tối giản hóa context và chuẩn hóa các quy tắc Backend (ASP.NET Core 8 microservices).
-
----
-
 ## 0. Ưu Tiên Và Phạm Vi
 
 1. `AI_RULES.md` là source of truth cao nhất. Rule này chỉ là extension cho backend domain.
 2. Scope áp dụng: `backend/src/**`, `backend/tests/**`, các file config backend.
-
----
 
 ## 1. Kiến Trúc Bắt Buộc
 
@@ -80,9 +74,9 @@ interruptMode: never
    - Lưu khóa ngoại ID và dùng quan hệ/navigation, projection/join hoặc lookup theo ID để lấy code/name từ entity nguồn.
    - Quy tắc áp dụng cho entity, DTO ghi dữ liệu, mapping và các luồng CRUD/import; DTO đọc được phép trả code/name được resolve từ entity nguồn, không lưu snapshot.
    - Không tự ý xóa field snapshot đang tồn tại hoặc tạo migration khi áp dụng rule này; việc chuyển đổi dữ liệu cũ cần yêu cầu triển khai riêng.
-6. **EF Core Migration**: CẤM TUYỆT ĐỐI tự viết tay file migration; chỉ được tạo/gỡ migration qua `./dev.sh add-migration <Service> <MigrationName>` và `./dev.sh remove-migration <Service>` (chỉ migration chưa apply). CẤM TUYỆT ĐỐI sửa file migration/snapshot đã sinh để pass logic; nếu sai sót bắt buộc phải sửa từ Entity/Fluent API Configuration, `remove-migration` rồi sinh lại.
-   - **Migration ngầm định**: Yêu cầu triển khai đổi schema (cột, bảng, index, cấu hình EF) coi như cho phép Main chạy `add-migration` một lần mỗi service sau khi nghiệm thu Entity/Configuration, đóng băng ghi backend khi chạy; specialist không tự chạy.
-   - Main đọc migration sinh ra: drift ngoài phạm vi thì báo user, đề xuất `remove-migration`, không sửa tay; `update-db` và thao tác phá huỷ DB vẫn cần yêu cầu đích danh.
+6. **EF Core Migration & CI**: Cấm tự viết/sửa tay migration hoặc snapshot; chỉ tạo/gỡ qua `./dev.sh add-migration|remove-migration` (nếu sai sửa Entity/Configuration, `remove-migration` rồi sinh lại). **Cấm chạy hoặc nhắc user chạy `update-db` lên DB dev dùng chung** - DB áp tự động qua GitLab CI (`migrate:<service>-api:dev` trong `.gitlab/ci/migrate.yml`).
+   - **Quy trình bắt buộc khi đổi schema**: Sau khi nghiệm thu Entity/Configuration, Main đóng băng ghi backend, chạy `add-migration` (1 lần/service, kiểm drift), tự `git commit` riêng phạm vi thay đổi + migration trên nhánh tính năng, tạo MR vào `develop`, tự động merge và giám sát pipeline `migrate:<service>-api:dev` pass xanh mới tính là xong (specialist không tự chạy).
+   - Dừng báo ngay (không ép merge, không bỏ qua lỗi) nếu có drift ngoài phạm vi, đang ở nhánh bảo vệ, conflict/chặn merge, hoặc pipeline build/migrate fail.
 7. **Default cột non-null mới**: Giá trị khởi tạo C# không thành default DB (EF sinh `defaultValue: 0`). Cột enum/bool/số có default nghiệp vụ khác `default(T)` phải khai báo `HasDefaultValue(...)` trong Configuration trước `add-migration`.
 
 ---

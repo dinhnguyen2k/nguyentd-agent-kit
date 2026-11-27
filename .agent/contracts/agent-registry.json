@@ -224,7 +224,7 @@
           "maintainer"
         ],
         "echo_command": true,
-        "deny_message": "Permission Denied: Agent không chạy trực tiếp dotnet ef migrations add/remove, dotnet ef database update hoặc update-db. Sinh/gỡ migration chưa apply chỉ qua ./dev.sh add-migration|remove-migration: Main được chạy add-migration một lần mỗi service khi task có đổi schema (backend.md §4.6), ngoài ra cần user yêu cầu rõ ràng; không tự áp DB hoặc sửa tay migration/snapshot.",
+        "deny_message": "Permission Denied: Agent không chạy trực tiếp dotnet ef migrations add/remove, dotnet ef database update hoặc update-db. Sinh/gỡ migration chưa apply chỉ qua ./dev.sh add-migration|remove-migration (Main chạy 1 lần/service khi đổi schema, sau đó commit riêng phạm vi migration, tạo MR vào develop, tự động merge và giám sát pipeline CI migrate-dev pass theo backend.md §4.6); không áp DB cục bộ hoặc sửa tay migration/snapshot.",
         "patterns": [
           "\\bdotnet\\s+ef\\s+migrations\\s+(add|remove)\\b",
           "\\bdotnet\\s+ef\\s+database\\s+update\\b",

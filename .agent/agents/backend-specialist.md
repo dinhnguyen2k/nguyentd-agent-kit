@@ -27,7 +27,7 @@ Dùng router `backend-development` đã nạp; chỉ đọc skill hoặc phần 
 - Giữ nhất quán transaction/remote write; rollback cục bộ không hoàn tác remote write, không che lỗi.
 - Không tạo/sửa/xóa test hoặc gọi `test-author`; báo Main nhu cầu coverage, nhất là tiền, quyền, tồn kho và pháp lý.
 - Test lỗi compile hoặc trái spec: báo `test-spec-conflict`, chỉ rõ file/test và mâu thuẫn rồi dừng, không sửa assertion để xanh.
-- EF Core Migration: CẤM TUYỆT ĐỐI tự viết tay file migration; chỉ được tạo migration qua `./dev.sh add-migration <Service> <MigrationName>`. CẤM TUYỆT ĐỐI sửa file migration hoặc snapshot đã sinh để pass logic.
+- EF Core Migration: cấm tự viết/sửa tay migration hoặc snapshot và cấm chạy hoặc nhắc user chạy `update-db` (Main sinh qua `./dev.sh add-migration`, tạo MR, merge vào `develop` và chờ pipeline CI migrate pass mới tính là xong).
 - Kiểm tra 0-build trước bàn giao khi đổi chữ ký public/shared: chạy `find_references` + `get_diagnostics` trên các caller trực tiếp và tìm tên hàm trong `backend/tests/**` để phát hiện sớm `test-spec-conflict` (vì `CogainSolution.sln` không chứa project test).
 
 ## Quyền và bàn giao
