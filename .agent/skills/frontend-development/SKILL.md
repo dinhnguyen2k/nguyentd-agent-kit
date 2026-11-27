@@ -30,7 +30,7 @@ Reuse this router and skills already in context; read only missing skills or nee
 Every matching registry trigger requires its owning skill before the related decision, whether the trigger appears in the request or is discovered while inspecting relevant source/consumers.
 Matching a trigger does not authorize a worker to reopen design or expand scope.
 
-Load the smallest set that satisfies those mandatory triggers. Context reuse never replaces inspection of affected source, nearest patterns/tests, or shared consumers according to risk. Do not load visual-design, browser, accessibility, and performance guidance for every routine code change.
+Load the smallest set that satisfies those mandatory triggers. Context reuse never replaces inspection of affected source, nearest patterns/tests, or shared consumers according to risk. When creating or expanding any screen, detail view, form, or dialog/sheet, MUST load [Cogain UI Guide](references/cogain-ui-guide.md) and [UI Review Taxonomy](references/ui-review-taxonomy.md) and anchor layout/toolbar/density to the nearest sibling screen of the same business family in the same app; skip visual/browser references only on pure non-UI hook/service/data edits.
 
 Không nạp reference search/filter khi task chỉ sửa layout, màu sắc, form, mutation hoặc bảng không thay đổi hành vi tìm kiếm/lọc.
 
@@ -68,6 +68,7 @@ Read the Cogain-native references on demand when checking UI states, layout, con
 - The changed app follows route -> hook/query -> service boundaries.
 - Form/API and enum/nullability contracts remain aligned.
 - Shared changes were checked against multiple consumers.
+- When browser/E2E verification is requested for UI screens, run Stage 1 ([UI Visual Gate](../playwright-skill/sub-skills/ui-visual-gate.md)) right after FE completes (`auditUiSurface` + side-by-side screenshot `Read` critique against the sibling exemplar, using `mockApiStates` if BE/DB is not yet live) before Stage 2 (`Business E2E`).
 - Validation status is explicit. Use `not run - not requested` when implementation
   was requested without validation. A skill or workflow cannot grant validation
   permission on the user's behalf.

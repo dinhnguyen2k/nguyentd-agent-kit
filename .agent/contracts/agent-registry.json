@@ -397,6 +397,18 @@
             "pattern": "\\.MapFrom\\s*\\([^;]{0,500}?\\bis\\s+(?:not\\s+)?[A-Za-z0-9_.]+\\s+(?:or|and)\\b",
             "message": "Cấm dùng pattern-matching 'is ... or/and ...' bên trong AutoMapper '.MapFrom(...)' vì biểu thức cây C# (Expression<Func<...>>) gây lỗi biên dịch CS8122. Hãy dùng '==' / '!=' kết hợp '||' / '&&'.",
             "source_feedback": "CS8122 trong MappingProfile.cs khi dùng is ... or ... trong opt.MapFrom"
+          },
+          {
+            "id": "no-native-select",
+            "path_globs": [
+              "frontend/**/*.tsx"
+            ],
+            "exclude_globs": [
+              "frontend/shared/ui/**/*.tsx"
+            ],
+            "pattern": "<select(?:\\s|>)",
+            "message": "Cấm dùng thẻ <select> HTML thô. Hãy dùng 'Select', 'CustomSelect' hoặc 'LazyCombobox' từ '@shared' để đồng bộ giao diện và portal.",
+            "source_feedback": "ui-review-taxonomy.md: cấm tự dựng <select> thô lệch hệ thống"
           }
         ]
       }

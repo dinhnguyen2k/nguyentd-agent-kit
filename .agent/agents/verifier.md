@@ -57,6 +57,11 @@ Never rely on truncated `tail -n 40`. Extract **all unique root errors grouped b
 
 Audit `backend/src/**` diff against the 4 gaming routes in `.agent/rules/test-enforcement.md` §2, plus transaction boundaries, repeated `IEnumerable` enumeration, record value equality, and inconsistent data sources. Do not run formatters unless requested.
 
+### 6. Two-Stage Browser UI & E2E Gate (when browser check is authorized)
+
+- **Stage 1 (`UI Visual Gate`)**: Run `.agent/skills/playwright-skill/lib/ui-visual-audit.js` (`auditUiSurface` + `captureSideBySideEvidence`, using `mockApiStates` if BE/DB is not yet live; keep `allowed_paths: []` and write ephemeral script to `/tmp/playwright-*.js`) at `1440x900` & `1280x800`, then `Read` exemplar and target `.png` screenshots to grade against `ui-review-taxonomy.md`. Fail on any **Hỏng** or **Lệch hệ**.
+- **Stage 2 (`Business E2E`)**: Verify real end-to-end business flows after BE + DB migration are live.
+
 ## Report
 
 Return `status` (`pass`/`fail`/`blocked`), `boundary`, `red_check`, `evidence` (command, exit code, refs), `criteria`, `regressions`, `residual_risks`. Hand `fail` back to the implementer; never patch source.

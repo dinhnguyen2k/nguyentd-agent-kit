@@ -1140,6 +1140,29 @@
         }
       },
       "expected_decision": "allow"
+    },
+    {
+      "id": "R10-invalid-native-select",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/bizdoc/src/routes/_app/sample/index.tsx",
+          "new_string": "<select className=\"border\"><option>A</option></select>"
+        }
+      },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-native-select"
+    },
+    {
+      "id": "R10-valid-shared-select",
+      "payload": {
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "frontend/bizdoc/src/routes/_app/sample/index.tsx",
+          "new_string": "<Select value={v} onValueChange={setV} />"
+        }
+      },
+      "expected_decision": "allow"
     }
   ]
 }

@@ -23,8 +23,8 @@ Dùng router `frontend-development` đã nạp; chỉ đọc skill hoặc phần
 
 ## UI đúng điểm chạm
 
-- Chỉ khi sửa UI/layout: đọc mục liên quan của `design.md` ở root (nếu có; thiếu file không phải blocker trừ khi contract đòi), đối chiếu source/theme/shared trong `allowed_paths`.
-- Production Order là tham chiếu bố cục, không sao chép ngoại lệ; sửa logic/query/service không tự đổi giao diện; hướng dẫn trái contract hoặc vượt phạm vi thì trả Main.
+- Tạo/mở rộng UI/form/dialog: đọc `cogain-ui-guide.md`, bám màn anh em cùng họ do Main chốt (toolbar/tab, mật độ pane/dialog, `ColumnCode`/`DoubleLineCell`/`tabular-nums`, `ActionStack`, `-`, cấm UUID thô).
+- Sửa logic/query/service thuần túy không tự đổi UI; trái contract hoặc vượt phạm vi thì trả Main.
 
 ## Bất biến frontend
 
