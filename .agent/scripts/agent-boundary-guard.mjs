@@ -14,7 +14,7 @@
  *   R6 db-destructive   - drop/truncate/delete không WHERE trên DB, chặn mọi role.
  *   R7 migration-write  - cấm tự viết/sửa file migration/snapshot EF Core.
  *   R8 build-runner     - build/typecheck chỉ khi user yêu cầu; role được phép theo registry.
- *   R9 migration-runner - cấm tự sinh/chạy migration EF Core (add-migration, dotnet ef).
+ *   R9 migration-runner - cấm chạy trực tiếp dotnet ef migrations add/remove, database update, update-db; sinh migration chỉ qua ./dev.sh add-migration.
  *   R10 code-conventions - chặn mẫu code frontend bị cấm (@shared barrel, .uuid(), .catch('')).
  *
  * Fail-open có chủ đích: lỗi nội bộ của guard không làm hỏng tool call.
@@ -137,6 +137,35 @@ function toRepoRelative(p, rootDir) {
   if (normalized === root) return "";
   if (normalized.startsWith(`${root}/`)) normalized = normalized.slice(root.length + 1);
   return normalized.replace(/^\/+/, "").replace(/^\.\//, "");
+}
+
+/**
+ * Gốc checkout (thư mục chứa `.git`) gần nhất của đường dẫn tuyệt đối nằm ngoài root.
+ * Sandbox truyền `knownRoots` để fixture không phụ thuộc đĩa thật.
+ */
+function findCheckoutRoot(absPath, knownRoots) {
+  if (knownRoots) {
+    const roots = knownRoots.map((r) => String(r).replace(/\\/g, "/").replace(/\/+$/, ""));
+    return roots.filter((r) => absPath.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0] ?? null;
+  }
+  for (let dir = dirname(absPath); dir !== dirname(dir); dir = dirname(dir)) {
+    if (existsSync(join(dir, ".git"))) return dir;
+  }
+  return null;
+}
+
+/**
+ * Quy đường dẫn ghi về dạng tương đối theo đúng checkout chứa nó (repo gốc, git worktree hoặc Treehouse),
+ * để R2/R4/R7/R10 áp cùng glob `backend/**`, `frontend/**` thay vì lệch thành `home/...`.
+ */
+function resolveWriteTarget(p, rootDir, knownRoots) {
+  const normalized = String(p || "").replace(/\\/g, "/");
+  const root = rootDir.replace(/\\/g, "/");
+  if (/^(?:\/|[A-Za-z]:\/)/.test(normalized) && normalized !== root && !normalized.startsWith(`${root}/`)) {
+    const checkout = findCheckoutRoot(normalized, knownRoots);
+    if (checkout) return { base: checkout, rel: toRepoRelative(normalized, checkout) };
+  }
+  return { base: rootDir, rel: toRepoRelative(normalized, rootDir) };
 }
 
 function knownRoles(registry) {
@@ -419,7 +448,11 @@ export function evaluateBoundaryPayload(payload, options = {}) {
     }
 
     if (["Edit", "Write", "MultiEdit", "NotebookEdit"].includes(tool)) {
-      const target = toRepoRelative(input.file_path || input.notebook_path || "", root);
+      const { base: targetRoot, rel: target } = resolveWriteTarget(
+        input.file_path || input.notebook_path || "",
+        root,
+        sandbox ? options.checkoutRoots || [] : undefined
+      );
       if (!target) return { decision: "allow" };
 
       const r3 = rules.self_protect || {};
@@ -453,7 +486,7 @@ export function evaluateBoundaryPayload(payload, options = {}) {
           role,
           `Permission Denied: ${target} là file migration/snapshot EF Core.\n\n` +
             `CẤM TUYỆT ĐỐI Agent tự viết tay hoặc chỉnh sửa file migration/snapshot.\n` +
-            `Sai sót phải sửa từ Entity hoặc Fluent API Configuration rồi để người dùng tự sinh migration bằng add-migration.`
+            `Sai sót phải sửa từ Entity hoặc Fluent API Configuration, ./dev.sh remove-migration rồi sinh lại bằng ./dev.sh add-migration (Main chạy khi task có đổi schema, theo backend.md §4.6).`
         );
       }
 
@@ -515,7 +548,7 @@ export function evaluateBoundaryPayload(payload, options = {}) {
             const targetService = m[1];
             if (targetService === currentService || NON_SERVICE_BACKEND_NAMESPACES.has(targetService)) continue;
             if (checkFs) {
-              const servicesDir = join(root, "backend", "src", "Services");
+              const servicesDir = join(targetRoot, "backend", "src", "Services");
               if (existsSync(servicesDir) && !existsSync(join(servicesDir, targetService))) continue;
             }
             return denyResult(
@@ -534,14 +567,14 @@ export function evaluateBoundaryPayload(payload, options = {}) {
             const spec = m[1];
             let resolvedAsset = null;
             if (spec.startsWith("./") || spec.startsWith("../")) {
-              resolvedAsset = resolve(dirname(join(root, target)), spec);
+              resolvedAsset = resolve(dirname(join(targetRoot, target)), spec);
             } else if (spec.startsWith("@/")) {
-              resolvedAsset = resolve(root, "frontend", appName, "src", spec.slice(2));
+              resolvedAsset = resolve(targetRoot, "frontend", appName, "src", spec.slice(2));
             } else if (spec.startsWith("@shared/")) {
-              resolvedAsset = resolve(root, "frontend", "shared", spec.slice("@shared/".length));
+              resolvedAsset = resolve(targetRoot, "frontend", "shared", spec.slice("@shared/".length));
             }
             if (resolvedAsset && !existsSync(resolvedAsset)) {
-              const relResolved = toRepoRelative(resolvedAsset, root) || resolvedAsset;
+              const relResolved = toRepoRelative(resolvedAsset, targetRoot) || resolvedAsset;
               return denyResult(
                 "R10-missing-static-asset",
                 role,

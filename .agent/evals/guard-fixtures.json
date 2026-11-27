@@ -1086,6 +1086,37 @@
       "options": { "envRole": "researcher" },
       "expected_decision": "deny",
       "expected_rule": "R4-gate-readonly-shell"
+    },
+    {
+      "id": "R8-valid-dotnet-build-server-shutdown",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cd ~/cogain/cogain-core && dotnet build-server shutdown >/dev/null 2>&1; lsof .agent/scratch/.runtime/ci-parity.lock" } },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R8-invalid-chained-dotnet-build",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "dotnet build-server shutdown && dotnet build backend/CogainSolution.sln" } },
+      "expected_decision": "deny",
+      "expected_rule": "R8-build-runner"
+    },
+    {
+      "id": "R4-valid-backend-specialist-sibling-worktree",
+      "payload": { "tool_name": "Write", "tool_input": { "file_path": "/srv/cogain-core-hotfix/backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/OvertimeRequestService.cs", "content": "namespace ServiceDesk.Services;" } },
+      "options": { "envRole": "backend-specialist", "checkoutRoots": ["/srv/cogain-core-hotfix"] },
+      "expected_decision": "allow"
+    },
+    {
+      "id": "R2-invalid-sibling-worktree-test-write",
+      "payload": { "tool_name": "Write", "tool_input": { "file_path": "/srv/cogain-core-hotfix/backend/tests/HR.Tests/LeaveTests.cs", "content": "class LeaveTests {}" } },
+      "options": { "envRole": "backend-specialist", "checkoutRoots": ["/srv/cogain-core-hotfix"] },
+      "expected_decision": "deny",
+      "expected_rule": "R2-test-write"
+    },
+    {
+      "id": "R10-invalid-sibling-worktree-double-cast",
+      "payload": { "tool_name": "Write", "tool_input": { "file_path": "/srv/cogain-core-hotfix/frontend/crm/src/utils/map.ts", "content": "const x = y as unknown as Foo;" } },
+      "options": { "checkoutRoots": ["/srv/cogain-core-hotfix"] },
+      "expected_decision": "deny",
+      "expected_rule": "R10-no-double-cast-unknown"
     }
   ]
 }

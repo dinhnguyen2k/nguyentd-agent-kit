@@ -14,7 +14,7 @@
 - **READ-ONLY INTENT** (`inspect`, `analyze`, `review`, `check`, `xem`, `phân tích`, `đánh giá`): CHỈ ĐỌC. CẤM sửa file, CẤM chạy build, lint, typecheck, test, format, codegen hay lệnh ghi.
 - **Proposal**: Chỉ giải thích phương án và đánh đổi. CẤM sửa code khi chưa có yêu cầu `fix`, `edit`, `sửa`, `triển khai` rõ ràng.
 - **Implementation**: Chỉ sửa trong phạm vi yêu cầu. Sửa code KHÔNG cấp quyền chạy lệnh validation.
-- **CẤM tự ý chạy lệnh nặng**: build, lint, typecheck, test, codegen, format chỉ chạy khi user nêu đích danh hành động (`run build`, `typecheck`, `run tests`, `/verify`).
+- **CẤM tự ý chạy lệnh nặng**: build, lint, typecheck, test, codegen, format chỉ chạy khi user nêu đích danh hành động (`run build`, `typecheck`, `run tests`, `/verify`). Ngoại lệ: `./dev.sh add-migration` khi triển khai đổi schema DB, theo `.agent/rules/backend.md` §4.6.
 - Không suy diễn quyền từ checklist, task tier hay thông lệ. User intent là quyết định.
 - Trước khi bàn giao thay đổi mã nguồn, xử lý sạch lỗi chẩn đoán tĩnh (syntax/type/compile) trên các tệp vừa sửa khi môi trường có công cụ chẩn đoán ngôn ngữ. Chẩn đoán tĩnh không phải validation command và không dùng làm bằng chứng `Status: verified`; không có yêu cầu validation thì ghi: `Validation: not run - not requested`.
 - Cấm build trực tiếp (bị chặn bởi guard R8); `.agent/scripts/ci-parity.sh` chỉ chạy khi user yêu cầu rõ ràng.

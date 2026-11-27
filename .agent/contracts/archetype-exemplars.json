@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-21",
+  "updated_at": "2026-11-25",
   "archetypes": {
     "crud-list": {
       "title": "Màn danh sách CRUD & chứng từ chuẩn",
@@ -49,17 +49,25 @@
       "frontend_exemplars": [
         "frontend/bizdoc/src/routes/_app/labor-order/_components/labor-order-form.tsx",
         "frontend/bizdoc/src/routes/_app/labor-order/_components/labor-order-form.schema.ts",
-        "frontend/shared/hooks/use-ref-doc-selector.ts"
+        "frontend/shared/hooks/use-ref-doc-selector.ts",
+        "frontend/bizdoc/src/routes/_app/attendance/leave-ticket/_components/leave-ticket-form.tsx",
+        "frontend/bizdoc/src/routes/_app/attendance/leave-ticket/_components/leave-ticket-detail-table.tsx",
+        "frontend/bizdoc/src/routes/_app/attendance/leave-ticket/_components/leave-calendar.tsx",
+        "frontend/shared/components/resizable-wrap-table.tsx",
+        "frontend/shared/hooks/use-field-row-actions.ts"
       ],
       "anti_exemplars_notes": [
         "Cấm dùng ReconcileCollections reflection đã deprecated; aggregate root phải khai báo AggregateShape và service override BuildIncomingGraph.",
         "Cấm gán tay *CodeSnapshot/*NameSnapshot từ client hoặc gọi gRPC rời rạc bên trong transaction DB; thu thập snapshot chạy ngoài transaction qua AggregateSnapshotService (UseSnapshots), transaction riêng đặt trong ExecuteCreateWriteAsync/ExecuteUpdateWriteAsync.",
-        "Cấm dùng z.string().uuid() trong Zod 4 vì từ chối ngầm GUID .NET không chuẩn RFC; dùng z.guid()."
+        "Cấm dùng z.string().uuid() trong Zod 4 vì từ chối ngầm GUID .NET không chuẩn RFC; dùng z.guid().",
+        "Cấm gọi useFieldArray.replace() khi chỉ thêm, nhân bản, xóa lẻ/hàng loạt dòng hoặc cập nhật cột mặc định trên bảng con vì làm đổi toàn bộ field.id, hủy-dựng lại mọi thẻ tr và nháy animation; phải dùng insert(..., { shouldFocus: false }), remove, form.setValue theo chỉ số và bật disableEntryAnimation trên ResizableWrapTable.",
+        "Cấm đặt useWatch({ name: 'details' }) ở gốc form lớn hoặc truyền inline component vào prop components={{ ... }} của Calendar/bảng; phải cô lập useWatch xuống component lá memo cấp module và giữ chiều cao cố định (min-h-*) cho thanh trạng thái phụ phía trên lịch/bảng."
       ],
       "invariants": [
         "WorkItem.Id == Entity.Id (ADR-0001) cho mọi chứng từ tham gia luồng WorkItem.",
         "Aggregate tự đồng bộ thêm/sửa/xóa mềm bảng con theo AggregateShape (một khai báo cho sync, include, snapshot, mapping); dòng mới giữ Id và được MarkAdded.",
-        "Form có CreatorSelector hoặc useRefDocSelector bắt buộc giữ createdById và createdOrganizationId xuyên suốt schema -> defaults -> reset -> payload -> CreateWorkItemRequest."
+        "Form có CreatorSelector hoặc useRefDocSelector bắt buộc giữ createdById và createdOrganizationId xuyên suốt schema -> defaults -> reset -> payload -> CreateWorkItemRequest.",
+        "Bảng con nhập liệu trên FE dùng ResizableWrapTable (isSubTable, headerVariant='sub-primary', disableEntryAnimation) + useFieldRowActions (handler ổn định qua useCallback) + DeleteConfirm cho thao tác xóa hết/xóa hàng loạt; cột checkbox, STT và Thao tác khóa độ rộng cố định."
       ],
       "acceptance_template": {
         "positive": [
@@ -111,7 +119,7 @@
         ],
         "negative": [
           "Phiếu đang chờ duyệt, nháp hoặc bị từ chối (chưa Closed) bị loại khỏi mọi số liệu tổng hợp, chi tiết và xuất Excel.",
-          "Kỳ chọn không hợp lệ hoặc không có dữ liệu trả về báo cáo rỗng đúng phân trang, không ném ngoại lệ."
+          "Kỳ không hợp lệ trả Result.Failure; kỳ hợp lệ nhưng không có dữ liệu trả báo cáo rỗng và giữ Page/PageSize trên endpoint chi tiết."
         ]
       }
     },
@@ -128,7 +136,7 @@
       ],
       "anti_exemplars_notes": [
         "Cấm ghi HrConfirmedDate / HrConfirmedById trước khi WorkItem transition thực sự đạt EWorkItemStatus.Closed.",
-        "Cấm bỏ qua ISnapshotPolicy<HrConfirmSnapshotCommand, TEntity> khi gán snapshot người xác nhận.",
+        "Cấm bỏ qua ISnapshotPolicy<HrConfirmSnapshotCommand, TEntity> khi gán snapshot người xác nhận; entity mới implement IHrConfirmable (ServiceDesk.Data/Entities/Common/IHrConfirmable.cs) và đăng ký HrConfirmSnapshotPolicy<TEntity> dùng chung trong ServiceExtensions thay vì viết thêm lớp policy riêng (tiền lệ EntryExitRegistration).",
         "Cấm ghép điều kiện lọc HR Confirm thủ công khi đã có hr-confirm-utils.ts và currentStepCode cố định theo enum bước HR_CONFIRM."
       ],
       "invariants": [
@@ -152,7 +160,8 @@
       "backend_exemplars": [
         "backend/src/BuildingBlocks/Infrastructure/Services/BaseService.cs",
         "backend/src/BuildingBlocks/Infrastructure/Services/Excel/ExcelDataExporter.cs",
-        "backend/src/Services/MasterData/MasterData.Services/Implement/Labor/WorkerSkillService.cs"
+        "backend/src/Services/MasterData/MasterData.Services/Implement/Labor/WorkerSkillService.cs",
+        "backend/src/Services/ServiceDesk/ServiceDesk.Services/Implement/Production/ProductionOrder/ProductionOrderService.Import.cs"
       ],
       "frontend_exemplars": [
         "frontend/shared/lib/excel-template-export.ts",
@@ -160,9 +169,10 @@
         "frontend/interactive/src/components/excel-import-export-actions.tsx"
       ],
       "anti_exemplars_notes": [
-        "Cấm override trực tiếp ImportFromExcel, ExportTemplateAsync, ExportDataAsync; chỉ mở rộng qua các hook được BaseService hỗ trợ.",
+        "Import/export thông thường chỉ mở rộng qua hook của BaseService; ngoại lệ import nhiều sheet kèm WorkItem theo backend-excel-import.md §0.",
         "Cấm gọi DB/gRPC theo từng dòng hoặc từng ô Excel; bắt buộc tải lô (batch preload) trước vòng lặp xử lý dòng.",
-        "Khi cột mã tham chiếu để trống lúc update qua Excel, giữ Guid.Empty ở đồ thị tạm và bảo toàn nguyên trạng ID/snapshot cũ."
+        "Khi cột mã tham chiếu để trống lúc update qua Excel, giữ Guid.Empty ở đồ thị tạm và bảo toàn nguyên trạng ID/snapshot cũ.",
+        "Không dựng SQL INSERT đa dòng/COPY trong service hoặc chỉnh MaxBatchSize để né giới hạn hiệu năng; mọi ghi import đi qua trục EF Core của docs/adr/0003-aggregate-write-pipeline.md và docs/adr/0004-excel-import-architecture.md, chỉ mở đường tăng tốc theo ADR-0004 §3 sau khi có số đo đạt backend-excel-import.md §5."
       ],
       "invariants": [
         "Cột biểu mẫu nhập và cột xuất dữ liệu tái nhập phải đối xứng qua một định nghĩa hợp đồng cột thống nhất.",
@@ -188,6 +198,7 @@
       "frontend_exemplars": [
         "frontend/shared/components/custom/tree-table.tsx",
         "frontend/shared/components/custom/tree-table-virtual.tsx",
+        "frontend/shared/components/resizable-wrap-table.tsx",
         "frontend/hrm/src/routes/_app/employee-attendance-v2/employee-attendance-board.tsx"
       ],
       "anti_exemplars_notes": [
@@ -196,7 +207,8 @@
       ],
       "invariants": [
         "Dữ liệu phân cấp hoặc ma trận phải chuẩn hóa cấu trúc phẳng/chỉ mục O(1) theo khóa trước khi render.",
-        "Tận dụng TreeTable / TreeTableVirtual trong @shared/components/custom thay vì tự dựng state đóng/mở đệ quy rời rạc trên từng màn hình."
+        "Cây phân cấp dùng TreeTable / TreeTableVirtual thay vì tự dựng state đóng/mở đệ quy.",
+        "Lưới chấm công Admin dùng ResizableWrapTable với phân trang từ máy chủ, ảo hóa dòng theo ngưỡng và optimizeHorizontalScroll cho lưới rộng; tra ô qua employee.cells theo khóa ngày."
       ],
       "acceptance_template": {
         "positive": [

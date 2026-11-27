@@ -10,6 +10,9 @@ $ARGUMENTS
 Chỉ chạy trong **Phiên Nâng Cấp Hệ Thống Agent Riêng** khi người dùng yêu cầu nâng cấp `.agent/`, rule, skill hoặc harness.
 Phiên làm tính năng thường (Luồng 1) KHÔNG sửa `.agent/**`; mọi ma sát gặp phải chỉ ghi vào `.agent/reports/agent-friction.jsonl` để xử lý tập trung ở phiên này.
 
+Trong workspace cô lập của `agent-updater`, dùng quyền phiên đã cấp và chỉ đối chiếu các nguồn nối liên kết.
+Không dọn state/log, cài wiring, đồng bộ Agent Kit hay đổi quyền phiên từ workspace này; chạy kiểm tra catalog và ghi `UPGRADE_SUMMARY.json` theo yêu cầu của công cụ.
+
 ## Quy Trình 6 Bước Chuẩn
 
 1. **Mở quyền `maintainer` (tạm thời trong phiên bảo trì)**:
@@ -18,6 +21,8 @@ Phiên làm tính năng thường (Luồng 1) KHÔNG sửa `.agent/**`; mọi ma
    - Chạy `node .agent/scripts/prune-agent-state.mjs --days 10` để dọn sạch phân tích, plan và log quá 10 ngày (giữ nguyên `.planning/codebase/` và `.planning/errors/ERRORS.md`).
    - Chạy `node .agent/scripts/summarize-friction.mjs` để đọc `.agent/reports/agent-friction.jsonl`, `.agent/reports/boundary-guard.log` và `enforcement.allowlist` trong `.agent/contracts/agent-registry.json`.
    - Rà soát độ trôi giữa **Code thực tế ↔ Tài liệu/Rule/Skill ↔ Khuôn mẫu** (`.agent/contracts/archetype-exemplars.json`): xử lý allowlist đã/sắp hết hạn `expires_at`, rule bị nghi chặn nhầm và tài liệu lỗi thời.
+   - Báo cáo ma sát gồm cả log lịch sử: đối chiếu ngày, mã hiện tại và mẫu hồi quy trước khi sửa luật.
+   - Với ca đọc bị báo là ghi, xác định harness, tên công cụ và đối số đã khử bí mật để kiểm tra lớp ánh xạ; riêng đường dẫn trong log `DENY` không đủ căn cứ để nới quyền.
 3. **Chuyển xuống Code & Tỉa bớt Chữ**:
    - Đưa các lỗi cú pháp/tĩnh lặp lại (regex/AST/path) xuống `R10` trong `.agent/contracts/agent-registry.json` và `.agent/scripts/agent-boundary-guard.mjs`.
    - Bắt buộc bổ sung cặp mẫu đúng (`valid`) và mẫu sai (`invalid`) vào `.agent/evals/guard-fixtures.json` rồi kiểm nhanh bằng `--sandbox`.

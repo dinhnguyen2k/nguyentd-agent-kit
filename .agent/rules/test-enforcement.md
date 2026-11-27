@@ -17,7 +17,7 @@ description: "When the user explicitly requests running tests, authoring tests v
 
 ## 1. Khi nào phải chạy test và ranh giới Agent
 
-- **Phân định vai trò:** Việc chạy test suite (`dotnet test`) và kiểm chứng tự động thuộc về Agent nghiệm thu (`verifier`).
+- **Phân định vai trò:** Khi người dùng đã cho phép chạy test, giao đúng lệnh và phạm vi cho `verifier`; `test-author` chỉ chạy các lệnh trong `permitted_checks` được giao. R1 không cấp quyền chạy test cho `implementer`, specialist hay `maintainer`.
 - **Trong task phân tích hoặc task triển khai cục bộ/đơn giản:**
   - Agent triển khai (`backend-specialist` / implementer) **TUYỆT ĐỐI CẤM** tự ý chạy `dotnet test`.
   - **DO NOT RUN `dotnet build` automatically. ON-DEMAND ONLY:** agent triển khai không tự build;
@@ -44,7 +44,7 @@ Ba luật dưới đây do PreToolUse hook `.agent/scripts/agent-boundary-guard.
 `verifier` và `test-author` là subagent thật trong `.claude/agents/`, nên `verifier` không được cấp Edit/Write ở tầng runtime.
 Harness không có hook (Codex, Antigravity, CI) dùng chung bộ luật qua CLI: `node .agent/scripts/agent-boundary-guard.mjs --check-command "<cmd>"`, exit 2 là bị chặn.
 
-Role mặc định là `implementer`, chặt nhất. Người dùng mở cổng bằng `! .agent/scripts/agent-role.sh verifier`, hiệu lực 8 giờ rồi tự hết hạn.
+Role mặc định là `implementer`, chặt nhất. Nếu cần chạy trực tiếp tại phiên chính, người dùng tự mở cổng bằng `! .agent/scripts/agent-role.sh verifier`; dùng `.agent/scripts/agent-role.sh show` để xem thời gian còn lại.
 Khai báo cho đúng một lệnh thì đặt `COGAIN_AGENT_ROLE=verifier` ở đầu dòng lệnh; cách này luôn hiện trong transcript nên không giấu được.
 Agent bị chặn thì dừng và báo lại, tuyệt đối không tự chạy lệnh mở cổng cho chính mình. Mọi lần chặn và mọi lần đổi role đều ghi vào `.agent/reports/boundary-guard.log`.
 

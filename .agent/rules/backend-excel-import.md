@@ -13,13 +13,27 @@ interruptMode: never
 
 ## 0. Kiến Trúc Base Import & Hook (BẮT BUỘC)
 
-Chỉ mở rộng qua đúng hook của `BaseService` (`CustomParseExcelToDtosAsync` -> `LoadImportReferencesAsync` -> `ValidateImportDtosAsync` -> `PrepareImportEntitiesAsync` -> `SaveImportEntitiesAsync`, Export: `GetExportTemplateFileName`, `GetExportDataFileName`, `GenerateTemplateBytesAsync`, `GenerateExportDataBytesAsync`).
+Chỉ mở rộng qua đúng hook của `BaseService`:
+- Import: `CustomParseExcelToDtosAsync` -> `LoadImportReferencesAsync` -> `ValidateImportDtosAsync` / `ValidateImportAsync` -> `CustomImportMappingAsync` -> `PrepareImportEntitiesAsync` -> `SaveImportEntitiesAsync`; lỗi tổng hợp qua `CreateImportValidationFailure`.
+- Export: `GetExportTemplateFileName`, `GetExportDataFileName`, `GenerateTemplateBytesAsync`, `GenerateExportDataBytesAsync`.
 
-Ngoại lệ có kiểm soát: khi aggregate nhiều sheet kèm `WorkItem` cần bỏ qua `BaseService.ImportFromExcel` (ví dụ `ProductionOrderService.ImportFromExcel`), vẫn phải đi qua cùng 3 trụ cột dùng chung trong `BuildingBlocks` thay vì viết pipeline đơn lẻ:
+Ngoại lệ có kiểm soát: chỉ aggregate nhiều sheet kèm `WorkItem` (hiện có `ProductionOrderService`, `OvertimeRequestService`) mới được bỏ qua `BaseService.ImportFromExcel`, và phải theo đúng các trụ cột dưới đây:
 
-1. **Đọc Excel Streaming (`ExcelWorkbookStreamReader`)**: Luôn dùng `ExcelWorkbookStreamReader` (`ReadSheet<T>` cho DTO gắn attribute hoặc `ReadRawSheet` cho layout vị trí cột) để đọc OpenXML forward-only (bỏ qua sheet `Data_*` và comments VML); cấm mở `new XLWorkbook(stream)` trên luồng import dữ liệu lớn.
-2. **Điều phối Snapshot + Giao dịch bù trừ (`WorkItemImportExecution.RunAsync`)**: Thu thập và áp `AggregateSnapshotService` / policy ngoài transaction với `AutoDetectChanges = false` (`SnapshotRoots`), truyền trạng thái qua biến cục bộ (cấm truyền qua `AsyncLocal` bên trong delegate `async`), giữ `SetAutoDetectChanges(false)` bao trọn `DetectChanges() + SaveChangesAsync()` bằng `WorkItemImportExecution.SaveTrackedChangesAsync`, và chạy `AfterCommitAsync` theo lô ngoài transaction.
-3. **Chèn lô đa dòng (`IUnitOfWork.BulkInsertEntitiesAsync`) & Batch DB**: Với lô tạo mới số lượng lớn, ưu tiên `_unitOfWork.BulkInsertEntitiesAsync` (`ChunkSize = 1000`, Npgsql `MaxBatchSize(1000)` trong `ConfigureServices.cs`); trước khi gọi `QueryAggregate()` có `SplitQuery` để kiểm tra bản ghi tồn tại, luôn truy vấn danh sách `Id` nhẹ trước để tránh bắn nhiều query rỗng qua mạng.
+1. **Chọn bộ đọc theo kích thước đo được**:
+   - Mặc định dùng `ExcelSheetReader` (ClosedXML) như mọi import khác.
+   - Chỉ dùng `ExcelWorkbookStreamReader` (`ReadSheet<T>` / `ReadRawSheet`) khi file thực tế lớn (cỡ hàng nghìn dòng trở lên hoặc nhiều MB) và có số đo parse cô lập chứng minh lợi ích; không chuyển import nhỏ sang stream reader.
+   - Không viết bộ chuyển đổi giá trị riêng: service dùng API public của `ExcelParsingHelpers`; trong `BuildingBlocks`, bộ đọc dùng chung các helper `internal` (`FromExcelSerial`, `TryParseDateText`, `TryParseDateTimeText`, `TryParseTimeText`, `TryParseIntegerText`). Hàm cố ý khác ngữ nghĩa phải có comment một dòng nêu khác biệt.
+   - Phải tôn trọng cờ `Date1904` của workbook; giá trị giờ ≥ 24 giờ bị từ chối nhất quán giữa hai bộ đọc, thông báo nêu sheet, dòng, cột, giá trị.
+2. **Điều phối snapshot và giao dịch bù trừ (`WorkItemImportExecution.RunAsync`)**:
+   - Gọi khi `AutoDetectChanges` đang bật; snapshot thu thập ngoài transaction.
+   - `SaveTrackedChangesAsync` chỉ `DetectChanges` + `SaveChangesAsync`; caller sở hữu cờ: bọc bằng `SetAutoDetectChanges(false)` ... `finally SetAutoDetectChanges(true)`.
+   - Khi execution strategy chạy lại (`attempt > 0`), ChangeTracker đã bị xóa (`IUnitOfWork.cs` hợp đồng retry): phải nạp lại graph từ DB, đồng bộ lại và áp lại snapshot, không dùng entity của lần trước.
+   - `AfterCommitAsync` chỉ chạy sau commit và để exception truyền ra.
+   - Không để lại `Stopwatch`/log thời gian từng pha trong mã import; đo hiệu năng bằng instrumentation tạm trên nhánh đo, gỡ trước khi bàn giao (§5).
+3. **Một trục ghi EF Core chuẩn theo `ADR-0003` và `ADR-0004` (`docs/adr/`)**:
+   - Tạo mới: dùng `_repository.AddRangeAsync` + `_unitOfWork.SaveChangesAsync` trong vùng `AutoDetectChanges` tắt; không cấu hình `MaxBatchSize` (trùng mặc định 1.000 của Npgsql EF), không tự dựng SQL `INSERT` đa dòng hay `COPY` trong service.
+   - Cập nhật: truy vấn `Id` nhẹ trước khi tải `QueryAggregate()` dùng `AsSplitQuery()` (bỏ qua tải graph khi `matchedIds.Count == 0`) trong vùng `AutoDetectChanges` tắt để giữ nguyên `OriginalValues` bảo toàn snapshot lịch sử (`AggregateSnapshotService`), đồng bộ qua `AggregateSynchronizer.Sync` + `_unitOfWork.MarkAdded(sync.Added)` và lưu bằng `WorkItemImportExecution.SaveTrackedChangesAsync`.
+   - Không dùng tầng bulk song song hoặc `AsNoTracking` stub cho đường cập nhật có snapshot lịch sử; mọi thay đổi bảng con đi qua `AggregateShape` và `AuditingInterceptor` dùng chung.
 4. Không gọi `_repository.AddAsync` hoặc `_unitOfWork.SaveChangesAsync` bên trong vòng parse/validate.
 
 ## 1. Cấu Trúc, Schema Cột & Đối Xứng Import/Export
@@ -47,9 +61,19 @@ Mọi luồng xuất Excel viết mới hoặc sửa đổi phải dùng bộ h�
 
 1. Luồng import có ghi sang dịch vụ khác qua gRPC phải định nghĩa rõ ranh giới giao dịch và cơ chế bù trừ (`compensation`), ưu tiên xử lý theo lô thay vì gọi lẻ từng dòng.
 2. Khi import có nhánh cập nhật bản ghi cũ (`Upsert`):
-   - Kiểm tra khóa nghiệp vụ (như `ApprovedDate != null` trên `ProductionOrder`) cả trước khi biến đổi graph lẫn tái kiểm bên trong transaction (kể cả khi execution strategy retry `attempt > 0`), trả lỗi theo từng dòng thay vì âm thầm ghi đè.
+   - Kiểm tra khóa nghiệp vụ (như `ApprovedDate != null` trên `ProductionOrder`) trước khi biến đổi graph để báo lỗi sớm theo dòng.
+   - Trong transaction (cả lần đầu lẫn `attempt > 0`), giành khóa hàng bằng một `ExecuteUpdateAsync` no-op có điều kiện trạng thái (`ApprovedDate == null && DeletedDate == null`, set `LastModifiedDate = LastModifiedDate`, tiền lệ `AttendanceTicketStateReader`); số hàng bị ảnh hưởng nhỏ hơn số bản ghi cần ghi thì trả lỗi kèm mã bị chốt/xóa. Cấm tái kiểm bằng truy vấn `AsNoTracking` vì không khóa hàng, thao tác chốt vẫn chen vào được.
    - Bảo toàn ID liên kết tạm cha - con (`Id = dto.Id ?? Guid.NewGuid()`, cấm sinh đè `Guid.NewGuid()` mới).
+   - Cập nhật đồng bộ con dựa trên `QueryAggregate()` (`AsSplitQuery`) và `AggregateSynchronizer.Sync` + `_unitOfWork.MarkAdded(sync.Added)` để giữ `Id` dòng khớp, giữ `OriginalValues` cho snapshot lịch sử và xóa mềm dòng bị bỏ; không xóa rồi chèn lại cả graph.
    - Tra cứu `Code` trên DB phải lọc `DeletedDate == null`, chuẩn hóa hoa/thường khớp PostgreSQL (`ToUpper()` / `ILike`), kiểm tra trùng mã trong file trước bằng `ExcelImportHelpers.CheckDuplicateCode`, và không để `ValidateImportDtosAsync` ném exception dữ liệu làm mất danh sách lỗi đã gom.
    - Mọi cột đã thu thập và kiểm tra hợp lệ phải được gán thực sự vào entity (tránh cột chết).
-   - Với batch create có `WorkItem`, không bọc `AggregateSnapshotService` cho node `Detached` bằng nhiều vòng `DbContext.Entry(node)` và phải gộp tra cứu phụ trợ (ví dụ kho mặc định `ApplyDefaultFromWarehouseBatchAsync`) một lần trước transaction.
+   - Với batch create có `WorkItem`, gộp tra cứu phụ trợ (ví dụ kho mặc định `ApplyDefaultFromWarehouseBatchAsync`) một lần trước transaction.
 3. Kiểm chứng: Không tự động chạy build khi người dùng chưa yêu cầu (`AI_RULES.md` §2); không kết luận import/export đúng nếu chỉ dựa vào kết quả biên dịch mà chưa kiểm tra tính đối xứng cột và xử lý dòng lỗi.
+
+## 5. Đo Hiệu Năng Import (khi tối ưu hoặc đổi kiến trúc ghi)
+
+1. Quy kết chậm phải dựa trên số đo từng pha (parse, snapshot, ghi, WorkItem, hậu commit) và số round-trip DB, không dựa trên một lần đo tổng. `Stopwatch`/log pha chỉ là instrumentation tạm trong lúc đo và phải gỡ khỏi mã trước khi bàn giao.
+2. Giao thức tối thiểu: cùng fixture byte-giống, cùng DB, cùng cấu hình build giữa các mốc; 1 lượt khởi động + ≥7 lượt mỗi kịch bản (tạo mới, cập nhật); báo median/min/max, không báo p95 khi n < 20; đo RTT DB trước và sau; đo lại mốc so sánh sau cùng để kiểm trôi (>15% thì cảnh báo).
+3. Ngưỡng chấp nhận đặt trước khi đo; tối ưu chỉ được giữ khi vượt ngưỡng đã đặt hoặc đơn giản hơn với hiệu năng tương đương.
+4. Benchmark và E2E chạy trên dữ liệu có tiền tố riêng và dọn qua API của ứng dụng, không xóa bằng SQL.
+5. Mọi tối ưu hoặc thay đổi luồng ghi phải kiểm đầy đủ trên PostgreSQL thật: tạo mới, cập nhật giữ ID, thêm và xóa mềm dòng con, bảo toàn snapshot lịch sử, audit, rollback, WorkItem và khóa lệnh đã chốt. Báo riêng kịch bản bị chặn bởi dữ liệu môi trường; không tính là đạt.

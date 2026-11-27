@@ -81,6 +81,8 @@ interruptMode: never
    - Quy tắc áp dụng cho entity, DTO ghi dữ liệu, mapping và các luồng CRUD/import; DTO đọc được phép trả code/name được resolve từ entity nguồn, không lưu snapshot.
    - Không tự ý xóa field snapshot đang tồn tại hoặc tạo migration khi áp dụng rule này; việc chuyển đổi dữ liệu cũ cần yêu cầu triển khai riêng.
 6. **EF Core Migration**: CẤM TUYỆT ĐỐI tự viết tay file migration; chỉ được tạo/gỡ migration qua `./dev.sh add-migration <Service> <MigrationName>` và `./dev.sh remove-migration <Service>` (chỉ migration chưa apply). CẤM TUYỆT ĐỐI sửa file migration/snapshot đã sinh để pass logic; nếu sai sót bắt buộc phải sửa từ Entity/Fluent API Configuration, `remove-migration` rồi sinh lại.
+   - **Migration ngầm định**: Yêu cầu triển khai đổi schema (cột, bảng, index, cấu hình EF) coi như cho phép Main chạy `add-migration` một lần mỗi service sau khi nghiệm thu Entity/Configuration, đóng băng ghi backend khi chạy; specialist không tự chạy.
+   - Main đọc migration sinh ra: drift ngoài phạm vi thì báo user, đề xuất `remove-migration`, không sửa tay; `update-db` và thao tác phá huỷ DB vẫn cần yêu cầu đích danh.
 7. **Default cột non-null mới**: Giá trị khởi tạo C# không thành default DB (EF sinh `defaultValue: 0`). Cột enum/bool/số có default nghiệp vụ khác `default(T)` phải khai báo `HasDefaultValue(...)` trong Configuration trước `add-migration`.
 
 ---

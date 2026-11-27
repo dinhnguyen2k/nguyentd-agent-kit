@@ -2,7 +2,7 @@
 name: cogain-form-rhf-zod
 description: Implements Cogain React Hook Form and Zod forms with safe API hydration, empty-value normalization, watched-field effects, and backend validation parity. Use when changing frontend forms, schemas, zodResolver, reset, setValue, or nullable IDs.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   layer: project-skill
 ---
 
@@ -33,6 +33,13 @@ Treat the form model and API model as different boundary types when nullability 
 - Ignore identical value emissions before forwarding `onChange`.
 - Do not nest buttons or wrap Radix Checkbox/Switch in a parent click-toggle. Use `Label htmlFor` and the control's own handler.
 - Tiêu đề form (SheetTitle/DialogTitle) dùng `FormTitle` shared, không viết tay ternary `mode === 'create'`.
+
+## FieldArray Child Tables & Render Isolation
+
+- Preserve `useFieldArray` keys (`field.id`): use `insert(index, item, { shouldFocus: false })` and `remove(indexOrIndices)` for row add, duplicate, calendar date toggle, or row/bulk deletion, and use `form.setValue(\`details.\${idx}.\${field}\`, value, { shouldDirty: true, shouldValidate: form.formState.isSubmitted })` for bulk field updates or default application. Restrict `replace()` to initial hydration or clearing all rows (`[]`), because `replace()` regenerates every `field.id`, unmounts all `<tr>` rows, wipes row selection, and replays entry animations.
+- Configure child input tables with `ResizableWrapTable` (`isSubTable`, `headerVariant="sub-primary"`, `disableEntryAnimation`), `useFieldRowActions` (passing `useCallback`-stabilized handlers and a module-level `getRowId`, never inline arrows), and `useFirstErrorRowId` paired with `useFormState({ control, name: 'details' })` instead of reading root `form.formState`.
+- Isolate `useWatch({ control, name: 'details' })` out of the root form component: move watched array calculations (tab badges, summary totals, conditional apply buttons, and calendar date mapping keyed by a primitive `dateKeysSignature`) into small module-level `React.memo` leaf components.
+- Pass `dropdownQuery.isLoading` (not `isFetching`) to `Combobox` `loading` props for cached master-data dropdowns so background refetches never flicker spinners across every row, and warm static dropdown queries in the parent list route when practical.
 
 ## Procedure
 

@@ -11,6 +11,7 @@ Tài liệu này tổng hợp các quy ước giao diện chuẩn của Cogain, 
 - Khi cần hiển thị lỗi tải kèm nút thử lại tại chỗ, dùng `QueryErrorAlert` (`frontend/shared/components/query-error-alert.tsx`) với prop `onRetry`.
 - Trạng thái rỗng của khối riêng dùng `Empty` (`frontend/shared/ui/empty.tsx`), còn bảng dùng prop `emptyMessage` của `CustomTable` (`frontend/shared/components/custom-table.tsx`).
 - Khi chuyển trạng thái (loading, hover, chọn dòng, thông báo lỗi), không để bố cục xung quanh bị nhảy hoặc co giãn theo nội dung mới xuất hiện.
+- Thanh gợi ý chế độ (như chọn từng ngày / chọn khoảng ngày) hoặc nút thao tác phụ xuất hiện có điều kiện (như áp dụng mặc định) nằm phía trên lịch hoặc bảng phải đặt trong hàng tiêu đề/trạng thái có chiều cao cố định (`min-h-*`) thay vì chèn khối dọc có điều kiện gây nhảy tọa độ `Y` khi đang thao tác.
 - Trạng thái loading trên nút thao tác giữ nguyên chiều rộng nút để không đẩy lệch các nút đứng cạnh.
 - Nút disabled giữ `disabled:pointer-events-none disabled:opacity-50` chuẩn của `Button` (`frontend/shared/ui/button.tsx`).
 - Khi nút disabled cần giải thích lý do qua tooltip, truyền prop `tooltip` trực tiếp cho `Button` (component tự bọc wrapper `cursor-not-allowed pointer-events-auto`) thay vì tự bọc thẻ ngoài.
@@ -71,12 +72,18 @@ Tài liệu này tổng hợp các quy ước giao diện chuẩn của Cogain, 
 - Thao tác trên dòng bảng `CustomTable` truyền qua prop `rowActions` (`RowActionsConfig` từ `@shared/components/custom/table-row-actions`).
 - `RowActionsConfig` hỗ trợ `onView`, `onEdit`, `onDelete`, `canView`, `canUpdate`, `canDelete`, `editDisabledReason`, `deleteDisabledReason` và tự co số nút hiển thị theo bề rộng bảng (`maxVisible` mặc định 3, co còn 2 dưới 768px và 1 dưới 480px).
 - Cấm tự dựng cột `id: 'actions'` và state `DeleteConfirm` riêng trong từng route danh sách.
+- Bảng con nhập liệu (`useFieldArray`) dùng `ResizableWrapTable` (`frontend/shared/components/resizable-wrap-table.tsx`) với `headerVariant="sub-primary"`, `isSubTable`, `disableEntryAnimation` và `useFieldRowActions` (`frontend/shared/hooks/use-field-row-actions.ts`) để đồng bộ cụm nút `ActionStack` (`mode="row"`) chuẩn `CustomTable`.
+- Khóa cứng độ rộng pixel cho cột checkbox (`40px`), cột `STT` (`defaultWidth: 48, minWidth: 48, maxWidth: 48`) và cột `Thao tác`, chỉ phân bổ phần dư khung nhìn cho các cột dữ liệu co giãn.
+- Mọi thao tác xóa hàng loạt (`Xóa hết` hoặc xóa các dòng đang chọn) trên bảng nhập liệu nháp không thể hoàn tác bắt buộc phải xác nhận qua `DeleteConfirm` trước khi thực thi.
 
 ## 6. Kỷ luật hiệu năng UI
 
 - Cấm tuyệt đối `import * as LucideIcons from 'lucide-react'`; chỉ import đích danh từng icon cần dùng hoặc dùng `DynamicIcon` (`lucide-react/dynamicIconImports`).
 - Cấm import qua barrel `@shared/components`, `@shared/hooks` hoặc `@shared/services`; phải import trực tiếp subpath file (ví dụ `@shared/components/custom-table`, `@shared/components/double-line-cell`).
 - Cấm khai báo component con bên trong thân hàm render của component cha vì gây unmount và remount toàn bộ nhánh DOM mỗi lần render lại.
+- Cấm truyền hàm component inline vào prop `components={{ Root: (...) => ..., Day: (...) => ... }}` của thư viện giao diện (`react-day-picker` trong `Calendar`, bảng/lưới) kể cả khi bọc trong `useMemo` phụ thuộc state động, vì đổi tham chiếu hàm làm hủy và dựng lại toàn bộ nhánh DOM con.
+- Bắt buộc đưa các slot component của thư viện giao diện ra cấp module kết hợp Context và `React.memo` với prop nguyên thủy.
+- Trên `Combobox` dùng danh mục có cache, truyền `query.isLoading` thay vì `query.isFetching` vào prop `loading` để lần làm tươi ngầm không làm nháy vòng xoay hoặc ẩn nhãn đã chọn trên các dòng bảng.
 - Không mount sẵn `Tooltip` hoặc `Popover` trên hàng nghìn ô bảng khi chưa hover hoặc tương tác.
 - Giữ callback, cột `useMemo` và bảng tra cứu `O(1)` ổn định để tránh khóa main thread khi render bảng dữ liệu lớn.
 - Không gọi `console.log` dữ liệu mảng hoặc object kích thước lớn trên môi trường Production.

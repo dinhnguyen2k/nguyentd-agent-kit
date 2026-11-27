@@ -68,6 +68,24 @@
       ]
     },
     {
+      "id": "excel-workitem-import-snapshot-retry",
+      "skills": [
+        "cogain-excel-import-export"
+      ],
+      "query": "Cập nhật luồng nhập nhiều sheet của lệnh sản xuất để đồng bộ dòng con và giữ snapshot đúng khi transaction thử lại.",
+      "expected_behavior": [
+        "Đọc sheet qua ExcelWorkbookStreamReader và dùng WorkItemImportExecution để giữ một transaction bù trừ",
+        "Thu thập snapshot ngoài transaction; khi thử lại, tải và đồng bộ graph mới rồi áp context đã thu thập",
+        "Giữ Id dòng con khớp, gắn khóa cha cho dòng thêm, xóa mềm dòng bị bỏ qua AggregateSynchronizer.Sync + MarkAdded và lưu bằng WorkItemImportExecution.SaveTrackedChangesAsync trong vùng AutoDetectChanges tắt",
+        "Giành khóa hàng cập nhật bằng ExecuteUpdateAsync no-op có điều kiện trong transaction, cả lần đầu lẫn khi thử lại"
+      ],
+      "forbidden_behavior": [
+        "Giả định RunAsync tự áp snapshot hoặc tự lưu entity cập nhật",
+        "Gọi gRPC lấy snapshot trong transaction hoặc truyền trạng thái giữa callback qua AsyncLocal",
+        "Tự dựng SQL INSERT đa dòng/COPY trong service hoặc cấu hình MaxBatchSize để né giới hạn hiệu năng"
+      ]
+    },
+    {
       "id": "query-invalidation-family",
       "skills": [
         "cogain-query-cache"
@@ -137,6 +155,7 @@
       "query": "Build a new ServiceDesk payroll period report with summary tabs, paginated detail table, and Excel export.",
       "expected_behavior": [
         "Backend uses PayrollReportQueryHelper.TryResolvePayrollPeriod and GetClosedWorkItemIdsAsync (EWorkItemStatus.Closed) cutting on HrConfirmedDate",
+        "Phân biệt kỳ không hợp lệ với kỳ hợp lệ không có dữ liệu; chỉ trường hợp sau trả báo cáo rỗng",
         "Backend orchestrates endpoints with ReportExecution.RunPageAsync/RunReadAsync/RunExportStreamAsync (MaxExportRows cap) and ExcelReportWriter.WriteToStream/ReportCol/ExcelReportLabels",
         "Frontend composes ReportLayout, ReportPanel, ReportSummaryTable, ReportDetailTable, ReportFilterChips, PayrollPeriodInput, and useReportQueries hooks",
         "Formats money and dates via @shared/lib helpers without cross-importing another route's _components or -components"
@@ -145,6 +164,21 @@
         "Counts unclosed documents or cuts payroll period by CreatedDate without business confirmation",
         "Cross-imports formatVndSafe or local helpers from another route's _components/-components folder",
         "Imports from the @shared/components barrel instead of direct component file paths"
+      ]
+    },
+    {
+      "id": "screen-archetype-timesheet-warning-policy",
+      "skills": [
+        "cogain-screen-archetypes"
+      ],
+      "query": "Rà luồng chốt công HR khi mẫu kỳ đổi cấu hình ẩn mã cảnh báo sau khi báo cáo đã đồng bộ.",
+      "expected_behavior": [
+        "Dùng PayrollWarningPolicy để phân biệt khóa cảnh báo theo ReportKind và mã; giữ cảnh báo với cờ IsSuppressed trong snapshot.",
+        "Dùng WarningPolicyChanged để yêu cầu đồng bộ lại báo cáo đang mở khi trạng thái ẩn đã lưu lệch với cấu hình hiện hành."
+      ],
+      "forbidden_behavior": [
+        "Xóa cảnh báo ẩn khỏi snapshot hoặc áp cấu hình theo mã cảnh báo mà bỏ ReportKind.",
+        "Kết luận cần đồng bộ lại chỉ vì ID phiên bản mẫu thay đổi mà không đối chiếu trạng thái ẩn đã lưu."
       ]
     },
     {
@@ -211,6 +245,25 @@
       "forbidden_behavior": [
         "Calls unguarded form.reset(query.data) inside useEffect whenever the query.data reference changes",
         "Weakens the form type to any"
+      ]
+    },
+    {
+      "id": "form-fieldarray-render-and-layout-stability",
+      "skills": [
+        "cogain-form-rhf-zod",
+        "cogain-screen-archetypes"
+      ],
+      "query": "Optimize a Cogain child table form with a quick date calendar where adding rows, clicking dates, or toggling range mode unmounts existing rows, replays entry animations, and shifts layout vertically.",
+      "expected_behavior": [
+        "Replaces useFieldArray replace() on incremental edits with sorted insert(..., { shouldFocus: false }), remove(indices), and per-index form.setValue while enabling disableEntryAnimation on ResizableWrapTable",
+        "Isolates useWatch({ name: 'details' }) into module-level React.memo leaf components instead of watching the array at the root form component",
+        "Hoists Calendar/table slot components out of inline JSX and useMemo factories into module-level components with Context and primitive-prop React.memo",
+        "Preserves fixed-height header/hint containers (min-h-*) so mode switches and conditional default-apply actions cause zero vertical layout shift"
+      ],
+      "forbidden_behavior": [
+        "Calls useFieldArray.replace() for single-row insert, duplicate, or bulk field update",
+        "Declares inline Day or Root components inside render/useMemo components={{ ... }}",
+        "Mounts full-width hint banners or buttons conditionally above the calendar causing vertical layout jump"
       ]
     }
   ]

@@ -72,6 +72,8 @@ Agent BẮT BUỘC phải đối chiếu nghiệp vụ cần triển khai với 
 3.  **Split Queries:** Đối với các truy vấn kết hợp nhiều `.Include()` trên các collection lớn, sử dụng `.AsSplitQuery()` để tránh bị nhân dòng (Cartesian Explosion) ở SQL.
 4.  **DbSet.AnyAsync() vs CountAsync():** Khi chỉ muốn kiểm tra sự tồn tại của dữ liệu, sử dụng `AnyAsync()` để Postgres trả về True/False ngay lập tức, tuyệt đối không dùng `CountAsync() > 0` hoặc `.ToListAsync()`.
 5.  **Zero-Allocation gRPC Collections:** Danh sách lặp trả về từ Protobuf (`RepeatedField<T>`) bản chất đã là in-memory list (`IReadOnlyList<T>`, `IList<T>`). Tuyệt đối không gọi `.ToList()` hoặc clone `[..]` sang `List<T>` mới; khai báo hàm trả về `IReadOnlyList<T>` và trả trực tiếp `RepeatedField<T>`.
+6.  **Ghi lô EF Core:** Mặc định `AddRangeAsync` + một `SaveChangesAsync`, để Npgsql tự gom lệnh; không đặt `MaxBatchSize` và không tự dựng SQL `INSERT` đa dòng/`COPY` khi chưa có số đo chứng minh. Với graph lớn đã dựng sẵn, tắt `AutoDetectChanges` quanh lần lưu (`finally` bật lại) thay vì đổi cơ chế ghi.
+7.  **Bằng chứng hiệu năng:** Quyết định tối ưu phải dựa trên đo cùng fixture, cùng cấu hình build, cùng DB: 1 lượt khởi động + ≥7 lượt, báo median/min/max theo từng pha, đo lại mốc so sánh để kiểm trôi; một lần đo đơn lẻ không đủ để giữ hoặc bỏ một tối ưu (chi tiết import: `backend-excel-import.md` §5).
 
 ### Phân vai benchmark
 

@@ -39,7 +39,7 @@ $ARGUMENTS
    (3) Quy tắc cắt kỳ thời gian và helper chuẩn (`AttendanceReportPeriod` / `PayrollReportQueryHelper` so với `PeriodId`);
    (4) Khuôn mẫu giao diện/dịch vụ chuẩn theo `[skill:cogain-screen-archetypes]` (cấm chép helper nội bộ từ `_components`/`-components` của route khác);
    (5) Cách xử lý dữ liệu cũ chưa có trường mới.
-5. Hoàn tất prerequisite trước khi giao slice phụ thuộc; phản biện phương án theo phase **Solution Critic** bên dưới trước implement/dispatch.
+5. Hoàn tất các phụ thuộc chặn theo mục **Chia việc theo mốc mở khóa** trước khi giao slice phụ thuộc; phản biện phương án theo phase **Solution Critic** bên dưới trước implement/dispatch.
 
 Main sở hữu tính khả thi và quyết định thiết kế cùng ranh giới rủi ro cao một lần; không dựng thêm planner chỉ để diễn giải lại quyết định của Main.
 Main chịu trách nhiệm chọn giải pháp đủ đơn giản, không chỉ soạn contract đủ để worker thi hành.
@@ -101,7 +101,7 @@ Không cắt error behavior, authorization, data integrity, cancellation, transa
 - Xác nhận lại source nếu đã thay đổi sau lần đọc.
 - Không sửa file worker đang sở hữu; gửi delta cho worker đó.
 - Giữ một owner cho cùng luồng/context; gom các bước sửa thành checklist, không tạo worker theo từng method/finding.
-- **Trần kích thước Slice & Sharding 2 pha (chống 1 worker ôm >120 turns)**: mỗi slice thực thi giao cho 1 specialist không vượt quá **2-3 aggregate đơn giản (hoặc 1 aggregate phức tạp >= 10 tệp) / ~8-12 tệp ghi** (tối đa **2-4 shard song song/đợt**). Với bài toán nhiều aggregate độc lập: *Pha 0* chốt trước contract/DTO/base class dùng chung -> *Pha A* fan-out các shard trên `allowed_paths` rời nhau hoàn toàn -> *Pha B* giao 1 owner nối tiếp cập nhật các tệp xương sống (`*DbContext.cs`, `Program.cs`, `ConfigureServices.cs`, `ServiceExtensions.cs`, `routeTree.gen.ts`).
+- **Trần kích thước Slice & Sharding 2 pha (chống 1 worker ôm >120 turns)**: mỗi slice thực thi giao cho 1 specialist không vượt quá **2-3 aggregate đơn giản (hoặc 1 aggregate phức tạp >= 10 tệp) / ~8-12 tệp ghi** (tối đa **2-4 shard song song/đợt**). Với bài toán nhiều aggregate độc lập: *Pha 0* chốt trước contract/DTO/base class dùng chung -> *Pha A* fan-out các shard trên `allowed_paths` rời nhau hoàn toàn -> *Pha B* giao 1 owner nối tiếp cập nhật các tệp dùng chung (danh sách tại mục **Chia việc theo mốc mở khóa**).
 - Chỉ tách worker khi độc lập về vùng đọc/ghi và không dùng chung core service lớn, transaction, lifecycle hoặc contract đang biến động.
 - Chỉ cho phép dùng chung interface chỉ đọc đã chốt; giữ `allowed_paths` tách biệt và kiểm dependency trước dispatch.
 - Chia luồng dài thành milestone theo dependency và điểm rủi ro, không theo số file/method; giữ một owner khi còn cùng context, transaction hoặc service.
@@ -194,11 +194,45 @@ Khi gặp lệch nhỏ chữ ký/type/hành vi thư viện, worker chạy **vi-x
 Khi phát hiện trong cùng phân hệ đã có helper hoặc component chuẩn thuộc `[skill:cogain-screen-archetypes]` mà contract bỏ sót hoặc bắt import chéo nội bộ route khác (`_components`/`-components`), worker phải dừng và báo ngay cho Main kèm `path:line` trước khi tự chế hoặc sao chép code.
 Đây là stop condition mặc định, không cần diễn giải lại ở nhiều section.
 
+## Chia việc theo mốc mở khóa
+
+Nhánh phụ thuộc chỉ chờ đúng phần nó cần, không chờ toàn bộ TASK phía trước.
+
+- **Chia theo tính năng, không theo tầng**: mỗi tính năng phía BE do một owner làm trọn entity, cấu hình EF, DTO, service và controller trong thư mục riêng của tính năng.
+  Song song hóa giữa các tính năng khác nhau và giữa BE với FE; không giao các tầng của cùng một tính năng cho nhiều worker vì chúng ghi chung `Controllers/`, `Implement/<Feature>/`, `Entities/<Feature>/`.
+- **Chốt nghiệp vụ trước khi chốt giao diện**: 5 bất biến ở bước 4 của Main discovery và nullability/tính bắt buộc của từng field phải chốt xong.
+  Field còn chưa chắc thì chưa được đưa vào giao diện dùng chung.
+- **Giao diện cho FE nằm ngay trong TASK FE**: Main ghi shape đã chốt vào `execution`/`acceptance` của TASK FE gồm field và kiểu, enum số trùng BE kèm nhãn, nullability từng ID, endpoint (path, method, `ApiResponse<T>`), khóa permission/resource và key i18n, đối chiếu `.agent/rules/domain-parity.md`.
+  FE tự viết `*.type.ts` từ shape này vì repo không sinh type từ BE, nên TASK FE để `dependencies: []` và chạy song song với BE từ đầu.
+- **TASK M0 khi bên tiêu thụ cần symbol C#**: khi tính năng hoặc service khác phải biên dịch với entity/DTO/enum/interface của tính năng đang làm, tách một TASK M0 riêng chỉ gồm khai báo: entity và cấu hình EF, DTO, enum, chữ ký service/controller, route, message proto nếu có; không chứa logic.
+  Main nghiệm thu M0 bằng đọc khai báo; TASK logic của chính tính năng và các TASK tiêu thụ cùng phụ thuộc `"<TASK M0>:type"` và được giao song song.
+  M0 là phần chốt thật, không phải stub; M0 đổi sau nghiệm thu thì tăng `contract_version` và supersede các TASK đã giao dựa trên nó.
+- **Phụ thuộc ghi kèm loại**: mỗi phần tử `dependencies` ghi dạng `"<TASK>:<loại>"`, ví dụ `"TASK-01:type"`.
+  Phần tử cũ không có loại được hiểu là chặn tới khi TASK đó hoàn tất.
+
+|Loại|Khi nào|Chặn giao việc|
+|---|---|---|
+|`type`|Cần symbol hoặc shape đã chốt của TASK trước|Có, tới khi TASK đó (thường là M0) được nghiệm thu|
+|`pilot`|Cần mẫu mới được làm thử thành công|Có, tới khi TASK pilot được nghiệm thu|
+|`behavior`|Cần logic của TASK trước chạy đúng để kiểm|Không; chỉ chặn bước kiểm thử/E2E của TASK sau|
+|`gate`|TASK kiểm tra tổng, sửa test hoặc dọn API cũ|Có; chỉ dùng cho các TASK đó, không dùng cho TASK triển khai|
+
+- **Cùng sửa một file không phải phụ thuộc**: chuyển phần sửa file dùng chung cho owner gom bên dưới, không nối tiếp các TASK triển khai vì lý do này.
+- **Pilot hẹp**: pilot chỉ chứng minh mẫu trên một aggregate nhỏ nhất; đăng ký diện rộng và các aggregate còn lại thuộc các TASK fan-out sau pilot.
+- **File dùng chung và owner gom**: khi từ 2 worker trở lên ghi cùng một service/app, worker Pha A không sửa các file dưới đây mà bàn giao danh sách đăng ký cần thêm (file, khối, nội dung).
+  Một owner gom áp dụng các danh sách đó một lần cho mỗi service/app ở Pha B và thêm migration cuối cùng, sau khi mọi thay đổi entity đã được nghiệm thu.
+  - BE: `ocelot.json`, `*DbContext.cs` (`DbSet`), `*ModelSnapshot.cs` và migration, `MappingProfile.cs`, `ServiceExtensions.cs`/`ConfigureServices.cs`, `Program.cs`, `appsettings.json` (tiền tố sinh mã), `*InfoGrpcService.cs`.
+  - FE: `src/i18n/index.ts`, `permission.enum.ts`, `parent-sidebar-constants.ts`, các barrel `index.ts` trong `frontend/shared`.
+  - `routeTree.gen.ts` được sinh tự động và bị gitignore nên không thuộc danh sách này.
+- **Lịch giao**: task index trong overview ghi phụ thuộc kèm loại và thêm một dòng đường găng (chuỗi phụ thuộc chặn dài nhất).
+  Main ưu tiên giao TASK trên đường găng và TASK mở khóa nhiều nhánh nhất, giữ trần 2-4 nhánh song song.
+  TASK M0 và pilot được nghiệm thu ngay khi bàn giao vì nhiều nhánh đang chờ chúng.
+
 ## Điều kiện dispatch
 
 Tính sẵn sàng theo dependency, không phải số thứ tự TASK hay rào cản batch, quyết định thời điểm dispatch.
 Main kiểm một lần trước khi giao slice:
-- Prerequisite của slice đã hoàn tất và được Main nghiệm thu, đồng thời interface hoặc contract dùng chung đã ổn định.
+- Các phụ thuộc chặn của slice (`type`, `pilot`, `gate` hoặc chưa ghi loại) đã hoàn tất và được Main nghiệm thu, đồng thời interface hoặc contract dùng chung đã ổn định; phụ thuộc `behavior` không chặn giao việc.
 - Khi thỏa mãn, dispatch đồng thời các slice độc lập đã sẵn sàng.
 - Yêu cầu quyền sở hữu ghi tách biệt hoàn toàn và không phụ thuộc output khả biến của slice khác chưa hoàn thành.
 - Khi một nhánh hoàn thành, Main nghiệm thu nhánh đó và giải phóng ngay các slice phụ thuộc vào nó mà không phải chờ các nhánh chạy song song khác chưa xong.
@@ -270,7 +304,7 @@ Giữ cổng advisor blocker và giới hạn hai vòng sửa theo `.omp/RULES.m
 - Folder plan mới BẮT BUỘC bắt đầu bằng ngày tạo theo định dạng `YYYY-MM-DD-<slug>`, lấy ngày hiện tại của môi trường làm việc để dễ lọc và sắp xếp theo ngày.
   Giữ nguyên tiền tố ngày khi cập nhật hoặc resume; không tự đổi tên folder plan cũ.
 - Tiền tố ngày chỉ áp dụng cho tên folder; giữ nguyên tên file bên trong như `00-OVERVIEW.md` và `TASK-<NN>-<slug>.md`.
-- Overview chỉ giữ quyết định tổng thể, task index một dòng mỗi TASK, dependency/lifecycle/supersession và finding còn ảnh hưởng plan; không copy scope/acceptance hoặc log mọi phản biện/PASS.
+- Overview chỉ giữ quyết định tổng thể, task index một dòng mỗi TASK kèm phụ thuộc có loại và một dòng đường găng, lifecycle/supersession và finding còn ảnh hưởng plan; không copy scope/acceptance hoặc log mọi phản biện/PASS.
 - Coordinator alone sửa overview/index/lifecycle/review state; scope/acceptance chỉ sửa tại TASK canonical.
 - Runbook/rollback/product docs/diagram user yêu cầu giữ tại owner phù hợp và link; nghiên cứu chỉ persist khi được yêu cầu trong `.agent/artifacts`, không tạo mới trong reports/artifacts.
 

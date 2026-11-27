@@ -45,7 +45,7 @@ Exactly one `json task-contract` fence per TASK and one `json task-lifecycle` fe
 The documented `manifest --contract <TASK> --output <manifest>` CLI requires user generation permission; no hand-editing generated manifests.
 
 - Chỉ tách worker khi độc lập về vùng đọc/ghi và không dùng chung core service lớn, transaction, lifecycle hoặc contract đang biến động; chỉ cho phép dùng chung interface chỉ đọc đã chốt, giữ `allowed_paths` tách biệt.
-- Backend/frontend contract work is sequenced unless ownership is truly disjoint.
+- Backend and frontend run in parallel once Main has frozen the FE-facing shape inside the FE TASK (`.agent/workflows/plan.md` section **Chia việc theo mốc mở khóa**); sequence them only when that shape is still open.
 - No worker may merge, deploy, or execute destructive production actions.
 - Require human approval for breaking, destructive, or product-decision changes.
 

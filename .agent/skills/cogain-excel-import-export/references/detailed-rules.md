@@ -49,7 +49,7 @@ Tài liệu này lưu chi tiết thiết kế schema header/sheet, gom tra cứu
 
 ## 4. Chi Tiết An Toàn Khi Cập Nhật Qua Import (`Upsert Safety`)
 
-1. **Khóa bản ghi đã chốt / phát hành (`ApprovedDate != null`)**: Mọi luồng có trạng thái chốt như `ProductionOrderService.ImportFromExcel` phải chặn ghi đè bản ghi có `ApprovedDate != null`, báo lỗi rõ theo từng dòng trước khi biến đổi graph và tái kiểm bên trong transaction (kể cả khi transient retry `attempt > 0`).
+1. **Khóa bản ghi đã chốt / phát hành (`ApprovedDate != null`)**: Mọi luồng có trạng thái chốt như `ProductionOrderService.ImportFromExcel` phải chặn ghi đè bản ghi có `ApprovedDate != null`, báo lỗi rõ theo từng dòng trước khi biến đổi graph; bên trong transaction (kể cả transient retry `attempt > 0`) giành khóa hàng bằng `ExecuteUpdateAsync` no-op có điều kiện (`ProductionOrderService.ClaimUnapprovedOrdersAsync`), không tái kiểm bằng truy vấn `AsNoTracking`.
 2. **Bảo toàn khóa liên kết tạm cha - con**: Giữ nguyên ID tạm sinh ở bước parse (`Id = dto.Id ?? Guid.NewGuid()`), cấm gọi `Guid.NewGuid()` đè làm đứt liên kết dòng con. Với cập nhật chi tiết theo khóa tự nhiên trên `ProductionOrder`, lập chỉ mục độ phức tạp tuyến tính trước khi remap để tránh quét lồng nhau.
 3. **Tra cứu theo `Code` an toàn xóa mềm & không ném ngoại lệ dữ liệu**:
    - Luôn bảo đảm lọc `DeletedDate == null` và dùng `GroupBy(...).ToDictionary(g => g.Key, g => g.First())` sau bước kiểm tra trùng mã (`ExcelImportHelpers.CheckDuplicateCode`).
@@ -61,13 +61,17 @@ Tài liệu này lưu chi tiết thiết kế schema header/sheet, gom tra cứu
 
 1. **`ExcelWorkbookStreamReader` (`Infrastructure/Services/Import/ExcelWorkbookStreamReader.cs`)**:
    - Đọc trực tiếp OpenXML forward-only (`OpenXmlReader` theo state `ReadFirstChild`/`ReadNextSibling`), nạp `SharedStringTable` và `Stylesheet` (gồm cả elapsed time `[h]:mm`) một lượt duy nhất, bỏ qua mọi sheet `Data_*` và VML comments, áp trần `MaxDataRows = 100_000`.
+   - Đọc cờ `WorkbookProperties.Date1904` một lần trong constructor và truyền xuống mọi chỗ đổi serial ngày qua `ExcelParsingHelpers.FromExcelSerial`; constructor tự `Dispose` document khi lỗi sau `Open`.
    - Hỗ trợ `ReadSheet<T>` / `TryReadSheet<T>` và `ReadRawSheet` / `TryReadRawSheet` (`ExcelRawRow` đọc nhanh theo chỉ số cột 1-based) trên cùng một stream bufferable (`MemoryStream` khi `!stream.CanSeek`).
+   - Chỉ dùng cho import lớn có số đo; import thông thường dùng `ExcelSheetReader`.
 2. **`WorkItemImportExecution` (`Infrastructure/Services/Import/WorkItemImportExecution.cs`)**:
-   - Điều phối vòng đời chung: thu thập và áp `AggregateSnapshotService` ngoài transaction dưới `AutoDetectChanges = false` (`SnapshotRoots` gồm cả Update đã sync và Create dựng sẵn) -> chạy `BeforeTransactionAsync` -> mở `ExecuteCompensatedTransactionAsync` với `attempt` tracking -> `ExecuteInTransactionBeforeCreateAsync` -> `SaveTrackedChangesAsync` -> `BulkCreateWithWorkItemsBatchAsync` (mặc định `ChunkSize = 1000`, `MaxBatchSize(1000)` trên `DbContext`) -> `AfterCommitAsync` hậu commit (ví dụ `AutoReturnIfReachedEndStepBatchAsync`).
+   - `RunAsync` được gọi khi `AutoDetectChanges` đang bật; tự tắt cờ trong lúc thu thập `SnapshotRoots`, gọi `OnSnapshotsCollected` nếu có rồi chạy `BeforeTransactionAsync` ngoài transaction.
+   - `ProductionOrderService.Import.cs` áp context vào graph dựng sẵn trong `OnSnapshotsCollected`; khi retry, tải lại dữ liệu, đồng bộ lại và áp cùng context lên graph vừa tải. `OvertimeRequestService.Import.cs` thu thập từ graph tạm rồi áp lên graph EF cần ghi.
+   - Trong transaction bù trừ, `ExecuteInTransactionBeforeCreateAsync` nhận số lần thử và context; callback tự lưu cập nhật bằng đường ghi đã chọn. Sau đó `RunAsync` gọi `BulkCreateWithWorkItemsBatchAsync` qua `PersistCreateChunkAsync` (mặc định `ChunkSize = 1000`), rồi gọi `AfterCommitAsync` chỉ khi commit thành công.
    - **Cấm truyền dữ liệu giữa các delegate `async` qua `AsyncLocal`**: `BeforeTransactionAsync` chạy trên `async` task con nên thay đổi `.Value` bị hủy sau khi `await` kết thúc; luôn chụp vào biến cục bộ của hàm gọi `RunAsync`.
-   - **`SaveTrackedChangesAsync`**: giữ `SetAutoDetectChanges(false)` bao trọn cả `DetectChanges()` lẫn `await SaveChangesAsync(ct)` và chỉ khôi phục trong `finally` để `AuditingInterceptor` không kích hoạt thêm vòng quét `ChangeTracker`.
+   - **`SaveTrackedChangesAsync`**: chỉ `DetectChanges()` + `SaveChangesAsync(ct)`; caller sở hữu cờ và bọc lời gọi bằng `SetAutoDetectChanges(false)` ... `finally SetAutoDetectChanges(true)` để `AuditingInterceptor` không kích hoạt thêm vòng quét `ChangeTracker`.
+   - Không giữ `Stopwatch`/log thời gian pha trong `RunAsync` hoặc service import; số đo pha chỉ lấy bằng instrumentation tạm khi benchmark rồi gỡ.
 3. **`AggregateSnapshotService` & `QueryAggregate()` SplitQuery**:
    - Khi root ở trạng thái `Detached` hoặc `Added`, `AggregateSnapshotService` chỉ kiểm tra `rootEntry` một lần và bỏ qua `unitOfWork.Entry(node)` ở các node con, đồng thời khử trùng lặp `(Kind, Id)` ngay bằng `HashSet<SnapshotKey>`.
-   - Khi kiểm tra bản ghi tồn tại trong `Import`, truy vấn danh sách `Id` trước bằng `_repository.Query(...).Select(x => x.Id)`; chỉ gọi `QueryAggregate()` khi `matchedIds.Count > 0`.
-4. **`IUnitOfWork.BulkInsertEntitiesAsync` (`UnitOfWorkBase.cs` + `AuditingInterceptor.cs`)**:
-   - Với cây entity sạch (`Npgsql`, không có hook `ISaveChangesHook`, không owned/discriminator/shadow column), tự động sinh SQL multi-row `INSERT ... VALUES ($1,$2,...),...` theo metadata `DbContext.Model` + `RelationalTypeMapping` + thứ tự tầng khóa ngoại `AggregateShapes` (gộp tới `min(1000, 60000 / số_cột)` dòng mỗi lệnh), đóng dấu audit bằng `ApplyAuditForBulkInsertAsync` và tự fallback về `AddRangeAsync` + `SaveChangesAsync` trong môi trường test (SQLite/in-memory).
+   - Truy vấn danh sách `Id` trước bằng `_repository.Query(...).Select(x => x.Id)`; chỉ gọi `QueryAggregate()` trong vùng `AutoDetectChanges` tắt khi `matchedIds.Count > 0` để giữ nguyên `OriginalValues` cho snapshot lịch sử.
+4. **Ghi dữ liệu theo `ADR-0003` & `ADR-0004`**: Tạo mới dùng `AddRangeAsync` + `SaveChangesAsync` trong vùng `AutoDetectChanges` tắt. Cập nhật đồng bộ qua `AggregateSynchronizer.Sync` + `_unitOfWork.MarkAdded(sync.Added)` rồi gọi `WorkItemImportExecution.SaveTrackedChangesAsync`. Không tự dựng SQL ghi khối lớn trong service.

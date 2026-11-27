@@ -159,7 +159,7 @@
           "MultiEdit",
           "NotebookEdit"
         ],
-        "note": "write_paths/deny_write_paths chỉ được áp khi một role cụ thể đang bật. Role mặc định `implementer` chỉ chịu R1/R2/R3 để phiên làm việc thường không bị chặn oan."
+        "note": "write_paths/deny_write_paths chỉ được áp khi một role cụ thể đang bật; role mặc định `implementer` không chịu R4. Đường dẫn tuyệt đối ngoài repo gốc được quy về checkout chứa nó (thư mục có `.git`: git worktree, Treehouse) trước khi so glob R2/R4/R7/R10, nên không khai báo đường dẫn tuyệt đối của worktree vào registry."
       },
       "secret_inline": {
         "id": "R5",
@@ -204,7 +204,7 @@
         "echo_command": true,
         "deny_message": "Permission Denied: build/typecheck ON-DEMAND ONLY, chỉ chạy khi user yêu cầu rõ ràng. CI parity qua verifier/maintainer; test-author chỉ chạy trong phạm vi test được cấp. Worker và main không tự build.",
         "patterns": [
-          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*dotnet\\s+(?:build|publish|msbuild)\\b",
+          "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*dotnet\\s+(?:build|publish|msbuild)\\b(?!-)",
           "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*msbuild\\b",
           "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:bash|sh|zsh)\\s+(?:-[exuo]+\\s+|-c\\s+['\"]?)?|(?:source|\\.)\\s+)?(?:\\./|[\\w./-]*/)?fast-build\\.sh(?:\\s|[;&|)'\"]|$)",
           "(?:^|[;&|(`])\\s*(?:env\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]+\\s+)*(?:(?:bash|sh|zsh)\\s+(?:-[exuo]+\\s+|-c\\s+['\"]?)?|(?:source|\\.)\\s+)?(?:\\./|[\\w./-]*/)?fast-check\\.sh(?:\\s|[;&|)'\"]|$)",
@@ -224,7 +224,7 @@
           "maintainer"
         ],
         "echo_command": true,
-        "deny_message": "Permission Denied: Agent không chạy trực tiếp dotnet ef migrations add/remove, dotnet ef database update hoặc update-db. Chỉ sinh/gỡ migration chưa apply qua ./dev.sh add-migration|remove-migration khi user yêu cầu rõ ràng; không tự áp DB hoặc sửa tay migration/snapshot (backend.md §4.6).",
+        "deny_message": "Permission Denied: Agent không chạy trực tiếp dotnet ef migrations add/remove, dotnet ef database update hoặc update-db. Sinh/gỡ migration chưa apply chỉ qua ./dev.sh add-migration|remove-migration: Main được chạy add-migration một lần mỗi service khi task có đổi schema (backend.md §4.6), ngoài ra cần user yêu cầu rõ ràng; không tự áp DB hoặc sửa tay migration/snapshot.",
         "patterns": [
           "\\bdotnet\\s+ef\\s+migrations\\s+(add|remove)\\b",
           "\\bdotnet\\s+ef\\s+database\\s+update\\b",
@@ -243,7 +243,7 @@
         "allowed_roles": [
           "maintainer"
         ],
-        "deny_message": "Permission Denied: CẤM TUYỆT ĐỐI Agent tự viết tay hoặc chỉnh sửa file migration/snapshot EF Core. Phải sửa Entity/Fluent API Configuration rồi sinh migration qua ./dev.sh add-migration <Service> <MigrationName> khi user yêu cầu rõ ràng (backend.md §4.6)."
+        "deny_message": "Permission Denied: CẤM TUYỆT ĐỐI Agent tự viết tay hoặc chỉnh sửa file migration/snapshot EF Core. Phải sửa Entity/Fluent API Configuration rồi sinh migration qua ./dev.sh add-migration <Service> <MigrationName> (Main chạy khi task có đổi schema, backend.md §4.6)."
       },
       "code_conventions": {
         "id": "R10",
@@ -436,14 +436,11 @@
       "profile": ".agent/agents/backend-specialist.md",
       "kind": "worker",
       "write_paths": [
-        "backend/**",
-        "home/nguyentd/.treehouse/cogain-excel-delivery/.treehouse/cogain-core-3386eb/1/cogain-core/backend/**"
+        "backend/**"
       ],
       "deny_write_paths": [
         "backend/tests/**",
-        "backend/src/**/Migrations/**",
-        "home/nguyentd/.treehouse/cogain-excel-delivery/.treehouse/cogain-core-3386eb/1/cogain-core/backend/tests/**",
-        "home/nguyentd/.treehouse/cogain-excel-delivery/.treehouse/cogain-core-3386eb/1/cogain-core/backend/src/**/Migrations/**"
+        "backend/src/**/Migrations/**"
       ],
       "tools": [
         "Read",
